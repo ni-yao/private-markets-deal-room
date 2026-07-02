@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Deal Room — Target‑State Product Design &amp; Azure Architecture</title>
+<style>
+  :root{
+    --navy:#16335b; --navy2:#1f3a5f; --navy3:#24487a;
+    --ink:#1b2733; --muted:#5b6b7d; --line:#e3e8ef; --bg:#f4f6fa; --card:#ffffff;
+    --data:#1f78b4; --ai:#6b2fa0; --flow:#4a7c2f; --collab:#c8541a;
+    --red:#b3122b; --green:#3c7a1e; --accent:#2f6fb3;
+    --shadow:0 2px 10px rgba(20,40,80,.08); --shadow2:0 6px 24px rgba(20,40,80,.12);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);line-height:1.55;font-size:15.5px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+
+  /* Hero */
+  header.hero{background:linear-gradient(135deg,var(--navy) 0%,#0e2444 55%,#101f3a 100%);
+    color:#fff;padding:56px 0 46px;position:relative;overflow:hidden}
+  header.hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;
+    background:linear-gradient(180deg,var(--data),var(--ai),var(--flow),var(--collab))}
+  .eyebrow{letter-spacing:.18em;font-size:12px;font-weight:700;color:#9fc3e8;text-transform:uppercase;margin-bottom:14px}
+  header.hero h1{font-size:40px;line-height:1.12;margin:0 0 14px;font-weight:800;letter-spacing:-.5px}
+  header.hero .sub{font-size:18px;color:#cdd9e8;max-width:820px}
+  .hero-meta{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px}
+  .chip{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.22);
+    border-radius:999px;padding:6px 14px;font-size:13px;color:#eaf1f9}
+  .hero-foot{margin-top:26px;font-size:13px;color:#9fb3cc;border-top:1px solid rgba(255,255,255,.16);padding-top:14px}
+
+  /* Nav */
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
+  nav.toc .wrap{display:flex;gap:6px;flex-wrap:wrap;padding:10px 22px}
+  nav.toc a{font-size:13px;font-weight:600;color:var(--navy2);padding:6px 11px;border-radius:8px}
+  nav.toc a:hover{background:var(--bg);text-decoration:none}
+
+  section{padding:42px 0;border-bottom:1px solid var(--line)}
+  section:last-of-type{border-bottom:none}
+  h2{font-size:27px;font-weight:800;color:var(--navy);margin:0 0 6px;letter-spacing:-.3px}
+  h2 .num{color:var(--accent);font-weight:800;margin-right:10px}
+  .lead{color:var(--muted);font-size:16px;margin:0 0 24px;max-width:880px}
+  h3{font-size:18px;color:var(--navy2);margin:26px 0 12px;font-weight:700}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:6px 0 8px}
+  .kpi{background:var(--navy2);color:#fff;border-radius:var(--radius);padding:24px;text-align:center;box-shadow:var(--shadow2);position:relative;overflow:hidden}
+  .kpi:after{content:"";position:absolute;left:0;right:0;top:0;height:5px;
+    background:linear-gradient(90deg,var(--data),var(--ai),var(--collab))}
+  .kpi .big{font-size:38px;font-weight:800;line-height:1}
+  .kpi .lbl{color:#c4d3e6;font-size:14px;margin-top:8px}
+  .footnote{color:var(--muted);font-size:13px;font-style:italic;margin-top:14px}
+
+  /* Generic cards grid */
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g5{grid-template-columns:repeat(5,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 16px;box-shadow:var(--shadow)}
+  .card.top{border-top:4px solid var(--accent)}
+  .card h4{margin:0 0 4px;font-size:16px;color:var(--navy)}
+  .card .role{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+  .card p{margin:0;font-size:14px;color:#33414f}
+  .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;
+    padding:3px 9px;border-radius:999px;margin-top:10px;background:#eef3fb;color:var(--accent)}
+
+  /* Current vs target */
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .panel{border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);background:#fff;border:1px solid var(--line)}
+  .panel.cur{border-top:5px solid var(--red)}
+  .panel.tgt{border-top:5px solid var(--green)}
+  .panel h4{margin:0 0 12px;font-size:16px}
+  .panel.cur h4{color:var(--red)}
+  .panel.tgt h4{color:var(--green)}
+  .pain{list-style:none;padding:0;margin:0}
+  .pain li{position:relative;padding:7px 0 7px 24px;font-size:14px;border-bottom:1px dashed var(--line)}
+  .pain li:last-child{border-bottom:none}
+  .pain.cur li:before{content:"▪";color:var(--red);position:absolute;left:4px;top:7px}
+  .pain.tgt li:before{content:"✓";color:var(--green);position:absolute;left:2px;top:7px;font-weight:800}
+  .rootcause{margin-top:18px;background:var(--navy);color:#fff;border-radius:var(--radius);padding:16px 20px}
+  .rootcause b{color:#ffd479}
+
+  /* Pipeline flow */
+  .flow{display:flex;gap:8px;flex-wrap:wrap;align-items:stretch;margin:8px 0 4px}
+  .stagebox{flex:1;min-width:150px;background:var(--navy2);color:#fff;border-radius:10px;padding:12px 14px;position:relative}
+  .stagebox.close{background:var(--flow)}
+  .stagebox .st{font-weight:700;font-size:15px}
+  .stagebox .ag{font-size:12px;color:#cfe0f2;margin-top:6px;border-top:1px solid rgba(255,255,255,.25);padding-top:6px}
+  .stagebox.close .ag{color:#e7f3dc;border-color:rgba(255,255,255,.35)}
+  .arrow{align-self:center;color:var(--muted);font-weight:800;font-size:18px}
+
+  /* Layer stack */
+  .stack{display:flex;flex-direction:column;gap:12px}
+  .layer{display:grid;grid-template-columns:230px 1fr;gap:0;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--line)}
+  .layer .lh{padding:18px;color:#fff;font-weight:800;font-size:18px;display:flex;flex-direction:column;justify-content:center}
+  .layer .lh small{font-weight:600;font-size:12.5px;opacity:.9;margin-top:4px}
+  .layer .lb{padding:16px 18px;background:#fff}
+  .layer .lb .plat{font-weight:700;color:var(--navy);font-size:14.5px}
+  .layer .lb .desc{color:var(--muted);font-size:13.5px;margin-top:4px}
+  .L-data .lh{background:var(--data)} .L-ai .lh{background:var(--ai)}
+  .L-flow .lh{background:var(--flow)} .L-collab .lh{background:var(--collab)}
+  .L-data{border-left:5px solid var(--data)} .L-ai{border-left:5px solid var(--ai)}
+  .L-flow{border-left:5px solid var(--flow)} .L-collab{border-left:5px solid var(--collab)}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto;border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line)}
+  table{border-collapse:collapse;width:100%;background:#fff;font-size:13.6px}
+  thead th{background:var(--navy);color:#fff;text-align:left;padding:11px 13px;font-weight:700;font-size:13px;white-space:nowrap}
+  tbody td{padding:10px 13px;border-top:1px solid var(--line);vertical-align:top}
+  tbody tr:nth-child(even){background:#fafbfd}
+  code,.mono{font-family:"Cascadia Code",Consolas,Menlo,monospace;font-size:12.6px;
+    background:#eef2f7;color:#16335b;padding:1px 6px;border-radius:5px}
+  .layer-pill{display:inline-block;font-size:11px;font-weight:700;color:#fff;padding:2px 8px;border-radius:6px}
+  .p-data{background:var(--data)} .p-ai{background:var(--ai)} .p-flow{background:var(--flow)}
+  .p-collab{background:var(--collab)} .p-plat{background:#445}
+
+  /* Roadmap */
+  .road{display:grid;gap:14px}
+  .phase{display:grid;grid-template-columns:170px 1fr;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  .phase .ph{background:linear-gradient(135deg,var(--navy),var(--navy3));color:#fff;padding:16px 18px;font-weight:700}
+  .phase .ph small{display:block;font-weight:600;opacity:.85;font-size:12px;margin-top:4px}
+  .phase .pc{background:#fff;padding:14px 18px;font-size:14px}
+  .phase .pc .res{color:var(--muted);font-size:12.8px;margin-top:8px}
+
+  /* Demo spine */
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .demo .d{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+  .demo .d.s1{border-top:5px solid var(--data)} .demo .d.s2{border-top:5px solid var(--ai)}
+  .demo .d .proves{margin-top:14px;font-weight:700;font-size:13.5px}
+  .demo .d.s1 .proves{color:var(--data)} .demo .d.s2 .proves{color:var(--ai)}
+  .win{counter-reset:w;margin:18px 0 0;padding:0;list-style:none}
+  .win li{position:relative;padding:10px 0 10px 42px;border-bottom:1px solid var(--line);font-size:14.5px}
+  .win li:last-child{border-bottom:none}
+  .win li:before{counter-increment:w;content:counter(w);position:absolute;left:0;top:9px;
+    width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;
+    text-align:center;line-height:26px;font-weight:800;font-size:13px}
+
+  .callout{background:#eef5ec;border-left:5px solid var(--green);border-radius:10px;padding:14px 18px;font-size:14px;margin-top:16px}
+  .callout.blue{background:#eaf2fb;border-color:var(--accent)}
+  .note{background:#fff8e9;border-left:5px solid #e0a93b;border-radius:10px;padding:12px 16px;font-size:13.5px;color:#6a531c}
+
+  footer{background:var(--navy);color:#cdd9e8;padding:26px 0;font-size:13px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+
+  @media(max-width:920px){
+    .kpis,.g3,.g5,.vs,.demo{grid-template-columns:1fr}
+    .g2{grid-template-columns:1fr}
+    .layer,.phase{grid-template-columns:1fr}
+    header.hero h1{font-size:30px}
+    nav.toc{display:none}
+  }
+  @media print{
+    nav.toc{display:none}
+    body{background:#fff;font-size:11.5px}
+    section{padding:16px 0;page-break-inside:avoid}
+    .kpi,.card,.panel,.layer,.phase,.demo .d{box-shadow:none}
+    header.hero{padding:24px 0}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Microsoft · Financial Services · Private Equity Deal Room</div>
+    <h1>The Deal Room — Target‑State Product Design<br/>&amp; Azure Cloud Architecture</h1>
+    <div class="sub">From fragmented workflows to an AI‑native deal flow: one governed deal record, governed Foundry agents at every stage, built on four Microsoft layers.</div>
+    <div class="hero-meta">
+      <span class="chip">Azure AI Foundry</span>
+      <span class="chip">Microsoft Fabric / OneLake</span>
+      <span class="chip">Azure OpenAI · Document Intelligence</span>
+      <span class="chip">Dynamics 365 · Power Platform</span>
+      <span class="chip">Microsoft 365 · Teams · Purview</span>
+      <span class="chip">Region: Sweden Central (swc)</span>
+    </div>
+    <div class="hero-foot">Stages in scope: Deal Origination &amp; Screening · Due Diligence &amp; Approval (with Close → Monitor extension) &nbsp;|&nbsp; Draft v1.0</div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#summary">Summary</a>
+    <a href="#state">Current → Target</a>
+    <a href="#personas">Personas</a>
+    <a href="#design">Product Design</a>
+    <a href="#arch">Architecture</a>
+    <a href="#azure">Azure Resources</a>
+    <a href="#models">Foundry Models</a>
+    <a href="#security">Security</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#demo">Demo Spine</a>
+    <a href="#kpi">KPIs</a>
+    <a href="#risks">Risks</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- 1 SUMMARY -->
+  <section id="summary">
+    <h2><span class="num">01</span>Executive summary</h2>
+    <p class="lead">Private‑markets deal teams run on disconnected point tools — data re‑keyed across PitchBook, Preqin, Excel and CRM; subjective prioritization; siloed CIM review; hand‑stitched IC memos; after‑the‑fact compliance. Specialist MDs are pulled in late and sequentially, so risk surfaces <em>after</em> time and money are committed. <strong>The Deal Room</strong> replaces this with one governed deal record and governed AI agents across the flow — every figure grounded and cited to source.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="big">70%</div><div class="lbl">faster screening &amp; sourcing</div></div>
+      <div class="kpi"><div class="big">weeks→days</div><div class="lbl">diligence cycle</div></div>
+      <div class="kpi"><div class="big">40%</div><div class="lbl">lower end‑to‑end cycle time</div></div>
+    </div>
+    <div class="footnote">Program target outcomes from the Deal Room concept &amp; prototype proposal — not a forecast for a specific fund.</div>
+
+    <h3>One governed record on four Microsoft layers</h3>
+    <div class="stack">
+      <div class="layer L-data"><div class="lh">Data<small>One governed deal estate</small></div>
+        <div class="lb"><div class="plat">Microsoft Fabric / OneLake</div><div class="desc">Unifies Preqin · PitchBook · Morningstar · eFront · FactSet · CapIQ with internal deal history &amp; D365 CRM.</div></div></div>
+      <div class="layer L-ai"><div class="lh">AI &amp; Intelligence<small>Governed agents</small></div>
+        <div class="lb"><div class="plat">Azure AI Foundry · Azure OpenAI · Document Intelligence · M365 Copilot</div><div class="desc">Agents score targets, parse documents and draft memos — every figure grounded and cited to source.</div></div></div>
+      <div class="layer L-flow"><div class="lh">Workflow &amp; Process<small>Process backbone</small></div>
+        <div class="lb"><div class="plat">Dynamics 365 · Power Platform / Power Automate</div><div class="desc">Pipeline, routed approvals, task assignment, compliance checkpoints, full audit trail.</div></div></div>
+      <div class="layer L-collab"><div class="lh">Collaboration<small>Where the team works</small></div>
+        <div class="lb"><div class="plat">Microsoft 365 · Teams · SharePoint · Copilot · Purview</div><div class="desc">Deal channels, the SharePoint data room, Copilot capturing decisions into the record.</div></div></div>
+    </div>
+    <div class="callout"><strong>What changes:</strong> continuous AI sourcing · sector / AI / supply‑chain MDs pulled forward (<em>shift‑left</em>) · connected diligence lanes · the IC memo drafts itself from the live record.</div>
+    <div class="note" style="margin-top:14px"><strong>Scope note:</strong> this is a product design &amp; cloud resource plan, not a deployed system. Resource names, SKUs and quantities are recommended starting points to confirm against tenant standards, quotas and security review.</div>
+  </section>
+
+  <!-- 2 STATE -->
+  <section id="state">
+    <h2><span class="num">02</span>From current state to target state</h2>
+    <p class="lead">Today the deal breaks down at every stage. The target state connects origination → screening → diligence → IC in one intelligent workflow.</p>
+    <div class="vs">
+      <div class="panel cur">
+        <h4>Current state — breaks down at every stage</h4>
+        <strong style="font-size:13px;color:var(--navy2)">Stage 1 · Origination &amp; Screening</strong>
+        <ul class="pain cur">
+          <li>Sourcing is network‑bound &amp; manual — weeks from signal to conviction</li>
+          <li>Data re‑keyed across PitchBook / Preqin / Excel / CRM — no single source of truth</li>
+          <li>No AI scoring — prioritization is subjective &amp; inconsistent</li>
+          <li>AI &amp; Supply‑Chain MDs engaged late — risk found after time is sunk</li>
+        </ul>
+        <strong style="font-size:13px;color:var(--navy2)">Stage 2 · Diligence &amp; Approval</strong>
+        <ul class="pain cur">
+          <li>CIMs, financials &amp; legal reviewed in silos; manual PDF extraction — weeks of effort</li>
+          <li>Four workstreams disconnected — cross‑domain risk slips through</li>
+          <li>IC memo stitched by hand — inconsistent numbers, version chaos</li>
+          <li>No shared audit trail; after‑the‑fact SFDR / ILPA compliance</li>
+        </ul>
+      </div>
+      <div class="panel tgt">
+        <h4>Target state — one governed record, agents across the flow</h4>
+        <ul class="pain tgt">
+          <li>Continuous AI sourcing — a ranked, persona‑tagged feed surfaced in Teams/Copilot</li>
+          <li>One governed deal estate in Fabric — no re‑keying, one source of truth</li>
+          <li>AI scoring + strategic‑fit ranking at triage</li>
+          <li>Sector / AI / Supply‑chain MDs shift‑left — captured at triage, not later</li>
+          <li>Document Intelligence parses CIMs in minutes → Fabric → LBO model</li>
+          <li>Connected diligence lanes write to one shared record — cross‑risk surfaces</li>
+          <li>IC memo drafts itself from the live record — consistent, cited numbers</li>
+          <li>SFDR / ILPA checks &amp; full audit trail in‑flow (Purview)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="rootcause"><b>Root cause:</b> No unified, AI‑driven deal flow connects origination → screening → diligence → IC in one intelligent workflow. <em>The shared record is the unlock</em> — a number the Supply‑Chain MD validates is instantly visible in the AI MD's plan.</div>
+
+    <h3>Agents across the flow</h3>
+    <div class="flow">
+      <div class="stagebox"><div class="st">Origination</div><div class="ag">Deal‑Sourcing Signal Agent</div></div>
+      <div class="arrow">›</div>
+      <div class="stagebox"><div class="st">Screening</div><div class="ag">Target‑Screening Agent</div></div>
+      <div class="arrow">›</div>
+      <div class="stagebox"><div class="st">Diligence</div><div class="ag">Document‑Intelligence + Commercial / AI / Ops DD</div></div>
+      <div class="arrow">›</div>
+      <div class="stagebox"><div class="st">IC Approval</div><div class="ag">IC‑Memo + Compliance Agent</div></div>
+      <div class="arrow">›</div>
+      <div class="stagebox close"><div class="st">Close → Monitor</div><div class="ag">Covenant‑Monitoring Agent</div></div>
+    </div>
+  </section>
+
+  <!-- 3 PERSONAS -->
+  <section id="personas">
+    <h2><span class="num">03</span>Personas &amp; stages in scope</h2>
+    <p class="lead">Five personas move two connected stages — from origination and screening (O1–O4) through diligence and approval (D1–D4). Specialist MDs are <em>shift‑left</em>: engaged at triage and diligence launch, not at the end.</p>
+    <div class="grid g5">
+      <div class="card top" style="border-top-color:var(--data)"><h4>Analyst</h4><div class="role">Deal Associate</div><p>Sources &amp; screens targets, finds precedents, builds models &amp; materials in the shared record.</p><span class="tag">O1–O3 · D1–D3</span></div>
+      <div class="card top" style="border-top-color:var(--collab)"><h4>Retail Sector MD</h4><div class="role">Consumer &amp; Retail</div><p>Owns the commercial lane — market, competitor, customer diligence into the IC decision.</p><span class="tag">O3 · D2 · D4</span></div>
+      <div class="card top" style="border-top-color:var(--ai)"><h4>AI MD</h4><div class="role">AI &amp; Digital Value</div><p>Owns the tech / AI lane — scores AI‑readiness and shapes the value‑creation plan, early.</p><span class="tag">O3 · D2–D4</span></div>
+      <div class="card top" style="border-top-color:var(--flow)"><h4>Supply Chain MD</h4><div class="role">Operations</div><p>Owns the operations lane — supplier mapping, COGS, tariff &amp; concentration risk, up front.</p><span class="tag">O3 · D2–D4</span></div>
+      <div class="card top" style="border-top-color:var(--navy3)"><h4>Partner / MD</h4><div class="role">Deal Sponsor</div><p>Sources &amp; sponsors the deal, sets gate priorities, chairs the IC approval.</p><span class="tag">O1 · O4 · D4</span></div>
+    </div>
+  </section>
+
+  <!-- 4 DESIGN -->
+  <section id="design">
+    <h2><span class="num">04</span>Product design</h2>
+    <p class="lead">Seven capability modules mapped to the deal lifecycle, powered by a roster of governed Foundry agents, all writing to one governed deal record.</p>
+
+    <h3>Design principles</h3>
+    <div class="grid g3">
+      <div class="card"><h4>① One governed record</h4><p>A single source of truth from signal to monitoring — no re‑keying.</p></div>
+      <div class="card"><h4>② Grounded &amp; cited</h4><p>Every agent figure traces to a source document or dataset (RAG + citations).</p></div>
+      <div class="card"><h4>③ Agents draft, humans decide</h4><p>Agents scan, parse and draft; MDs review and approve at gates.</p></div>
+      <div class="card"><h4>④ Shift‑left expertise</h4><p>Sector / AI / ops views captured at triage, not after the fact.</p></div>
+      <div class="card"><h4>⑤ Compliance in‑flow</h4><p>SFDR / ILPA checks &amp; audit trail embedded in the workflow (Purview).</p></div>
+      <div class="card"><h4>⑥ Work where teams work</h4><p>Teams, Excel, Word, SharePoint, Copilot — no new island UI.</p></div>
+    </div>
+
+    <h3>The governed deal record (core concept)</h3>
+    <div class="callout blue">A logical entity that physically spans <strong>Dynamics 365 / Dataverse</strong> (pipeline, decisions, approvals), <strong>Microsoft Fabric / OneLake</strong> (analytical deal estate), the <strong>SharePoint data room</strong> (documents + sensitivity labels), and <strong>Microsoft Purview</strong> (lineage &amp; audit). Agents read/write through governed tools so the same validated number appears consistently to every persona and in every artifact.</div>
+
+    <h3>Capability modules</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Module</th><th>Stage</th><th>What it does</th><th>Primary agent(s)</th></tr></thead>
+        <tbody>
+          <tr><td>M1</td><td><strong>Continuous Deal Sourcing</strong></td><td>O1</td><td>Scans data &amp; signals weekly; ranks &amp; persona‑tags a feed in Teams/Copilot; 1‑click promote to D365; drafts CxO outreach</td><td>Deal‑Sourcing Signal Agent (+ AI‑readiness &amp; supply‑chain risk taggers)</td></tr>
+          <tr><td>M2</td><td><strong>AI Screening &amp; Triage</strong></td><td>O2 · O3</td><td>Auto‑drafts a cited screening one‑pager from Fabric; generates comps; scores strategic fit; captures sector/AI/ops views</td><td>Target‑Screening · Pipeline‑Prioritization</td></tr>
+          <tr><td>M3</td><td><strong>Screening Gate &amp; Handoff</strong></td><td>O4</td><td>On "pursue": NDA, CIM request, provisions Teams + SharePoint data room, assigns MD lanes; writes decision to D365</td><td>Gate‑Orchestration (Power Automate)</td></tr>
+          <tr><td>M4</td><td><strong>Orchestrated Diligence</strong></td><td>D1 · D2</td><td>DD checklist from playbook; parses CIM/financials → Fabric → LBO model; parallel Commercial / Tech‑AI / Ops lanes</td><td>Diligence‑Planner · Document‑Intelligence · Commercial/Tech‑AI/Ops‑DD</td></tr>
+          <tr><td>M5</td><td><strong>Synthesis &amp; IC Memo</strong></td><td>D3</td><td>Drafts a cited IC memo from the live record; embeds SFDR/ILPA checks as it assembles (Purview trail)</td><td>IC‑Memo · Compliance</td></tr>
+          <tr><td>M6</td><td><strong>IC Approval &amp; Execution</strong></td><td>D4</td><td>Builds the IC deck with source‑traceable Q&amp;A; routes approval; writes decision + conditions to D365; triggers next steps</td><td>Approval‑Orchestration</td></tr>
+          <tr><td>M7</td><td><strong>Close → Monitor</strong></td><td>Post‑close</td><td>Archives with a full audit trail; monitors covenants/KPIs and flags breaches</td><td>Covenant‑Monitoring</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Agent roster</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Agent</th><th>Responsibility</th><th>Grounding / tools</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Deal‑Sourcing Signal</strong></td><td>Continuous scan of CxO conversations, news, filings, analyst reports vs. mandates; ranks; tags AI‑readiness &amp; supply‑chain risk</td><td>Fabric data agent, AI Search, web grounding, Document Intelligence, D365</td></tr>
+          <tr><td><strong>Target‑Screening</strong></td><td>Drafts cited sector/tech/supply‑chain screen one‑pager; Copilot drafting in Excel/PPT</td><td>Fabric, AI Search, Azure OpenAI, M365 Copilot</td></tr>
+          <tr><td><strong>Pipeline‑Prioritization</strong></td><td>Score × strategic‑fit ranking; records notes/context to CRM</td><td>Fabric, Dataverse, Azure OpenAI</td></tr>
+          <tr><td><strong>Gate‑Orchestration</strong></td><td>On "pursue" — NDA, CIM request, workspace + data‑room provisioning, lane assignment</td><td>Power Automate, Graph, SharePoint, Teams</td></tr>
+          <tr><td><strong>Diligence‑Planner</strong></td><td>Builds DD checklist from playbook + comparable deals</td><td>AI Search (playbooks), Fabric, Azure OpenAI</td></tr>
+          <tr><td><strong>Document‑Intelligence</strong></td><td>Parses CIM / financials / legal in minutes → Fabric → LBO model; flags anomalies</td><td>Azure AI Document Intelligence, Fabric, Azure OpenAI</td></tr>
+          <tr><td><strong>Commercial‑DD</strong></td><td>Synthesizes market / comp / customer signals; cited section</td><td>Fabric, AI Search, Azure OpenAI</td></tr>
+          <tr><td><strong>Tech/AI‑DD</strong></td><td>Scores AI maturity; drafts value‑creation plan with quantified levers</td><td>Fabric, AI Search, Azure OpenAI</td></tr>
+          <tr><td><strong>Ops‑DD</strong></td><td>Builds supplier map + COGS bridge; flags tariff/concentration risk</td><td>Fabric, AI Search, Azure OpenAI</td></tr>
+          <tr><td><strong>IC‑Memo</strong></td><td>Drafts the IC memo from the live record — consistent, cited numbers</td><td>Fabric, AI Search, Azure OpenAI, M365 Copilot</td></tr>
+          <tr><td><strong>Compliance</strong></td><td>Embeds SFDR / ILPA checks as the memo assembles; writes Purview audit trail</td><td>Purview, AI Search (policy DB), Azure OpenAI</td></tr>
+          <tr><td><strong>Approval‑Orchestration</strong></td><td>Captures IC decision; routes approval; writes conditions to D365; triggers next steps</td><td>Power Automate, Dataverse, Graph</td></tr>
+          <tr><td><strong>Covenant‑Monitoring</strong></td><td>Post‑close covenant/KPI monitoring; breach alerts</td><td>Fabric, Azure OpenAI, Power Automate, Teams</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout"><strong>Orchestration:</strong> a top‑level <strong>Deal Orchestrator</strong> (Foundry connected‑agents) routes work to specialists that run <em>in parallel</em> during diligence and write back to the shared record. Human‑in‑the‑loop approval gates sit at O4 and D4.</div>
+  </section>
+
+  <!-- 5 ARCHITECTURE -->
+  <section id="arch">
+    <h2><span class="num">05</span>Solution architecture</h2>
+    <p class="lead">A layered reference architecture: personas collaborate in M365; workflow runs on D365 + Power Automate; intelligence is governed Foundry agents; data is unified in Fabric/OneLake — all wrapped in Entra identity, Purview governance and private networking.</p>
+
+    <div class="stack">
+      <div class="layer L-collab"><div class="lh">Collaboration<small>personas work here</small></div>
+        <div class="lb"><div class="plat">Teams · SharePoint data room · M365 Copilot</div><div class="desc">In‑thread votes/annotations, IC meetings, Copilot drafting — connected via Microsoft Graph / MCP.</div></div></div>
+      <div class="layer L-flow"><div class="lh">Workflow &amp; Process<small>pipeline · approvals · audit</small></div>
+        <div class="lb"><div class="plat">Dynamics 365 (Dataverse) · Power Automate</div><div class="desc">Opportunity state, routed approvals, task assignment, compliance checkpoints, full audit trail.</div></div></div>
+      <div class="layer L-ai"><div class="lh">AI &amp; Intelligence<small>governed agents</small></div>
+        <div class="lb"><div class="plat">Azure AI Foundry — Agent Service</div><div class="desc">Deal Orchestrator + 13 specialist agents · Azure OpenAI / Foundry models · Azure AI Search (RAG grounding) · Document Intelligence · Content Safety · Speech — governed by the Azure API Management AI Gateway.</div></div></div>
+      <div class="layer L-data"><div class="lh">Data<small>one governed estate</small></div>
+        <div class="lb"><div class="plat">Microsoft Fabric / OneLake (Lakehouse)</div><div class="desc">Preqin · PitchBook · Morningstar · eFront · FactSet · CapIQ · internal history · D365 — via OneLake shortcuts + the Fabric data agent.</div></div></div>
+    </div>
+    <div class="callout blue"><strong>Cross‑cutting:</strong> Microsoft Entra ID (identity, Agent ID, RBAC) · Azure Key Vault (CMK) · Microsoft Purview (governance/audit) · Azure Monitor / App Insights · VNet + Private Endpoints · Microsoft Defender for Cloud · Microsoft Cloud for Financial Services.</div>
+
+    <h3>Data flow (happy path)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Step</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>External market data + internal history land in <strong>OneLake</strong> (Fabric pipelines / shortcuts).</td></tr>
+          <tr><td>2</td><td><strong>Deal‑Sourcing Signal Agent</strong> scores targets → ranked feed in Teams → 1‑click <strong>D365</strong> opportunity.</td></tr>
+          <tr><td>3</td><td>On <strong>pursue (O4)</strong>, <strong>Power Automate</strong> provisions Teams + SharePoint data room and assigns lanes.</td></tr>
+          <tr><td>4</td><td>CIMs uploaded → <strong>Document Intelligence</strong> parses → structured data to <strong>Fabric</strong> → LBO model.</td></tr>
+          <tr><td>5</td><td>Parallel <strong>DD agents</strong> enrich the shared record; <strong>AI Search</strong> grounds every claim with citations.</td></tr>
+          <tr><td>6</td><td><strong>IC‑Memo Agent</strong> drafts the memo; <strong>Compliance Agent</strong> embeds SFDR/ILPA + writes the <strong>Purview</strong> trail.</td></tr>
+          <tr><td>7</td><td><strong>Approval‑Orchestration Agent</strong> captures the IC decision → conditions to <strong>D365</strong> → next steps triggered.</td></tr>
+          <tr><td>8</td><td><strong>Covenant‑Monitoring Agent</strong> watches post‑close KPIs and raises alerts in Teams.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 6 AZURE -->
+  <section id="azure">
+    <h2><span class="num">06</span>Azure cloud resources (bill of materials)</h2>
+    <p class="lead">Naming: <code>{type}-dealroom-{env}-swc</code> (globally‑unique names drop separators, e.g. <code>stdealroomprodswc</code>). All data + AI in <strong>Sweden Central</strong> for EU residency. Dedicated resource groups segregate domains.</p>
+
+    <div class="grid g2" style="margin-bottom:18px">
+      <div class="card"><h4>Resource groups</h4><p>
+        <code>rg-dealroom-ai-prod-swc</code> — Foundry, OpenAI, Doc Intelligence, AI Search, Content Safety, Speech<br/>
+        <code>rg-dealroom-data-prod-swc</code> — Fabric, storage, data integration<br/>
+        <code>rg-dealroom-app-prod-swc</code> — APIM, Container Apps, Functions, Service Bus, Cosmos DB<br/>
+        <code>rg-dealroom-platform-prod-swc</code> — Key Vault, networking, monitoring, identity</p></div>
+      <div class="card"><h4>Conventions</h4><p>Environments: <code>dev</code> · <code>test</code> · <code>prod</code> (repeat RGs per env). Azure Policy locks region to <code>swc</code> and enforces private endpoints + customer‑managed keys. Every resource tagged <code>workload=dealroom</code>, <code>env</code>, <code>costCenter</code>.</p></div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Layer</th><th>Resource</th><th>Recommended name</th><th>SKU / tier</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure AI Foundry hub</td><td><code>aih-dealroom-prod-swc</code></td><td>Standard</td><td>Governance, shared connections, security for AI projects</td></tr>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure AI Foundry project</td><td><code>proj-dealroom-prod-swc</code></td><td>—</td><td>Hosts agents, model deployments, evaluations</td></tr>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure OpenAI / Foundry deployments</td><td><code>oai-dealroom-prod-swc</code></td><td>Standard / PTU</td><td>Hosts the models (see §07)</td></tr>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure AI Document Intelligence</td><td><code>di-dealroom-prod-swc</code></td><td>S0</td><td>Parse CIMs, financials, legal PDFs</td></tr>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure AI Search</td><td><code>srch-dealroom-prod-swc</code></td><td>Standard S1</td><td>Hybrid + semantic RAG index for grounding &amp; citations</td></tr>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure AI Content Safety</td><td><code>cs-dealroom-prod-swc</code></td><td>Standard</td><td>Guardrails / prompt shields for agent I/O</td></tr>
+          <tr><td><span class="layer-pill p-ai">AI</span></td><td>Azure AI Speech</td><td><code>spch-dealroom-prod-swc</code></td><td>S0</td><td>Transcribe CxO calls / meeting audio into the record</td></tr>
+          <tr><td><span class="layer-pill p-data">DATA</span></td><td>Microsoft Fabric capacity</td><td><code>fab-dealroom-prod-swc</code></td><td>F64 (prod) / F8 (dev)</td><td>OneLake, Lakehouse, pipelines, Power BI, Fabric data agent</td></tr>
+          <tr><td><span class="layer-pill p-data">DATA</span></td><td>OneLake Lakehouse</td><td><code>lh_dealroom_prod</code></td><td>in Fabric</td><td>Unified deal estate (bronze/silver/gold)</td></tr>
+          <tr><td><span class="layer-pill p-data">DATA</span></td><td>Fabric Data Warehouse</td><td><code>dw_dealroom_prod</code></td><td>in Fabric</td><td>Curated marts for comps, models, signals</td></tr>
+          <tr><td><span class="layer-pill p-data">DATA</span></td><td>ADLS Gen2</td><td><code>stdealroomdataprodswc</code></td><td>StorageV2, GRS</td><td>Landing/staging + OneLake shortcuts target</td></tr>
+          <tr><td><span class="layer-pill p-flow">FLOW</span></td><td>Dynamics 365 Sales</td><td>D365 tenant</td><td>Enterprise</td><td>CRM pipeline, opportunities, decisions, approvals</td></tr>
+          <tr><td><span class="layer-pill p-flow">FLOW</span></td><td>Microsoft Dataverse</td><td><code>dv-dealroom-prod</code></td><td>with D365</td><td>Workflow system of record for the deal</td></tr>
+          <tr><td><span class="layer-pill p-flow">FLOW</span></td><td>Power Platform environment</td><td><code>env-dealroom-prod</code></td><td>Production</td><td>Hosts Power Automate flows + Copilot Studio</td></tr>
+          <tr><td><span class="layer-pill p-collab">COLLAB</span></td><td>Microsoft 365 + Copilot</td><td>M365 tenant</td><td>E5 + Copilot</td><td>Teams, Word/Excel/PPT Copilot, Graph</td></tr>
+          <tr><td><span class="layer-pill p-collab">COLLAB</span></td><td>SharePoint Online</td><td><code>Deal Room</code> site</td><td>with M365</td><td>Secure data room, document library, sensitivity labels</td></tr>
+          <tr><td><span class="layer-pill p-collab">COLLAB</span></td><td>Microsoft Purview</td><td>tenant</td><td>Compliance / DG</td><td>Audit trail, lineage, SFDR/ILPA evidence, DLP, eDiscovery</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Azure API Management</td><td><code>apim-dealroom-prod-swc</code></td><td>Standard v2 / Premium</td><td><strong>AI Gateway</strong> — token limits, load balancing, semantic caching, MCP, logging</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Azure Container Apps</td><td><code>ca-dealroom-orchestrator-prod-swc</code></td><td>Consumption + Dedicated</td><td>Custom orchestration / MCP servers / agent back‑end APIs</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Azure Functions</td><td><code>func-dealroom-events-prod-swc</code></td><td>Flex Consumption</td><td>Event‑driven glue (webhooks, enrichment, post‑processing)</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Azure Service Bus</td><td><code>sb-dealroom-prod-swc</code></td><td>Standard</td><td>Reliable messaging between agents ↔ workflow</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Azure Cosmos DB</td><td><code>cosmos-dealroom-prod-swc</code></td><td>Serverless / Autoscale</td><td>Agent state, conversation history, deal‑record metadata index</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Microsoft Entra ID</td><td>tenant</td><td>P2</td><td>Identity, Conditional Access, PIM, <strong>Entra Agent ID</strong></td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>User‑assigned managed identity</td><td><code>id-dealroom-prod-swc</code></td><td>—</td><td>Passwordless access from agents/apps to Azure</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Azure Key Vault</td><td><code>kv-dealroom-prod-swc</code></td><td>Standard / Premium</td><td>Secrets, keys, certs; customer‑managed keys</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Virtual Network + Private Endpoints</td><td><code>vnet-dealroom-prod-swc</code></td><td>—</td><td>Private access to OpenAI, Search, Storage, Cosmos, Key Vault</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Log Analytics + App Insights</td><td><code>log/appi-dealroom-prod-swc</code></td><td>Workspace‑based</td><td>App + agent tracing, latency, token telemetry, dashboards</td></tr>
+          <tr><td><span class="layer-pill p-plat">PLAT</span></td><td>Microsoft Defender for Cloud</td><td>subscription</td><td>Defender plans</td><td>CSPM + workload protection (AI, storage, containers)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 7 MODELS -->
+  <section id="models">
+    <h2><span class="num">07</span>Foundry models &amp; AI services</h2>
+    <p class="lead">Right‑size the model to the task: frontier models for reasoning &amp; drafting, mini models for high‑volume scanning, embeddings for retrieval — all governed through the APIM AI Gateway, with Provisioned Throughput on hot paths.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Model (deployment)</th><th>Where used</th><th>Why</th><th>Initial capacity</th></tr></thead>
+        <tbody>
+          <tr><td><strong>GPT‑4.1</strong> (or GPT‑4o)</td><td>Screening one‑pagers, IC memo, IC deck, MD Q&amp;A</td><td>Strong long‑context reasoning + drafting quality</td><td>Standard 50–100K TPM → PTU for prod</td></tr>
+          <tr><td><strong>o‑series reasoning</strong> (o3 / o4‑mini)</td><td>Cross‑domain risk synthesis, anomaly detection, value‑creation levers</td><td>Deeper multi‑step reasoning for complex diligence</td><td>Standard, scale on use</td></tr>
+          <tr><td><strong>GPT‑4.1‑mini / 4o‑mini</strong></td><td>High‑volume sourcing scan (10,000+ targets/week), tagging, classification</td><td>Cost / latency‑efficient at scale</td><td>Standard, high TPM</td></tr>
+          <tr><td><strong>text‑embedding‑3‑large</strong></td><td>Vector index for Azure AI Search (RAG)</td><td>Best retrieval quality for citations</td><td>Standard</td></tr>
+          <tr><td><strong>Document Intelligence</strong> (layout + custom)</td><td>CIM / financials / legal extraction</td><td>Tables, key‑value, structure from PDFs</td><td>S0</td></tr>
+          <tr><td><em>(Optional)</em> <strong>Phi</strong> small models</td><td>Edge / cheap classification, routing</td><td>Cost control for simple tasks</td><td>Managed compute</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid g2" style="margin-top:18px">
+      <div class="card top"><h4>MCP connectors (target segment)</h4><p>Fabric / OneLake data agent · Dynamics 365 / Dataverse · SharePoint / Graph · Document Intelligence · Azure AI Search — surfaced to <strong>M365 Copilot in Excel/Word/Teams</strong>. Aligns with "Copilot in Excel for Frontier Finance" and "trusted data in the flow of work."</p></div>
+      <div class="card top"><h4>Skills / declarative agents</h4><p><code>@deal-screening</code> — screening one‑pager + strategic‑fit score · <code>@comps-analysis</code> — comparable‑company / precedent generation · plus per‑persona DD lane agents (Commercial, Tech/AI, Ops).</p></div>
+    </div>
+  </section>
+
+  <!-- 8 SECURITY -->
+  <section id="security">
+    <h2><span class="num">08</span>Security, compliance &amp; governance (FSI)</h2>
+    <p class="lead">Built for a regulated industry: EU data residency, in‑flow compliance, governed agent identities, private networking and responsible‑AI guardrails.</p>
+    <div class="grid g3">
+      <div class="card"><h4>Data residency</h4><p>All AI + data in Sweden Central; Azure Policy enforces region, private endpoints &amp; CMK.</p></div>
+      <div class="card"><h4>Compliance in‑flow</h4><p>Microsoft Cloud for FS baseline + Purview: lineage, audit trail, sensitivity labels, DLP and SFDR / ILPA evidence generated as the memo assembles — not after the fact.</p></div>
+      <div class="card"><h4>Identity</h4><p>Entra ID + Conditional Access + PIM; Entra Agent ID per agent; least‑privilege RBAC; managed identities (no secrets in code).</p></div>
+      <div class="card"><h4>Network isolation</h4><p>VNet + Private Endpoints for OpenAI, Search, Storage, Cosmos, Key Vault; no public data plane.</p></div>
+      <div class="card"><h4>Responsible AI</h4><p>Content Safety + prompt shields; groundedness + citations on every output; Foundry evaluations; human‑in‑the‑loop at O4/D4.</p></div>
+      <div class="card"><h4>Auditability</h4><p>Immutable audit trail across Dataverse, SharePoint, OneLake — unified in Purview for a fully compliant, auditable pattern.</p></div>
+    </div>
+  </section>
+
+  <!-- 9 ROADMAP -->
+  <section id="roadmap">
+    <h2><span class="num">09</span>Delivery roadmap</h2>
+    <p class="lead">Stand up foundations, prove the demo spine fast, then complete each stage and extend to post‑close monitoring.</p>
+    <div class="road">
+      <div class="phase"><div class="ph">Phase 0<small>Weeks 1–4</small></div><div class="pc"><strong>Foundations</strong> — landing zone, identity, networking, governance.<div class="res">Resource groups · Entra/RBAC · Key Vault · VNet + Private Endpoints · Log Analytics · Azure Policy · Defender</div></div></div>
+      <div class="phase"><div class="ph">Phase 1<small>Weeks 5–10</small></div><div class="pc"><strong>MVP demo spine</strong> — prove the loop: O1–O2 sourcing+screening feed and D2–D3 CIM→memo.<div class="res">Fabric · OneLake · AI Search · Foundry project + GPT‑4.1 &amp; embeddings · Document Intelligence · Deal‑Sourcing + Target‑Screening + Document‑Intelligence + IC‑Memo agents · Teams/Copilot · APIM gateway</div></div></div>
+      <div class="phase"><div class="ph">Phase 2<small>Weeks 11–16</small></div><div class="pc"><strong>Full Stage 1</strong> — triage, scoring, gate handoff.<div class="res">Pipeline‑Prioritization + Gate‑Orchestration agents · Power Automate · D365 opportunity write‑back · SharePoint/Teams provisioning</div></div></div>
+      <div class="phase"><div class="ph">Phase 3<small>Weeks 17–24</small></div><div class="pc"><strong>Full Stage 2</strong> — connected diligence lanes + IC approval + compliance.<div class="res">Diligence‑Planner · Commercial/Tech‑AI/Ops‑DD · Compliance · Approval‑Orchestration agents · Purview SFDR/ILPA · o‑series reasoning model</div></div></div>
+      <div class="phase"><div class="ph">Phase 4<small>Weeks 25+</small></div><div class="pc"><strong>Close → Monitor &amp; scale</strong> — post‑close monitoring, PTU hardening, multi‑deal scale.<div class="res">Covenant‑Monitoring agent · PTU model capacity · Cosmos/Service Bus scale · cost optimization</div></div></div>
+    </div>
+  </section>
+
+  <!-- 10 DEMO -->
+  <section id="demo">
+    <h2><span class="num">10</span>Recommended demo spine</h2>
+    <p class="lead">Two end‑to‑end slices prove the value to the PE pod fast.</p>
+    <div class="demo">
+      <div class="d s1"><h4 style="margin:0 0 6px;color:var(--data)">Stage 1 · O1–O2</h4><p>Sourcing‑Signal + Screening agents on Fabric surface a ranked, persona‑tagged feed in Teams/Copilot, with a one‑click promote to a D365 opportunity.</p><div class="proves">Proves: 70% faster screening · shift‑left for AI &amp; SC MDs</div></div>
+      <div class="d s2"><h4 style="margin:0 0 6px;color:var(--ai)">Stage 2 · D2–D3</h4><p>Document Intelligence parses a sample CIM → connected agent lanes → IC‑Memo Agent drafts a cited memo from the live record.</p><div class="proves">Proves: diligence weeks → days · one source of truth</div></div>
+    </div>
+    <h3>Three winning points to land</h3>
+    <ol class="win">
+      <li><strong>MCP connectors</strong> relevant to the target segment (Copilot in Excel for Frontier Finance; trusted data in the flow of work).</li>
+      <li><strong>Disjointed workflows + collaboration</strong> unified into one experience across M365 + CRM.</li>
+      <li><strong>Unified intelligence across Work, Fabric and Foundry</strong> as the game‑changer for faster, more insightful decisions in a fully compliant, auditable pattern.</li>
+    </ol>
+  </section>
+
+  <!-- 11 KPI -->
+  <section id="kpi">
+    <h2><span class="num">11</span>Success metrics</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>KPI</th><th>Target</th><th>Measurement</th></tr></thead>
+        <tbody>
+          <tr><td>Screening &amp; sourcing speed</td><td><strong>70% faster</strong></td><td>Time from signal → qualified opportunity</td></tr>
+          <tr><td>Diligence cycle</td><td><strong>weeks → days</strong></td><td>CIM received → IC‑ready memo</td></tr>
+          <tr><td>End‑to‑end cycle time</td><td><strong>40% lower</strong></td><td>Origination → IC decision</td></tr>
+          <tr><td>Re‑keying / manual effort</td><td>Near‑zero</td><td>Manual data‑entry touchpoints per deal</td></tr>
+          <tr><td>Groundedness</td><td>≥ 95% cited</td><td>% agent figures with a valid source citation</td></tr>
+          <tr><td>Compliance</td><td>100% in‑flow</td><td>SFDR/ILPA checks before IC; full Purview audit</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="footnote">KPIs reflect program target outcomes from the Deal Room concept &amp; prototype proposal — not a forecast for a specific fund.</div>
+  </section>
+
+  <!-- 12 RISKS -->
+  <section id="risks">
+    <h2><span class="num">12</span>Risks &amp; mitigations</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr><td>Hallucinated / uncited figures in a regulated workflow</td><td>Mandatory RAG grounding + citation checks; Foundry groundedness evals; human approval gates at O4/D4</td></tr>
+          <tr><td>External data licensing (Preqin/PitchBook/FactSet/CapIQ)</td><td>Honor source licenses; ingest via approved connectors; access controls + Purview lineage</td></tr>
+          <tr><td>Data residency / privacy (EU, FSI)</td><td>Sweden Central only; Private Endpoints; CMK; Microsoft Cloud for FS baseline</td></tr>
+          <tr><td>Agent sprawl / inconsistent state</td><td>Single governed record; Deal Orchestrator; shared tools via MCP; Cosmos state index</td></tr>
+          <tr><td>Model cost / latency spikes</td><td>APIM gateway quotas + semantic caching; PTU for hot paths; mini models for high‑volume scan</td></tr>
+          <tr><td>Change management (agents draft, humans decide)</td><td>Shift‑left training; review‑not‑build UX; keep MDs in the approval loop</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Appendix — persona × stage (Stage 1: Origination &amp; Screening)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Persona</th><th>O1 · AI Sourcing</th><th>O2 · Auto Screen</th><th>O3 · Triage</th><th>O4 · Screening Gate</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Analyst</strong></td><td>Reviews ranked, scored feed; 1‑click promote to D365; drafts CxO emails</td><td>Reviews the cited one‑pager from Fabric — reviews instead of builds</td><td>Ranks live pipeline; Teams notes recorded to CRM</td><td>Reviews the pack; decision + actions to D365</td></tr>
+          <tr><td><strong>Retail Sector MD</strong></td><td>Curates thesis criteria; trains the ranking</td><td>Gets a sector‑contextual screen</td><td>Votes / annotates in‑thread on the same record</td><td>Decides with prior‑deal knowledge surfaced by Copilot</td></tr>
+          <tr><td><strong>AI MD</strong></td><td>AI‑Readiness Signal tags tech maturity — early</td><td>Auto‑drafted AI value‑creation hypothesis with sources</td><td>Tech view captured at triage, not later</td><td>Answers AI‑thesis questions via Copilot</td></tr>
+          <tr><td><strong>Supply Chain MD</strong></td><td>Risk Signal tags concentration &amp; tariff exposure up front</td><td>Auto‑drafted COGS / resilience read</td><td>Ops view captured at triage, not later</td><td>Answers Ops‑risk questions via Copilot</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout"><strong>Handoff:</strong> on "pursue," the Gate‑Orchestration Agent (Power Automate) initiates the NDA, requests the CIM, provisions the diligence Teams workspace + SharePoint data room, and assigns each MD a lane — the handoff into diligence is automatic.</div>
+
+    <h3>Appendix — persona × stage (Stage 2: Diligence &amp; Approval)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Persona</th><th>D1 · Orchestrated Launch</th><th>D2 · AI Diligence</th><th>D3 · Synthesis</th><th>D4 · IC &amp; Approval</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Analyst</strong></td><td>Teams + SharePoint room auto‑provisioned; checklist from playbook</td><td>Document‑Intelligence Agent parses CIM/financials → Fabric → LBO model; flags anomalies</td><td>Reviews the memo drafted from the live record — consistent, cited numbers</td><td>Reviews the IC deck; live Q&amp;A traceable to source</td></tr>
+          <tr><td><strong>Retail Sector MD</strong></td><td>Owns a commercial lane in the shared record</td><td>Commercial‑DD Agent synthesizes market/comp/customer signals; cited</td><td>Edits the commercial section in‑flow (Word / Copilot)</td><td>Decides in a Teams IC; decision + conditions captured</td></tr>
+          <tr><td><strong>AI MD</strong></td><td>Owns a tech / AI lane in the same record</td><td>Tech/AI‑DD Agent scores AI maturity; value‑creation plan with quantified levers</td><td>Sees ops‑validated data feeding its plan — cross‑risk caught</td><td>Decision made with the full cross‑domain view intact</td></tr>
+          <tr><td><strong>Supply Chain MD</strong></td><td>Owns an ops lane in the same record</td><td>Ops‑DD Agent builds supplier map + COGS bridge; flags tariff/concentration risk</td><td>Compliance Agent embeds SFDR/ILPA as the memo assembles (Purview trail)</td><td>Approval routed; conditions written to D365; next steps triggered</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout blue"><strong>The unlock:</strong> the shared record means a number the Supply‑Chain MD validates is instantly visible to the AI MD's plan, so the cross‑domain risk the current state misses surfaces automatically — with the DD agents still running in parallel.</div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>The Deal Room — Target‑State Product Design &amp; Azure Cloud Architecture · Draft v1.0</span>
+    <span>Microsoft · Financial Services · Private Equity Deal Room · Region: Sweden Central</span>
+  </div>
+</footer>
+
+</body>
+</html>

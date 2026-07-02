@@ -1,0 +1,12 @@
+node_modules
+client/node_modules
+client/dist
+.git
+.github
+*.png
+.playwright-mcp
+.dockerignore
+Dockerfile
+README.md
+npm-debug.log
+.env.local

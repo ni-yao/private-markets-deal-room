@@ -1,0 +1,277 @@
+import { useState } from 'react';
+import type { Deal, MdOption, Swimlane, ChecklistSection } from '../types';
+
+interface Props {
+  deal: Deal;
+  mdOptions: MdOption[];
+  onAssign: (lane: string, md: string) => void;
+  onCycleChecklist: (itemId: string) => void;
+  onLaunch: () => void;
+  launching: boolean;
+}
+
+type Sub = { kind: 'overview' } | { kind: 'checklist' } | { kind: 'templates' } | { kind: 'lane'; lane: string };
+
+const LANE_COLOR: Record<string, string> = {
+  commercial: '#0d9488',
+  techai: '#7c3aed',
+  operations: '#ea580c'
+};
+const STATUS_META: Record<string, { label: string; cls: string }> = {
+  requested: { label: 'Requested', cls: 'req' },
+  received: { label: 'Received', cls: 'rec' },
+  reviewed: { label: 'Reviewed', cls: 'rev' }
+};
+
+export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunch, launching }: Props) {
+  const [sub, setSub] = useState<Sub>({ kind: 'overview' });
+  const ws = deal.workspace;
+
+  // Screened (pre-launch) deal — nothing provisioned yet.
+  if (!ws) {
+    return (
+      <div className="wsp">
+        <div className="wsp-empty">
+          <div className="wsp-empty-ic">🚀</div>
+          <div>
+            <div className="wsp-empty-t">Diligence workspace not yet provisioned</div>
+            <div className="wsp-empty-s">
+              {deal.company} has cleared the Screening Gate. Launching provisions the Teams + SharePoint
+              deal space, the DD request list, the playbook templates and the three diligence swimlanes.
+            </div>
+          </div>
+          <button className="btn primary" onClick={onLaunch} disabled={launching}>
+            {launching ? 'Provisioning…' : '🚀 Launch Diligence & Approval'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const openExt = (url: string) => window.open(url, '_blank', 'noopener');
+
+  return (
+    <div className="wsp">
+      {/* header */}
+      <div className="wsp-head">
+        <div>
+          <div className="wsp-title">Deal workspace · {deal.company}</div>
+          <div className="wsp-sub">Provisioned by {ws.provisionedBy}</div>
+        </div>
+        <div className="wsp-links">
+          <button className="wsp-link teams" onClick={() => openExt(ws.teamsUrl)}>Open in Teams ↗</button>
+          <button className="wsp-link spo" onClick={() => openExt(ws.sharePointUrl)}>Open SharePoint ↗</button>
+        </div>
+      </div>
+
+      {/* tabs */}
+      <div className="wsp-tabs">
+        <button className={sub.kind === 'overview' ? 'on' : ''} onClick={() => setSub({ kind: 'overview' })}>◇ Architecture</button>
+        <button className={sub.kind === 'checklist' ? 'on' : ''} onClick={() => setSub({ kind: 'checklist' })}>
+          ☑ DD Checklist {deal.checklistStats ? <span className="wsp-tab-c">{deal.checklistStats.pct}%</span> : null}
+        </button>
+        <button className={sub.kind === 'templates' ? 'on' : ''} onClick={() => setSub({ kind: 'templates' })}>▤ Templates <span className="wsp-tab-c">{ws.templates.length}</span></button>
+        {ws.swimlanes.map((s) => (
+          <button key={s.lane} className={sub.kind === 'lane' && sub.lane === s.lane ? 'on' : ''} onClick={() => setSub({ kind: 'lane', lane: s.lane })}>
+            <span className="wsp-dot" style={{ background: LANE_COLOR[s.lane] }} /> {s.label}
+          </button>
+        ))}
+      </div>
+
+      {sub.kind === 'overview' && (
+        <Overview ws={ws} onOpenExt={openExt} onGo={setSub} />
+      )}
+      {sub.kind === 'checklist' && (
+        <Checklist sections={ws.checklist} onCycle={onCycleChecklist} stats={deal.checklistStats} />
+      )}
+      {sub.kind === 'templates' && (
+        <Templates ws={ws} onOpen={openExt} />
+      )}
+      {sub.kind === 'lane' && (
+        <LanePage
+          swimlane={ws.swimlanes.find((s) => s.lane === (sub as { lane: string }).lane)!}
+          deal={deal}
+          mdOptions={mdOptions}
+          onAssign={onAssign}
+          onOpen={openExt}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Architecture diagram (SVG hub-and-spoke) ---------------- */
+function Overview({ ws, onOpenExt, onGo }: { ws: NonNullable<Deal['workspace']>; onOpenExt: (u: string) => void; onGo: (s: Sub) => void }) {
+  // node: x,y are centre coordinates in the 960x430 viewBox
+  const CX = 480, CY = 205;
+  const nodes = [
+    { id: 'teams', label: 'Microsoft Teams', sub: `${ws.channels.length} channels`, x: 205, y: 70, color: '#4b53bc', act: () => onOpenExt(ws.teamsUrl) },
+    { id: 'spo', label: 'SharePoint · VDR', sub: `${ws.folders.length} folders`, x: 755, y: 70, color: '#036c70', act: () => onOpenExt(ws.sharePointUrl) },
+    { id: 'checklist', label: 'DD Checklist', sub: 'request list', x: 120, y: 205, color: '#2563eb', act: () => onGo({ kind: 'checklist' }) },
+    { id: 'templates', label: 'Templates', sub: `${ws.templates.length} docs`, x: 840, y: 205, color: '#b45309', act: () => onGo({ kind: 'templates' }) },
+    ...ws.swimlanes.map((s, i) => ({
+      id: s.lane,
+      label: s.label,
+      sub: s.advisor,
+      x: 270 + i * 210,
+      y: 360,
+      color: LANE_COLOR[s.lane],
+      act: () => onGo({ kind: 'lane', lane: s.lane })
+    }))
+  ];
+
+  const NW = 150, NH = 52;
+  return (
+    <div className="wsp-diagram">
+      <svg viewBox="0 0 960 430" className="wsp-svg" role="img" aria-label="Deal workspace architecture">
+        {/* connectors */}
+        {nodes.map((n) => (
+          <line key={`l-${n.id}`} x1={CX} y1={CY} x2={n.x} y2={n.y} className="wsp-edge" />
+        ))}
+        {/* hub */}
+        <g>
+          <rect x={CX - 105} y={CY - 40} width={210} height={80} rx={14} className="wsp-hub" />
+          <text x={CX} y={CY - 8} className="wsp-hub-t">Deal Workspace</text>
+          <text x={CX} y={CY + 14} className="wsp-hub-s">Teams + SharePoint · governed</text>
+          <text x={CX} y={CY + 31} className="wsp-hub-x">IC {new Date(ws.icDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</text>
+        </g>
+        {/* nodes */}
+        {nodes.map((n) => (
+          <g key={n.id} className="wsp-node" onClick={n.act} role="button">
+            <rect x={n.x - NW / 2} y={n.y - NH / 2} width={NW} height={NH} rx={11} style={{ stroke: n.color }} />
+            <circle cx={n.x - NW / 2 + 16} cy={n.y} r={5} style={{ fill: n.color }} />
+            <text x={n.x - NW / 2 + 30} y={n.y - 3} className="wsp-node-t">{n.label}</text>
+            <text x={n.x - NW / 2 + 30} y={n.y + 13} className="wsp-node-s">{n.sub}</text>
+          </g>
+        ))}
+      </svg>
+
+      {/* resource strips */}
+      <div className="wsp-res">
+        <div className="wsp-res-col">
+          <div className="wsp-res-h"><b>Teams channels</b><span onClick={() => onOpenExt(ws.teamsUrl)} className="wsp-res-open">open ↗</span></div>
+          <div className="wsp-chips">
+            {ws.channels.map((c) => (
+              <button key={c.name} className="wsp-chip" title={c.purpose} onClick={() => onOpenExt(c.url)}>#{c.name}</button>
+            ))}
+          </div>
+        </div>
+        <div className="wsp-res-col">
+          <div className="wsp-res-h"><b>SharePoint data room</b><span onClick={() => onOpenExt(ws.sharePointUrl)} className="wsp-res-open">open ↗</span></div>
+          <div className="wsp-chips">
+            {ws.folders.map((f) => (
+              <button key={f.name} className="wsp-chip folder" onClick={() => onOpenExt(f.url)}>📁 {f.name}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- DD Checklist ---------------- */
+function Checklist({ sections, onCycle, stats }: { sections: ChecklistSection[]; onCycle: (id: string) => void; stats?: Deal['checklistStats'] }) {
+  return (
+    <div className="wsp-checklist">
+      <div className="wsp-cl-legend">
+        <span>Click an item to advance: <b className="cl-b req">Requested</b> → <b className="cl-b rec">Received</b> → <b className="cl-b rev">Reviewed</b></span>
+        {stats && <span className="wsp-cl-stat">{stats.reviewed} reviewed · {stats.received} received · {stats.requested} outstanding</span>}
+      </div>
+      {sections.map((sec) => {
+        const rev = sec.items.filter((i) => i.status === 'reviewed').length;
+        return (
+          <div className="wsp-cl-sec" key={sec.id}>
+            <div className="wsp-cl-sec-h">
+              <span className="wsp-cl-sec-t">{sec.section}</span>
+              {sec.lane && <span className={`wsp-lane-tag ${sec.lane}`}>{sec.lane}</span>}
+              {sec.workstream && <span className="wsp-ws-tag">{sec.workstream}</span>}
+              <span className="wsp-cl-sec-c">{rev}/{sec.items.length}</span>
+            </div>
+            {sec.items.map((it) => (
+              <button key={it.id} className={`wsp-cl-item ${it.status}`} onClick={() => onCycle(it.id)}>
+                <span className={`wsp-cl-box ${STATUS_META[it.status].cls}`}>{it.status === 'reviewed' ? '✓' : it.status === 'received' ? '·' : ''}</span>
+                <span className="wsp-cl-txt">{it.text}</span>
+                <span className={`wsp-cl-status ${STATUS_META[it.status].cls}`}>{STATUS_META[it.status].label}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- Templates ---------------- */
+const TPL_ICON: Record<string, string> = { Excel: '📊', Word: '📝', PowerPoint: '📽' };
+function Templates({ ws, onOpen }: { ws: NonNullable<Deal['workspace']>; onOpen: (u: string) => void }) {
+  return (
+    <div className="wsp-templates">
+      {ws.templates.map((t) => (
+        <button key={t.id} className="wsp-tpl" onClick={() => onOpen(t.url)}>
+          <span className="wsp-tpl-ic">{TPL_ICON[t.type] || '📄'}</span>
+          <span className="wsp-tpl-body">
+            <span className="wsp-tpl-n">{t.name} <span className="wsp-tpl-ext">.{t.ext}</span></span>
+            <span className="wsp-tpl-d">{t.desc}</span>
+          </span>
+          <span className="wsp-tpl-go">↗</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ---------------- Swimlane subpage ---------------- */
+function LanePage({ swimlane, deal, mdOptions, onAssign, onOpen }: {
+  swimlane: Swimlane;
+  deal: Deal;
+  mdOptions: MdOption[];
+  onAssign: (lane: string, md: string) => void;
+  onOpen: (u: string) => void;
+}) {
+  const color = LANE_COLOR[swimlane.lane];
+  const relatedItems = (deal.workspace?.checklist || []).filter((s) => s.lane === swimlane.lane).flatMap((s) => s.items);
+  const ws = deal.workstreams.find((w) => w.lane === swimlane.lane);
+  return (
+    <div className="wsp-lane">
+      <div className="wsp-lane-head" style={{ borderColor: color }}>
+        <div>
+          <div className="wsp-lane-title" style={{ color }}>{swimlane.label}</div>
+          <div className="wsp-lane-adv">{swimlane.advisorType} · <b>{swimlane.advisor}</b></div>
+        </div>
+        <label className="wsp-md">
+          <span>Lane owner (MD)</span>
+          <select value={swimlane.md} onChange={(e) => onAssign(swimlane.lane, e.target.value)}>
+            {mdOptions.map((m) => <option key={m.id} value={m.id}>{m.name} — {m.title}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <div className="wsp-lane-grid">
+        <div className="wsp-lane-card">
+          <div className="wsp-lane-card-h">Scope</div>
+          <ul className="wsp-scope">{swimlane.scope.map((s) => <li key={s}>{s}</li>)}</ul>
+          <div className="wsp-lane-deliv">Deliverable · <b>{swimlane.deliverable}</b></div>
+        </div>
+        <div className="wsp-lane-card">
+          <div className="wsp-lane-card-h">Workspace</div>
+          <button className="wsp-chip" onClick={() => onOpen(swimlane.channelUrl)}>Teams channel ↗</button>
+          <button className="wsp-chip folder" onClick={() => onOpen(swimlane.folderUrl)}>SharePoint folder ↗</button>
+          <div className="wsp-lane-prog">
+            <div className="wsp-lane-prog-t"><span>Lane progress</span><b>{ws?.progress ?? 0}%</b></div>
+            <div className="wsp-lane-prog-track"><i style={{ width: `${ws?.progress ?? 0}%`, background: color }} /></div>
+          </div>
+        </div>
+        <div className="wsp-lane-card">
+          <div className="wsp-lane-card-h">Owns checklist items</div>
+          {relatedItems.length === 0 && <div className="wsp-lane-none">No lane-specific items.</div>}
+          {relatedItems.map((it) => (
+            <div className={`wsp-lane-item ${it.status}`} key={it.id}>
+              <span className={`wsp-cl-box ${STATUS_META[it.status].cls}`}>{it.status === 'reviewed' ? '✓' : it.status === 'received' ? '·' : ''}</span>
+              {it.text}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

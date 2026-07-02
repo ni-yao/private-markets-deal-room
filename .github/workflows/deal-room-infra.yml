@@ -1,0 +1,117 @@
+name: deal-room-infra
+
+# Deploys infra/main.bicep as an Azure Deployment Stack.
+#
+# Auth uses OIDC / federated workload identity — NO client secrets are stored.
+# Each GitHub Environment (dev / test / prod) holds its OWN values:
+#   secrets:  AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# Pointing an environment at a different subscription = change those secrets,
+# never the code. Add required reviewers on the `prod` environment for approval.
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/deal-room-infra.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/deal-room-infra.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment to deploy
+        type: choice
+        options: [ dev, test, prod ]
+        default: dev
+
+concurrency:
+  group: infra-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  LOCATION: swedencentral
+
+jobs:
+  lint:
+    name: Lint (bicep build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build / lint template
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep
+
+  preview:
+    name: What-if (dev)
+    if: github.event_name == 'pull_request'
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Ensure resource group
+        run: az group create -n rg-dealroom-dev-swc -l "$LOCATION" --only-show-errors
+      - name: What-if
+        run: |
+          az deployment group what-if \
+            -g rg-dealroom-dev-swc \
+            -f infra/main.bicep \
+            -p infra/main.dev.bicepparam \
+            --no-pretty-print > whatif.txt || true
+          {
+            echo '## What-if — dev';
+            echo '```';
+            cat whatif.txt;
+            echo '```';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy stack
+    if: github.event_name != 'pull_request'
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'dev' }}
+    env:
+      ENVIRONMENT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Compute names
+        id: names
+        run: |
+          echo "rg=rg-dealroom-${ENVIRONMENT}-swc" >> "$GITHUB_OUTPUT"
+          echo "stack=stack-dealroom-${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
+          if [ "$ENVIRONMENT" = "prod" ]; then
+            echo "deny=denyDelete" >> "$GITHUB_OUTPUT"
+          else
+            echo "deny=none" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Ensure resource group
+        run: az group create -n "${{ steps.names.outputs.rg }}" -l "$LOCATION" --only-show-errors
+      - name: Deploy as deployment stack
+        run: |
+          az stack group create \
+            --name "${{ steps.names.outputs.stack }}" \
+            -g "${{ steps.names.outputs.rg }}" \
+            -f infra/main.bicep \
+            -p "infra/main.${ENVIRONMENT}.bicepparam" \
+            --deny-settings-mode "${{ steps.names.outputs.deny }}" \
+            --action-on-unmanage deleteResources \
+            --yes
