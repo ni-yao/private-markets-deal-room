@@ -146,6 +146,7 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
             subtitle="The agent proposes advance/pass on the fund's hard criteria. Confirm each candidate — advance survivors to Triage, or pass/park with a reason."
             advanceLabel="Advance to Triage →"
             agent="Target-Screening Agent"
+            assess
             onChanged={onCohortChanged}
           />
         </div>
@@ -160,6 +161,7 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
             subtitle="Candidates ranked by mandate fit. Decide which deserve the gate — advance the strongest, pass or park the rest with a reason."
             advanceLabel="Advance to Gate →"
             agent="Pipeline-Prioritization Agent"
+            assess
             onChanged={onCohortChanged}
           />
         </div>

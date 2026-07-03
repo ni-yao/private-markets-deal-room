@@ -1083,6 +1083,32 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 .co-pass, .co-park { font-size: 11px; padding: 5px 10px; }
 .co-actions .co-adv { width: 100%; }
 .co-actions > button:not(.co-adv) { display: inline-block; }
+
+/* Per-candidate agent assessment (O2 Auto Screen · O3 Triage) */
+.co-assess { margin-top: 8px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--canvas); }
+.co-assess.advance { border-left: 3px solid var(--positive); }
+.co-assess.pass { border-left: 3px solid var(--danger); }
+.co-assess.park { border-left: 3px solid var(--amber); }
+.co-assess.loading { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.ca-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ca-badge { font-size: 10px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; color: #fff; }
+.ca-badge.advance { background: var(--positive); }
+.ca-badge.pass { background: var(--danger); }
+.ca-badge.park { background: var(--amber); }
+.ca-reason { font-size: 10.5px; font-weight: 700; color: var(--ink); background: var(--surface); border: 1px solid var(--line); padding: 2px 7px; border-radius: 6px; }
+.ca-conf { font-size: 10px; font-weight: 700; color: var(--muted); }
+.ca-src { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; padding: 2px 6px; border-radius: 5px; }
+.ca-src.live { background: var(--positive-tint); color: #0b6b60; }
+.ca-src.demo { background: var(--line); color: var(--muted); }
+.ca-reassess { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 6px; color: var(--muted); }
+.ca-reassess:hover { color: var(--ink); border-color: var(--muted); }
+.ca-why { font-size: 11.5px; line-height: 1.5; color: var(--ink); margin-top: 6px; }
+
+/* Recommended action gets a subtle ring so the agent's call reads at a glance */
+.btn.reco { box-shadow: 0 0 0 2px rgba(37,99,235,.28); position: relative; }
+.btn.co-adv.reco { box-shadow: 0 0 0 2px rgba(16,185,129,.35); }
+.btn.co-pass.reco { box-shadow: 0 0 0 2px rgba(220,38,38,.28); }
+.btn.co-park.reco { box-shadow: 0 0 0 2px rgba(245,158,11,.32); }
 .co-reason { background: var(--canvas); border: 1px solid var(--line); border-radius: 9px; padding: 8px; width: 200px; }
 .co-reason-h { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
 .co-reason-sel { width: 100%; font-family: inherit; font-size: 11.5px; border: 1px solid var(--line); border-radius: 7px; padding: 5px 7px; margin: 5px 0; }

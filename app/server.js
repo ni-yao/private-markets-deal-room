@@ -34,6 +34,8 @@ import {
   getCohort,
   getPipeline,
   getPassReasons,
+  assessCohort,
+  assessCandidateById,
   screenCandidate,
   triageCandidate,
   gateCandidate,
@@ -85,6 +87,31 @@ api.get('/stage1/funnel', (_req, res) => res.json(getStage1Funnel()));
 api.get('/stage1/pipeline', (_req, res) => res.json(getPipeline()));
 api.get('/stage1/cohort/:stage', (req, res) => res.json(getCohort(req.params.stage)));
 api.get('/stage1/pass-reasons', (_req, res) => res.json(getPassReasons()));
+
+// Run the step's assessment agent across the whole active cohort (O2/O3), then
+// return the cohort with each candidate's recommendation attached.
+api.post('/stage1/cohort/:stage/assess', async (req, res) => {
+  const stage = req.params.stage;
+  if (stage !== 'O2' && stage !== 'O3') return res.status(400).json({ error: 'stage-not-assessable' });
+  try {
+    const cohort = await assessCohort(stage, { force: !!req.body?.force });
+    res.json(cohort);
+  } catch (err) {
+    res.status(500).json({ error: 'assess failed', detail: String(err?.message || err) });
+  }
+});
+
+// Force a fresh assessment for a single candidate (per-row re-assess).
+api.post('/candidates/:id/assess', async (req, res) => {
+  try {
+    const r = await assessCandidateById(req.params.id, true);
+    if (r.error) return res.status(400).json(r);
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: 'assess failed', detail: String(err?.message || err) });
+  }
+});
+
 api.post('/candidates/:id/screen', (req, res) => {
   const r = screenCandidate(req.params.id, req.body?.action, req.body?.reason, req.body?.note);
   if (r.error) return res.status(400).json(r);

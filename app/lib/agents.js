@@ -2,7 +2,7 @@
 // record. Uses the live Foundry model when available; otherwise returns a
 // realistic seeded draft so the workspace is fully demoable offline.
 
-import { complete } from './ai.js';
+import { complete, getModelInfo } from './ai.js';
 import { LANES } from '../data/personas.js';
 
 // Catalyst-classifier agent — labels a news finding with its catalyst category.
@@ -359,4 +359,142 @@ function demoChat(deal, persona, message) {
     return `**${deal.company}** is on an agent-accelerated path to IC. Remaining gating items are the operations lane and the SFDR/ILPA checks; on current pace it is **IC-ready ~9 days ahead** of the ${deal.baselineDays}-day baseline.\n\nSources: Live diligence record.`;
   }
   return `On **${deal.company}** (${deal.sector}): revenue ${fig(deal, 'Revenue')}, EBITDA ${fig(deal, 'EBITDA')} at ${fig(deal, 'EBITDA margin')}. Ask me about returns, risks, the value plan, or IC readiness — or run a quick-action to draft it to the record.\n\nSources: CIM, Deal model.`;
+}
+
+// ---------------------------------------------------------------------------
+// Cohort screening agents — O2 (Auto Screen) and O3 (Triage). Each ASSESSES a
+// single candidate against the fund mandate and the step's job, and returns a
+// recommended disposition + short rationale. This is the real "AI agent run
+// against each candidate": a live Foundry model call when configured, with a
+// deterministic seeded fallback so the funnel still reasons offline. The
+// analyst keeps the final call — the recommendation is advisory.
+// ---------------------------------------------------------------------------
+
+const ASSESS_META = {
+  O2: {
+    agent: 'Target-Screening Agent',
+    actions: ['advance', 'pass'],
+    task:
+      "Apply the fund's HARD KNOCKOUT screen to this one candidate. Advance it only if it clears every binding hard criterion (mandate sector/geography, EV band, minimum scale, business-model viability, ESG exclusions). Otherwise pass it. Soft concerns — valuation, competitive dynamics, thesis conviction — are NOT knockouts here; those belong at Triage.",
+    reasonHint:
+      'When action is "pass", reasonCode MUST be one of: size-floor, business-model, revenue-quality, sector-risk, exit-prospects, esg-exclusion, capital-structure. When action is "advance", reasonCode is null.'
+  },
+  O3: {
+    agent: 'Pipeline-Prioritization Agent',
+    actions: ['advance', 'pass', 'park'],
+    task:
+      "Triage this candidate on relative attractiveness and fit for the fund thesis versus a typical mid-market buyout target. Gate slots are scarce: advance it to the partner Screening Gate only if it earns one on conviction. Pass (kill) weak or ill-fitting targets; park (watchlist) ones that are interesting but not actionable now.",
+    reasonHint:
+      'When action is "pass", reasonCode MUST be one of: valuation-gap, competitive, weak-moat, no-angle, management, no-portfolio-fit, team-capacity, conviction. When action is "park", reasonCode MUST be one of: not-ready, monitor, re-engage. When action is "advance", reasonCode is null.'
+  }
+};
+
+const ASSESS_SYSTEM = `You are a screening agent inside "The Deal Room", the AI deal-flow workspace of a European mid-market private-equity fund (Fund IV).
+You assess ONE candidate company at a specific origination-funnel step and recommend a single disposition with a short, evidence-grounded rationale that a deal partner would accept.
+Rules: reason only from the provided fund mandate and candidate record; be decisive, not wishy-washy; cite the specific figures (EV, EBITDA, margin, growth, sector, geography) that drive your call; never invent precise numbers that are not given.
+Output STRICT JSON ONLY — no prose, no markdown fences — exactly:
+{"action":"<one allowed value>","reasonCode":<string|null>,"rationale":"<= 55 words","confidence":<number 0-1>}`;
+
+function extractJson(raw) {
+  if (!raw) return null;
+  let t = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/,'').trim();
+  const i = t.indexOf('{');
+  const j = t.lastIndexOf('}');
+  if (i < 0 || j < 0 || j <= i) return null;
+  try { return JSON.parse(t.slice(i, j + 1)); } catch { return null; }
+}
+
+function parseAssessment(raw, meta) {
+  const o = extractJson(raw);
+  if (!o || typeof o.action !== 'string') return null;
+  const action = o.action.toLowerCase().trim();
+  if (!meta.actions.includes(action)) return null;
+  let rationale = typeof o.rationale === 'string' ? o.rationale.trim() : '';
+  if (!rationale) return null;
+  if (rationale.length > 420) rationale = rationale.slice(0, 417) + '…';
+  let confidence = Number(o.confidence);
+  if (!Number.isFinite(confidence)) confidence = 0.7;
+  confidence = Math.max(0, Math.min(1, confidence > 1 ? confidence / 100 : confidence));
+  const reasonCode = action === 'advance' ? null : (typeof o.reasonCode === 'string' && o.reasonCode.trim() ? o.reasonCode.trim() : null);
+  return { action, reasonCode, rationale, confidence: +confidence.toFixed(2) };
+}
+
+// Deterministic fallback so the desk still produces a reasoned recommendation
+// with no model configured (demo mode) or if a live call fails.
+function assessMock(stage, knowledge) {
+  const k = knowledge;
+  if (stage === 'O2') {
+    if (k.knockouts.length) {
+      const primary = k.knockouts[0];
+      return {
+        action: 'pass',
+        reasonCode: primary.reason,
+        rationale: `Fails a hard criterion: ${k.knockouts.map((x) => x.detail).join('; ')}. Below the fund's screening floor — pass before spending diligence time.`,
+        confidence: 0.82
+      };
+    }
+    return {
+      action: 'advance',
+      reasonCode: null,
+      rationale: `Clears the hard screen — ${k.sector} in ${k.region}, EV €${k.dealSize}M inside the €100–800M band, EBITDA €${k.ebitda}M at ${k.ebitdaMargin}% margin, ${k.growth >= 0 ? '+' : ''}${k.growth}% growth. No knockouts; advance to Triage.`,
+      confidence: 0.78
+    };
+  }
+  // O3 — relative prioritisation off the quant fit score / band.
+  const s = k.score;
+  const fit = k.matchedScreen ? ` best-fit screen "${k.matchedScreen.name}"` : ' no strong screen match';
+  if (k.band === 'strong' || s >= 60) {
+    return {
+      action: 'advance',
+      reasonCode: null,
+      rationale: `Strong mandate fit (score ${s}/100,${fit}); ${k.growth}% growth and ${k.ebitdaMargin}% margins support the thesis. Earns a gate slot — advance to the Screening Gate.`,
+      confidence: 0.76
+    };
+  }
+  if (s >= 42) {
+    return {
+      action: 'park',
+      reasonCode: 'monitor',
+      rationale: `Moderate fit (score ${s}/100,${fit}). Interesting but not gate-priority against the current cohort — park and monitor 12–24 months for a better entry or trigger.`,
+      confidence: 0.64
+    };
+  }
+  return {
+    action: 'pass',
+    reasonCode: 'conviction',
+    rationale: `Weak relative fit (score ${s}/100,${fit}); ${k.growth}% growth and ${k.ebitdaMargin}% margins don't build partner conviction versus stronger cohort names. Pass.`,
+    confidence: 0.68
+  };
+}
+
+export async function assessCandidate({ candidate, stage, knowledge }) {
+  const meta = ASSESS_META[stage];
+  if (!meta) return null;
+  const user = `STEP ${stage} — ${meta.agent}
+TASK: ${meta.task}
+ALLOWED action values: ${meta.actions.map((a) => `"${a}"`).join(', ')}.
+${meta.reasonHint}
+
+FUND MANDATE:
+${knowledge.mandate}
+
+HARD-GATE PRE-CHECK: ${knowledge.gateSummary}
+QUANT FIT SCORE: ${knowledge.scoreSummary}
+RULE-BASED KNOCKOUT FLAGS: ${knowledge.knockoutSummary}
+
+CANDIDATE RECORD:
+${knowledge.candidateSummary}
+
+Return the strict JSON now.`;
+
+  let raw = null;
+  try {
+    raw = await complete({ system: ASSESS_SYSTEM, user, maxTokens: 320, temperature: 0.2 });
+  } catch {
+    raw = null;
+  }
+  const parsed = raw ? parseAssessment(raw, meta) : null;
+  const stamp = { stage, agent: meta.agent, at: new Date().toISOString() };
+  if (parsed) return { ...parsed, ...stamp, source: 'live', model: getModelInfo().model };
+  return { ...assessMock(stage, knowledge), ...stamp, source: 'demo', model: null };
 }

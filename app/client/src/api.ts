@@ -19,6 +19,7 @@ import type {
   Pipeline,
   PassReasons,
   Candidate,
+  Assessment,
   MdOption
 } from './types';
 
@@ -73,6 +74,10 @@ export const api = {
   stage1Funnel: () => get<PipelineFunnel>('/api/stage1/funnel'),
   stage1Pipeline: () => get<Pipeline>('/api/stage1/pipeline'),
   cohort: (stage: string) => get<Cohort>(`/api/stage1/cohort/${stage}`),
+  assessCohort: (stage: string, force = false) =>
+    post<Cohort>(`/api/stage1/cohort/${stage}/assess`, { force }),
+  assessCandidate: (id: string) =>
+    post<{ assessment: Assessment; candidate: Candidate }>(`/api/candidates/${id}/assess`, {}),
   passReasons: () => get<PassReasons>('/api/stage1/pass-reasons'),
   screenCandidate: (id: string, action: string, reason?: string, note?: string) =>
     post<{ candidate: Candidate }>(`/api/candidates/${id}/screen`, { action, reason, note }),

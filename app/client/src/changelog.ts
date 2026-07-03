@@ -13,6 +13,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.7.0',
+    date: '2026-07-03',
+    image: 'dealroom-app:v10',
+    revision: 'ca-dealroom-orch-dev-swc--0000006',
+    title: 'O2/O3 agents actually reason on every candidate',
+    tag: 'feature',
+    highlights: [
+      'The Auto Screen (O2) and Triage (O3) agents now run a real per-candidate assessment — the Foundry model reasons against each company at that step and returns a recommended action (advance / pass / park) with a written rationale and confidence, instead of a static rules table.',
+      'Assessments fire automatically when you open the desk (all candidates in parallel) and are cached per candidate, with a per-row ↻ re-assess; the recommended action is highlighted and its pass/park reason pre-selects.',
+      'Grounded in the fund mandate, hard gate, quant fit score and financials; live Foundry model when configured, deterministic seeded fallback offline. The analyst still makes the final call — the recommendation is advisory.'
+    ]
+  },
+  {
     version: 'v0.6.1',
     date: '2026-07-02',
     image: 'dealroom-app:v9',

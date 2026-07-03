@@ -8,7 +8,7 @@ import { runStep as runStepAgent } from './agents.js';
 import { mailbox, companiesWithSignals, crmForCompany } from '../data/signals.js';
 import { SOURCES, catalysts, catalystById, deskCompanies } from '../data/news.js';
 import { researchFor } from '../data/research.js';
-import { classifyCatalyst } from './agents.js';
+import { classifyCatalyst, assessCandidate } from './agents.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
@@ -520,6 +520,40 @@ function screenRecommendation(c) {
   return { action: knockouts.length ? 'pass' : 'advance', knockouts };
 }
 
+// Assemble the grounded "knowledge" an assessment agent reasons over: the fund
+// mandate + hard gate + quant fit + the candidate record. Keeps the LLM (or the
+// seeded fallback) anchored to real fund constraints and figures.
+function candidateKnowledge(c) {
+  const sc = scoreCandidate(c);
+  const rec = screenRecommendation(c);
+  const mandate = [
+    `${fund.name} — ${fund.strategy}.`,
+    `Permitted sectors: ${fund.sectorsPermitted.join(', ')}. LPA-excluded: ${fund.sectorsExcluded.join(', ')}.`,
+    `Geographies: ${fund.geographies.join(', ')}. EV band €${fund.evMin}–${fund.evMax}M.`,
+    `ESG: ${fund.esgPolicy}. Leverage limit ${fund.leverageLimit}. Max ${fund.maxEquityPerDeal}% equity/deal, ${fund.maxSectorConcentration}% sector concentration.`
+  ].join(' ');
+  const gateSummary = sc.gate.passes
+    ? 'PASSES all binding mandate constraints (sector, geography, EV band).'
+    : `FAILS mandate constraints — ${sc.gate.reasons.join('; ')}.`;
+  const scoreSummary = `${sc.score}/100 (${sc.band} fit)${sc.matchedScreen ? `, best-fit screen "${sc.matchedScreen.name}"` : ', no strong screen match'}.`;
+  const knockoutSummary = rec.knockouts.length
+    ? rec.knockouts.map((k) => k.detail).join('; ')
+    : 'none tripped.';
+  const candidateSummary = [
+    `${c.company} — ${c.sector} / ${c.subSector}, ${c.region} (${c.country}), HQ ${c.hq}.`,
+    `Ownership: ${c.ownership}. Indicative EV €${c.dealSize}M.`,
+    `Revenue €${c.revenue}M, EBITDA €${c.ebitda}M (${c.ebitdaMargin}% margin), growth ${c.growth >= 0 ? '+' : ''}${c.growth}% YoY.`,
+    `Angle/keywords: ${(c.keywords || []).join(', ') || '—'}.`
+  ].join(' ');
+  return {
+    mandate, gateSummary, scoreSummary, knockoutSummary, candidateSummary,
+    score: sc.score, band: sc.band, matchedScreen: sc.matchedScreen,
+    knockouts: rec.knockouts,
+    sector: c.sector, region: c.region, dealSize: c.dealSize,
+    ebitda: c.ebitda, ebitdaMargin: c.ebitdaMargin, growth: c.growth
+  };
+}
+
 function publicCandidate(c) {
   const sc = scoreCandidate(c);
   return {
@@ -550,7 +584,8 @@ function publicCandidate(c) {
     gated: !sc.gate.passes,
     gateReasons: sc.gate.reasons,
     matchedScreen: sc.matchedScreen,
-    screenRec: screenRecommendation(c)
+    screenRec: screenRecommendation(c),
+    assessment: (c.assessments && c.assessments[c.stage]) || null
   };
 }
 
@@ -604,6 +639,40 @@ export function getCohort(stage) {
     list.forEach((c, i) => { c.rank = i + 1; });
   }
   return { stage, fundName: fund.name, candidates: list };
+}
+
+// Only O2 (Auto Screen) and O3 (Triage) run a per-candidate assessment agent.
+// O4 is the MD's human PURSUE call; O1 is sourcing.
+const ASSESSABLE = new Set(['O2', 'O3']);
+
+// Run (or reuse) the assessment agent for a single candidate at its stage. The
+// result is cached on the candidate so opening the desk doesn't re-run the model
+// every refresh; `force` bypasses the cache for a manual re-assessment.
+async function ensureAssessment(c, force) {
+  if (!ASSESSABLE.has(c.stage)) return null;
+  c.assessments = c.assessments || {};
+  if (c.assessments[c.stage] && !force) return c.assessments[c.stage];
+  const knowledge = candidateKnowledge(c);
+  const a = await assessCandidate({ candidate: publicCandidate(c), stage: c.stage, knowledge });
+  if (a) c.assessments[c.stage] = a;
+  return a;
+}
+
+// Assess every active candidate at a stage (in parallel) and return the cohort
+// with each candidate's recommendation attached. Called when the O2/O3 desk opens.
+export async function assessCohort(stage, { force = false } = {}) {
+  if (!ASSESSABLE.has(stage)) return getCohort(stage);
+  const active = candidates.filter((c) => c.disposition === 'active' && c.stage === stage);
+  await Promise.all(active.map((c) => ensureAssessment(c, force).catch(() => null)));
+  return getCohort(stage);
+}
+
+// Force a fresh assessment for one candidate (the per-row re-assess action).
+export async function assessCandidateById(id, force = true) {
+  const c = candidates.find((x) => x.id === id);
+  if (!c || c.disposition !== 'active' || !ASSESSABLE.has(c.stage)) return { error: 'not-actionable' };
+  const a = await ensureAssessment(c, force);
+  return { ok: true, assessment: a, candidate: publicCandidate(c) };
 }
 
 // The whole Stage-1 pipeline (for the Pipeline page).

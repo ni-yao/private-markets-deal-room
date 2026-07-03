@@ -191,6 +191,18 @@ export interface ScreenRec {
   knockouts: { reason: string; detail: string }[];
 }
 
+export interface Assessment {
+  stage: string;                         // 'O2' | 'O3'
+  action: 'advance' | 'pass' | 'park';
+  reasonCode: string | null;             // pass/park reason id (null when advance)
+  rationale: string;
+  confidence: number;                    // 0-1
+  agent: string;
+  source: 'live' | 'demo';
+  model: string | null;
+  at: string;
+}
+
 export interface Candidate {
   id: string;
   company: string;
@@ -220,6 +232,7 @@ export interface Candidate {
   gateReasons: string[];
   matchedScreen: { id: string; name: string } | null;
   screenRec: ScreenRec;
+  assessment?: Assessment | null;
   rank?: number;
 }
 
