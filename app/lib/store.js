@@ -9,6 +9,7 @@ import { mailbox, companiesWithSignals, crmForCompany } from '../data/signals.js
 import { SOURCES, catalysts, catalystById, deskCompanies } from '../data/news.js';
 import { researchFor } from '../data/research.js';
 import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage } from './agents.js';
+import { scoutNews, newsAgentConfigured } from './newsAgent.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
@@ -305,7 +306,9 @@ function publicCompany(c) {
     ownership: c.ownership,
     news: c.news,
     filings: c.filings,
-    quality: c.quality
+    quality: c.quality,
+    live: !!c.live,
+    estimated: !!c.estimated
   };
 }
 
@@ -331,6 +334,35 @@ export function findMoreNews() {
     n.aiLabeled = true;
   }
   return { revealed: publicCompany(next), desk: getSourcingDesk() };
+}
+
+// Live news search — invokes the Bing-grounded Foundry news-scout agent for the
+// fund mandate, injects any newly discovered (real, source-cited) companies into
+// the desk, and returns the desk. Falls back to the seed reveal on empty/error so
+// the desk always advances. `source` tells the UI whether results were live.
+export async function searchMoreNews({ focus } = {}) {
+  if (!newsAgentConfigured()) {
+    return { source: 'seed', ...findMoreNews() };
+  }
+  let scouted = [];
+  try {
+    scouted = await scoutNews({ mandate: fund, focus });
+  } catch (err) {
+    return { source: 'fallback', error: String(err?.message || err), ...findMoreNews() };
+  }
+  // Keep only companies we don't already have on the desk (by name).
+  const known = new Set(desk.map((c) => c.name.toLowerCase()));
+  const fresh = scouted.filter((c) => !known.has(c.name.toLowerCase()));
+  if (fresh.length === 0) {
+    return { source: 'fallback', ...findMoreNews() };
+  }
+  for (const c of fresh) desk.push(c);
+  return {
+    source: 'live',
+    revealed: fresh.map(publicCompany),
+    revealedCount: fresh.length,
+    desk: getSourcingDesk()
+  };
 }
 
 export function setFindingCatalyst(findingId, catalystId) {

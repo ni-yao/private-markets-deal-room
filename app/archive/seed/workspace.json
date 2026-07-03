@@ -1,0 +1,24 @@
+{
+  "MD_OPTIONS": [
+    {
+      "id": "retail-md",
+      "name": "James Whitfield",
+      "title": "Retail Sector MD"
+    },
+    {
+      "id": "ai-md",
+      "name": "Dr. Priya Nair",
+      "title": "AI MD"
+    },
+    {
+      "id": "supply-md",
+      "name": "Diego Marquez",
+      "title": "Supply-chain MD"
+    },
+    {
+      "id": "partner",
+      "name": "Eleanor Bishop",
+      "title": "Partner / Deal Sponsor"
+    }
+  ]
+}

@@ -20,6 +20,7 @@ import {
   getCrm,
   getSourcingDesk,
   findMoreNews,
+  searchMoreNews,
   setFindingCatalyst,
   testSource,
   getAnalystResearch,
@@ -54,6 +55,7 @@ import {
 import { personaById } from './data/personas.js';
 import { runAction, chat } from './lib/agents.js';
 import { getModelInfo } from './lib/ai.js';
+import { newsAgentConfigured } from './lib/newsAgent.js';
 import graphRouter from './lib/graph.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -73,7 +75,8 @@ api.get('/config', (_req, res) => {
   res.json({
     ...info,
     region: process.env.DEAL_ROOM_REGION || 'swedencentral',
-    appName: 'The Deal Room'
+    appName: 'The Deal Room',
+    newsAgent: newsAgentConfigured() ? 'live' : 'demo'
   });
 });
 
@@ -180,7 +183,15 @@ api.get('/signals/companies/:id/crm', (req, res) => {
 
 // O1 · Deal Sourcing — News & filings desk
 api.get('/news/desk', (_req, res) => res.json(getSourcingDesk()));
-api.post('/news/find-more', (_req, res) => res.json(findMoreNews()));
+// Live news search via the Bing-grounded Foundry agent (seed fallback on failure).
+api.post('/news/find-more', async (req, res) => {
+  try {
+    const out = await searchMoreNews({ focus: req.body?.focus });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'news search failed', detail: String(err?.message || err) });
+  }
+});
 api.post('/news/findings/:id/catalyst', (req, res) => {
   const out = setFindingCatalyst(req.params.id, req.body?.catalyst);
   if (!out) return res.status(400).json({ error: 'unknown finding or catalyst' });

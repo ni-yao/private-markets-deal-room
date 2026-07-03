@@ -413,6 +413,9 @@ export interface DeskNews {
   confidence: number;
   aiLabeled?: boolean;
   manualOverride?: boolean;
+  url?: string | null;
+  publisher?: string;
+  live?: boolean;
 }
 
 export interface DeskFiling {
@@ -444,6 +447,8 @@ export interface DeskCompany {
   news: DeskNews[];
   filings: DeskFiling[];
   quality: DeskQuality;
+  live?: boolean;
+  estimated?: boolean;
 }
 
 export interface SourcingDesk {

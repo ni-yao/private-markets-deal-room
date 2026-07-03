@@ -1,0 +1,80 @@
+{
+  "archivedAt": "2026-07-03T20:15:08.385Z",
+  "modules": {
+    "candidates": {
+      "file": "seed/candidates.json",
+      "exports": [
+        "PARK_REASONS",
+        "PASS_REASONS",
+        "STAGE_ORDER",
+        "seedCandidates"
+      ]
+    },
+    "deals": {
+      "file": "seed/deals.json",
+      "exports": [
+        "seedDeals",
+        "seedSourcing"
+      ]
+    },
+    "flow": {
+      "file": "seed/flow.json",
+      "exports": [
+        "FLOW",
+        "GATE",
+        "STAGES",
+        "STAGE_ORDER",
+        "STEPS",
+        "STEP_KEYS"
+      ]
+    },
+    "mandates": {
+      "file": "seed/mandates.json",
+      "exports": [
+        "fundMandate",
+        "seedScreens",
+        "seedThemes"
+      ]
+    },
+    "news": {
+      "file": "seed/news.json",
+      "exports": [
+        "SOURCES",
+        "catalystById",
+        "catalysts",
+        "deskCompanies",
+        "sourceById"
+      ]
+    },
+    "personas": {
+      "file": "seed/personas.json",
+      "exports": [
+        "LANES",
+        "personaById",
+        "personas"
+      ]
+    },
+    "research": {
+      "file": "seed/research.json",
+      "exports": [
+        "researchByCompany"
+      ]
+    },
+    "signals": {
+      "file": "seed/signals.json",
+      "exports": [
+        "chats",
+        "emails",
+        "mailbox",
+        "meetings",
+        "signalCompanies"
+      ]
+    },
+    "workspace": {
+      "file": "seed/workspace.json",
+      "exports": [
+        "MD_OPTIONS"
+      ]
+    }
+  }
+}

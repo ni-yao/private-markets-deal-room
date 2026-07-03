@@ -38,3 +38,6 @@ test-results/
 
 # Session / scratch
 *.tmp
+app/scripts/news-agent.env
+app/scripts/_sample-news.json
+app/scripts/__pycache__/

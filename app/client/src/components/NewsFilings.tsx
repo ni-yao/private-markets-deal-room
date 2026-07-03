@@ -166,8 +166,8 @@ export function NewsFilings({ onBack }: Props) {
                 <button className="co-block-hd" onClick={() => toggleNews(c.id)}>
                   <span className="cob-caret">{openNews.has(c.id) ? '▾' : '▸'}</span>
                   <div className="cob-main">
-                    <div className="cob-name">{c.name}</div>
-                    <div className="cob-meta">{c.sector} · {c.region} · €{c.dealSize}M · {c.ownership}</div>
+                    <div className="cob-name">{c.name}{c.live && <span className="live-badge">● LIVE</span>}</div>
+                    <div className="cob-meta">{c.sector} · {c.region} · €{c.dealSize}M{c.estimated ? ' (est.)' : ''} · {c.ownership}</div>
                   </div>
                   <span className="cob-count">{c.news.length}</span>
                 </button>
@@ -176,11 +176,16 @@ export function NewsFilings({ onBack }: Props) {
                     {c.news.map((n) => (
                       <div className="news-find" key={n.id}>
                         <div className="nf-top">
-                          <span className={`src-badge ${n.source}`}>{sourceName(desk.sources, n.source)}</span>
+                          <span className={`src-badge ${n.source}`}>{n.publisher || sourceName(desk.sources, n.source)}</span>
                           <span className="nf-when">{timeAgo(n.when)}</span>
                         </div>
                         <div className="nf-headline">{n.headline}</div>
                         <div className="nf-detail">{n.detail}</div>
+                        {n.url && (
+                          <a className="nf-source" href={n.url} target="_blank" rel="noreferrer">
+                            🔗 {sourceHost(n.url)}
+                          </a>
+                        )}
                         <button className="cat-chip" onClick={() => setEditing({ finding: n, companyId: c.id })} title="AI-labeled catalyst — click to review / change">
                           <span className="cat-chip-ic">{catById[n.catalyst]?.icon}</span>
                           {catById[n.catalyst]?.label}
@@ -195,7 +200,7 @@ export function NewsFilings({ onBack }: Props) {
               </div>
             ))}
             <button className="find-more" onClick={findMore} disabled={findingMore}>
-              {findingMore ? 'Scanning Web + PitchBook…' : '↻ Find more news'}
+              {findingMore ? '✦ Scouting the live web (Bing-grounded agent)…' : '↻ Find more news'}
             </button>
           </div>
         </div>
@@ -283,6 +288,14 @@ export function NewsFilings({ onBack }: Props) {
 
 function sourceName(sources: DeskSource[], id: string) {
   return sources.find((s) => s.id === id)?.name || id;
+}
+
+function sourceHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'source';
+  }
 }
 
 function ColHeader({ n, title, sub, sources }: { n: number; title: string; sub: string; sources: DeskSource[] }) {

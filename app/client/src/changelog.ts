@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.10.0',
+    date: '2026-07-03',
+    image: 'dealroom-app:v14',
+    revision: 'ca-dealroom-orch-dev-swc--0000010',
+    title: 'Live news search · Bing-grounded Foundry agent',
+    tag: 'feature',
+    highlights: [
+      '“Find more news” is now backed by a standalone Foundry Agent Service agent (deal-room-news-scout) that uses Grounding with Bing Search to find REAL, recent M&A catalysts about actual European mid-market companies matching the fund mandate — no longer a scripted reveal of seeded data.',
+      'Discovered companies are injected into the O1 desk with real headlines and clickable source links (e.g. swissinfo.ch, dw.com, grantthornton.co.uk), tagged LIVE; financials are flagged as estimates pending the market-data connectors.',
+      'The agent runs on gpt-5-mini (gpt-4o is retired in this environment) and is invoked from the server via managed identity; if the agent is unavailable or rate-limited, the desk gracefully falls back to the seeded reveal.',
+      'Groundwork for production: all demo/seed data was archived to retrievable JSON, and a phased plan was set for a real datastore, connectors, ingestion/entity-resolution, persisted workflow state, and RAG grounding.'
+    ]
+  },
+  {
     version: 'v0.9.0',
     date: '2026-07-03',
     image: 'dealroom-app:v12',
