@@ -6,9 +6,12 @@ import type {
   Screen,
   ScoredTargets,
   ScoredTarget,
-  ScreenMutationError
+  ScreenMutationError,
+  AnalystResearch,
+  CompanyResearch
 } from '../types';
 import { api } from '../api';
+import { ResearchDetail } from './AnalystReports';
 
 const TIER_BADGE: Record<number, { label: string; cls: string; role: string }> = {
   1: { label: 'GATE', cls: 'gate', role: 'binding LPA constraints' },
@@ -19,10 +22,12 @@ const TIER_BADGE: Record<number, { label: string; cls: string; role: string }> =
 export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: () => void } = {}) {
   const [fw, setFw] = useState<Framework | null>(null);
   const [scored, setScored] = useState<ScoredTargets | null>(null);
-  const [expanded, setExpanded] = useState<string | null>('fund-iv');
+  const [research, setResearch] = useState<AnalystResearch | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [creatingUnder, setCreatingUnder] = useState<string | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  const [mandatesOpen, setMandatesOpen] = useState(false);
 
   async function refresh() {
     const [f, s] = await Promise.all([api.framework(), api.scoredTargets()]);
@@ -31,7 +36,16 @@ export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: (
   }
   useEffect(() => {
     refresh();
+    api.research().then(setResearch).catch(() => {});
   }, []);
+
+  // Analyst research keyed by target id (scored targets and research share the
+  // same desk-company id), for the inline expandable detail on each ranked target.
+  const researchById = useMemo(() => {
+    const m: Record<string, CompanyResearch> = {};
+    for (const c of research?.companies ?? []) m[c.id] = c.research;
+    return m;
+  }, [research]);
 
   if (!fw) return <div className="framework"><div className="finding empty">Loading framework…</div></div>;
 
@@ -54,66 +68,85 @@ export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: (
     }
   }
 
+  const selectedScreens = fw.themes.reduce((n, t) => n + t.screens.filter((s) => s.selected).length, 0);
+
   return (
     <div className="framework">
-      <div className="fw-grid">
-        {/* Left: the three-tier hierarchy */}
-        <div className="fw-tree">
-          <FundCard
-            fund={fw.fund}
-            expanded={expanded === fw.fund.id}
-            onToggle={() => setExpanded(expanded === fw.fund.id ? null : fw.fund.id)}
-          />
-
-          <div className="fw-themes-hd">
-            <span className="fw-section-label">Investment themes &amp; screens</span>
-          </div>
-
-          {fw.themes.map((t) => (
-            <ThemeBlock
-              key={t.id}
-              theme={t}
-              fund={fw.fund}
-              expandedId={expanded}
-              editingId={editing}
-              creatingUnder={creatingUnder}
-              onToggleExpand={(id) => setExpanded(expanded === id ? null : id)}
-              onToggleTheme={toggleTheme}
-              onToggleScreen={toggleScreen}
-              onEdit={(id) => { setEditing(id); setExpanded(id); }}
-              onCancelEdit={() => setEditing(null)}
-              onStartCreate={(themeId) => { setCreatingUnder(themeId); setExpanded(themeId); }}
-              onCancelCreate={() => setCreatingUnder(null)}
-              onSaved={async () => { setEditing(null); setCreatingUnder(null); await refresh(); }}
-            />
-          ))}
-        </div>
-
-        {/* Right: ranked targets */}
-        <div className="scored">
-          <div className="scored-hd">
-            <span className="m365-title">Ranked targets</span>
-            <span className="m365-count">
-              {scored ? `${scored.selectedCount} screen${scored.selectedCount === 1 ? '' : 's'} active` : '…'}
-            </span>
-          </div>
-          <div className="scored-sub">
-            {scored?.totalCount ?? 0} companies discovered on the News &amp; filings desk —
-            gated by the <b>Fund Mandate</b>, then ranked by your selected <b>screens</b>.
-            {(scored?.gatedCount ?? 0) > 0 && (
-              <span className="disc-note gated"> · {scored!.gatedCount} excluded by the gate</span>
-            )}
-            {(scored?.discoveredCount ?? 0) > 0 && (
-              <span className="disc-note"> · {scored!.discoveredCount} new from “Find more news”</span>
-            )}
-          </div>
-          {scored?.selectedCount === 0 && (
-            <div className="finding empty" style={{ margin: '10px 0' }}>
-              Select one or more screens (or a theme) to rank targets.
+      {/* Collapsible three-tier investment-mandate hierarchy (starts collapsed) */}
+      <div className={`fw-mandates ${mandatesOpen ? 'open' : ''}`}>
+        <button className="fw-mandates-hd" onClick={() => setMandatesOpen((v) => !v)}>
+          <span className="fw-mandates-caret">{mandatesOpen ? '▾' : '▸'}</span>
+          <div className="fw-mandates-titles">
+            <div className="fw-mandates-title">Investment mandates</div>
+            <div className="fw-mandates-sub">
+              <span className="tier-badge gate">GATE</span> fund mandate ·
+              <span className="tier-badge guide">GUIDE</span> themes ·
+              <span className="tier-badge rank">RANK</span> screens
             </div>
-          )}
-          {scored?.targets.map((t) => <ScoredRow key={t.id} t={t} onSend={sendToScreening} sending={sending === t.id} />)}
+          </div>
+          <span className="fw-mandates-count">{selectedScreens} screen{selectedScreens === 1 ? '' : 's'} active</span>
+        </button>
+
+        {mandatesOpen && (
+          <div className="fw-tree">
+            <FundCard
+              fund={fw.fund}
+              expanded={expanded === fw.fund.id}
+              onToggle={() => setExpanded(expanded === fw.fund.id ? null : fw.fund.id)}
+            />
+
+            <div className="fw-themes-hd">
+              <span className="fw-section-label">Investment themes &amp; screens</span>
+            </div>
+
+            {fw.themes.map((t) => (
+              <ThemeBlock
+                key={t.id}
+                theme={t}
+                fund={fw.fund}
+                expandedId={expanded}
+                editingId={editing}
+                creatingUnder={creatingUnder}
+                onToggleExpand={(id) => setExpanded(expanded === id ? null : id)}
+                onToggleTheme={toggleTheme}
+                onToggleScreen={toggleScreen}
+                onEdit={(id) => { setEditing(id); setExpanded(id); }}
+                onCancelEdit={() => setEditing(null)}
+                onStartCreate={(themeId) => { setCreatingUnder(themeId); setExpanded(themeId); }}
+                onCancelCreate={() => setCreatingUnder(null)}
+                onSaved={async () => { setEditing(null); setCreatingUnder(null); await refresh(); }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Ranked targets — full-width, at the bottom of the page */}
+      <div className="scored full">
+        <div className="scored-hd">
+          <span className="m365-title">Ranked targets</span>
+          <span className="m365-count">
+            {scored ? `${scored.selectedCount} screen${scored.selectedCount === 1 ? '' : 's'} active` : '…'}
+          </span>
         </div>
+        <div className="scored-sub">
+          {scored?.totalCount ?? 0} companies discovered on the News &amp; filings desk —
+          gated by the <b>Fund Mandate</b>, then ranked by your selected <b>screens</b>.
+          {(scored?.gatedCount ?? 0) > 0 && (
+            <span className="disc-note gated"> · {scored!.gatedCount} excluded by the gate</span>
+          )}
+          {(scored?.discoveredCount ?? 0) > 0 && (
+            <span className="disc-note"> · {scored!.discoveredCount} new from “Find more news”</span>
+          )}
+        </div>
+        {scored?.selectedCount === 0 && (
+          <div className="finding empty" style={{ margin: '10px 0' }}>
+            Select one or more screens (or a theme) in <b>Investment mandates</b> above to rank targets.
+          </div>
+        )}
+        {scored?.targets.map((t) => (
+          <ScoredRow key={t.id} t={t} onSend={sendToScreening} sending={sending === t.id} research={researchById[t.id]} />
+        ))}
       </div>
     </div>
   );
@@ -413,7 +446,8 @@ const PART_KEYS: { k: keyof NonNullable<ScoredTarget['parts']>; label: string }[
   { k: 'growth', label: 'Grw' }
 ];
 
-function ScoredRow({ t, onSend, sending }: { t: ScoredTarget; onSend: (deskId: string) => void; sending: boolean }) {
+function ScoredRow({ t, onSend, sending, research }: { t: ScoredTarget; onSend: (deskId: string) => void; sending: boolean; research?: CompanyResearch }) {
+  const [open, setOpen] = useState(false);
   if (t.gated) {
     return (
       <div className="scored-row gated">
@@ -432,42 +466,54 @@ function ScoredRow({ t, onSend, sending }: { t: ScoredTarget; onSend: (deskId: s
     );
   }
   return (
-    <div className={`scored-row ${t.justDiscovered ? 'new' : ''}`}>
-      <div className={`score-badge ${t.band}`}>{t.score}</div>
-      <div className="scored-main">
-        <div className="scored-name">
-          {t.name}
-          <span className="gate-pass" title="Passes the fund mandate">✓ gate</span>
-          {t.justDiscovered && <span className="new-badge">✦ new</span>}
-          <span className="scored-srcs">
-            {t.sources.map((s) => <span key={s} className={`src-tag ${s}`}>{s === 'cxo' ? 'CxO' : 'News'}</span>)}
-          </span>
-        </div>
-        <div className="scored-meta">{t.sector} · {t.region} · €{t.dealSize}M · {t.ownership}</div>
-        {t.matchedScreen ? (
-          <div className="scored-match">
-            best screen <b>{t.matchedScreen.name}</b>
-            {t.parts && (
-              <span className="score-parts">
-                {PART_KEYS.map(({ k, label }) => (
-                  <span key={k} className={`sp ${t.parts![k] > 0 ? 'hit' : 'miss'}`} title={`${label}: ${t.parts![k]}`}>{label}</span>
-                ))}
-              </span>
-            )}
+    <div className={`scored-row ${t.justDiscovered ? 'new' : ''} ${open ? 'open' : ''}`}>
+      <div className="scored-lead">
+        <div className={`score-badge ${t.band}`}>{t.score}</div>
+        <div className="scored-main">
+          <div className="scored-name">
+            {t.name}
+            <span className="gate-pass" title="Passes the fund mandate">✓ gate</span>
+            {t.justDiscovered && <span className="new-badge">✦ new</span>}
+            <span className="scored-srcs">
+              {t.sources.map((s) => <span key={s} className={`src-tag ${s}`}>{s === 'cxo' ? 'CxO' : 'News'}</span>)}
+            </span>
           </div>
-        ) : (
-          <div className="scored-match none">no screen selected</div>
-        )}
+          <div className="scored-meta">{t.sector} · {t.region} · €{t.dealSize}M · {t.ownership}</div>
+          {t.matchedScreen ? (
+            <div className="scored-match">
+              best screen <b>{t.matchedScreen.name}</b>
+              {t.parts && (
+                <span className="score-parts">
+                  {PART_KEYS.map(({ k, label }) => (
+                    <span key={k} className={`sp ${t.parts![k] > 0 ? 'hit' : 'miss'}`} title={`${label}: ${t.parts![k]}`}>{label}</span>
+                  ))}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="scored-match none">no screen selected</div>
+          )}
+          {research && (
+            <button className="scored-research-toggle" onClick={() => setOpen((v) => !v)}>
+              {open ? '▾' : '▸'} Analyst research · sector outlook · competitive rank · sell-side view
+            </button>
+          )}
+        </div>
+        <div className="scored-send">
+          {t.inFunnel ? (
+            <span className="in-funnel" title="Already in the Stage-1 funnel">in funnel ✓</span>
+          ) : (
+            <button className="btn tiny primary" disabled={sending} onClick={() => onSend(t.id)}>
+              {sending ? '…' : '→ Send to screening'}
+            </button>
+          )}
+        </div>
       </div>
-      <div className="scored-send">
-        {t.inFunnel ? (
-          <span className="in-funnel" title="Already in the Stage-1 funnel">in funnel ✓</span>
-        ) : (
-          <button className="btn tiny primary" disabled={sending} onClick={() => onSend(t.id)}>
-            {sending ? '…' : '→ Send to screening'}
-          </button>
-        )}
-      </div>
+      {research && open && (
+        <div className="scored-research">
+          <ResearchDetail r={research} />
+        </div>
+      )}
     </div>
   );
 }

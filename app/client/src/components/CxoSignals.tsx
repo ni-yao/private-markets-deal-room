@@ -23,7 +23,7 @@ export function CxoSignals({ onBack }: Props) {
   const [mailbox, setMailbox] = useState<Mailbox | null>(null);
   const [companies, setCompanies] = useState<SignalCompany[]>([]);
   const [tab, setTab] = useState<Tab>('emails');
-  const [expanded, setExpanded] = useState<string | null>('frostbite');
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [crm, setCrm] = useState<Record<string, CrmRelationship>>({});
   const [crmLoading, setCrmLoading] = useState<string | null>(null);
 

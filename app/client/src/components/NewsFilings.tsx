@@ -20,7 +20,7 @@ export function NewsFilings({ onBack }: Props) {
   const [testing, setTesting] = useState<string | null>(null);
 
   const [openNews, setOpenNews] = useState<Set<string>>(new Set());
-  const [openFilings, setOpenFilings] = useState<string | null>(null);
+  const [openFilings, setOpenFilings] = useState<Set<string>>(new Set());
   const [qualityRun, setQualityRun] = useState<Set<string>>(new Set());
   const [runningQuality, setRunningQuality] = useState<string | null>(null);
   const [findingMore, setFindingMore] = useState(false);
@@ -29,7 +29,10 @@ export function NewsFilings({ onBack }: Props) {
   useEffect(() => {
     api.newsDesk().then((d) => {
       setDesk(d);
-      setOpenNews(new Set(d.companies.map((c) => c.id)));
+      // "In the News" starts fully collapsed; every identified company gets its
+      // Morningstar quality check auto-run so no manual click is needed.
+      setOpenNews(new Set());
+      setQualityRun(new Set(d.companies.map((c) => c.id)));
     });
   }, []);
 
@@ -58,12 +61,17 @@ export function NewsFilings({ onBack }: Props) {
   async function findMore() {
     if (findingMore) return;
     setFindingMore(true);
+    const priorIds = new Set(desk?.companies.map((c) => c.id) ?? []);
     try {
       const { desk: d } = await api.findMoreNews();
       setDesk(d);
-      // open the newly revealed company's news
-      const newIds = d.companies.map((c) => c.id);
-      setOpenNews((s) => new Set([...s, ...newIds]));
+      // Any newly discovered company auto-runs BOTH quantify-with-filings and the
+      // Morningstar quality check. "In the News" stays collapsed for new finds.
+      const newIds = d.companies.map((c) => c.id).filter((id) => !priorIds.has(id));
+      if (newIds.length) {
+        setOpenFilings((s) => new Set([...s, ...newIds]));
+        setQualityRun((s) => new Set([...s, ...newIds]));
+      }
     } finally {
       setFindingMore(false);
     }
@@ -197,10 +205,10 @@ export function NewsFilings({ onBack }: Props) {
           <ColHeader n={2} title="Quantify with Filings" sub="confirm & validate" sources={sourcesByRole('confirm')} />
           <div className="col-body">
             {desk.companies.map((c) => {
-              const open = openFilings === c.id;
+              const open = openFilings.has(c.id);
               return (
                 <div className={`co-block ${open ? 'open' : ''}`} key={c.id}>
-                  <button className="co-block-hd" onClick={() => setOpenFilings(open ? null : c.id)}>
+                  <button className="co-block-hd" onClick={() => setOpenFilings((s) => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; })}>
                     <span className="cob-caret">{open ? '▾' : '▸'}</span>
                     <div className="cob-main">
                       <div className="cob-name">{c.name}</div>

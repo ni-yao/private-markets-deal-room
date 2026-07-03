@@ -1,0 +1,91 @@
+import { useEffect, useState } from 'react';
+import type { Mailbox, SignalCompany, SourcingDesk } from '../types';
+import { api } from '../api';
+
+// CxO Signals summary — a compact card on the Deal Sourcing page. Surfaces the
+// M365 signal metrics (emails / chats / meeting notes) and the number of target
+// companies identified, and opens the full CxO Signals desk on click.
+export function CxoSummary({ onOpen }: { onOpen: () => void }) {
+  const [mailbox, setMailbox] = useState<Mailbox | null>(null);
+  const [companies, setCompanies] = useState<SignalCompany[] | null>(null);
+
+  useEffect(() => {
+    api.mailbox().then(setMailbox).catch(() => {});
+    api.signalCompanies().then(setCompanies).catch(() => {});
+  }, []);
+
+  const emails = mailbox?.emails.length ?? 0;
+  const chats = mailbox?.chats.length ?? 0;
+  const meetings = mailbox?.meetings.length ?? 0;
+  const targets = companies?.length ?? 0;
+
+  return (
+    <button className="src-summary cxo" onClick={onOpen}>
+      <div className="ss-head">
+        <span className="ss-ic">✦</span>
+        <div className="ss-titles">
+          <div className="ss-title">CxO Signals</div>
+          <div className="ss-sub">M365 intent — emails, chats & meeting notes</div>
+        </div>
+        <span className="ss-go">explore →</span>
+      </div>
+      <div className="ss-metrics">
+        <div className="ss-metric"><span className="ss-n">{emails}</span><span className="ss-l">✉ Emails</span></div>
+        <div className="ss-metric"><span className="ss-n">{chats}</span><span className="ss-l">💬 Chats</span></div>
+        <div className="ss-metric"><span className="ss-n">{meetings}</span><span className="ss-l">🗓 Meeting notes</span></div>
+      </div>
+      <div className="ss-foot">
+        <span className="ss-foot-n">{targets}</span> target{targets === 1 ? '' : 's'} identified from signals
+      </div>
+    </button>
+  );
+}
+
+// News & Filings summary — a compact card on the Deal Sourcing page. Lists the
+// companies surfaced in the news with their Morningstar rating, plus the total
+// number of filings pulled, and opens the full News & Filings desk on click.
+export function NewsSummary({ onOpen }: { onOpen: () => void }) {
+  const [desk, setDesk] = useState<SourcingDesk | null>(null);
+
+  useEffect(() => {
+    api.newsDesk().then(setDesk).catch(() => {});
+  }, []);
+
+  const companies = desk?.companies ?? [];
+  const filings = companies.reduce((n, c) => n + c.filings.length, 0);
+
+  function band(score: number) {
+    return score >= 7 ? 'strong' : score >= 5 ? 'moderate' : 'weak';
+  }
+
+  return (
+    <button className="src-summary news" onClick={onOpen}>
+      <div className="ss-head">
+        <span className="ss-ic">📰</span>
+        <div className="ss-titles">
+          <div className="ss-title">News &amp; Filings</div>
+          <div className="ss-sub">Public catalysts, filings & Morningstar quality</div>
+        </div>
+        <span className="ss-go">explore →</span>
+      </div>
+
+      <div className="ss-metrics">
+        <div className="ss-metric"><span className="ss-n">{companies.length}</span><span className="ss-l">📈 In the news</span></div>
+        <div className="ss-metric"><span className="ss-n">{filings}</span><span className="ss-l">📄 Filings pulled</span></div>
+      </div>
+
+      <div className="ss-colist">
+        {companies.length === 0 && <div className="ss-empty">Loading the news desk…</div>}
+        {companies.map((c) => (
+          <div className="ss-corow" key={c.id}>
+            <span className="ss-coname">{c.name}</span>
+            <span className="ss-cofilings">📄 {c.filings.length}</span>
+            <span className={`ss-rating ${band(c.quality.score)}`} title={`Morningstar ${c.quality.rating}`}>
+              ★ {c.quality.rating}
+            </span>
+          </div>
+        ))}
+      </div>
+    </button>
+  );
+}

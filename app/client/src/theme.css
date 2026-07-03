@@ -419,8 +419,10 @@ button { font-family: inherit; cursor: pointer; }
 .scored { padding: 14px 16px; overflow-y: auto; }
 .scored-hd { display: flex; align-items: center; justify-content: space-between; }
 .scored-sub { font-size: 11px; color: var(--muted); margin: 4px 0 12px; line-height: 1.4; }
-.scored-row { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.scored-row { display: flex; flex-direction: column; gap: 0; padding: 10px 0; border-bottom: 1px solid var(--line-2); }
 .scored-row:last-child { border-bottom: none; }
+.scored-lead { display: flex; gap: 12px; align-items: center; }
+.scored-row.gated { flex-direction: row; gap: 12px; align-items: center; }
 .score-badge { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-size: 16px; font-weight: 800; color: #fff; flex-shrink: 0; }
 .score-badge.strong { background: var(--positive); }
 .score-badge.moderate { background: var(--amber); }
@@ -1159,6 +1161,58 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 /* Send-to-screening on O1 ranked targets */
 .scored-send { display: flex; align-items: center; margin-left: auto; padding-left: 10px; }
 .in-funnel { font-size: 10px; font-weight: 800; color: var(--positive); background: var(--positive-tint); border-radius: 10px; padding: 3px 9px; white-space: nowrap; }
+
+/* ===== O1 Deal Sourcing — CxO + News summary cards ===== */
+.o1-summaries { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 18px; }
+@media (max-width: 1080px) { .o1-summaries { grid-template-columns: 1fr; } }
+.src-summary { text-align: left; font-family: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 15px 16px; cursor: pointer; display: flex; flex-direction: column; gap: 13px; transition: border-color .13s, box-shadow .13s, transform .1s; }
+.src-summary:hover { border-color: var(--primary); box-shadow: 0 8px 22px rgba(2,6,23,.10); transform: translateY(-1px); }
+.src-summary.cxo:hover { border-color: #2563eb; }
+.src-summary.news:hover { border-color: #b45309; }
+.ss-head { display: flex; align-items: center; gap: 11px; }
+.ss-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
+.src-summary.cxo .ss-ic { background: #e0f2fe; }
+.src-summary.news .ss-ic { background: #fff7ed; }
+.ss-titles { flex: 1; min-width: 0; }
+.ss-title { font-size: 15px; font-weight: 800; color: var(--ink); letter-spacing: -.2px; }
+.ss-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.ss-go { font-size: 11px; font-weight: 700; color: var(--primary); white-space: nowrap; }
+.ss-metrics { display: flex; gap: 10px; }
+.ss-metric { flex: 1; background: var(--canvas); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 10px; text-align: center; }
+.ss-n { display: block; font-size: 20px; font-weight: 800; color: var(--ink); line-height: 1; }
+.ss-l { display: block; font-size: 9.5px; font-weight: 650; color: var(--muted); margin-top: 5px; }
+.ss-foot { font-size: 12px; color: var(--ink-2); }
+.ss-foot-n { font-weight: 800; color: var(--ink); }
+.ss-colist { display: flex; flex-direction: column; gap: 5px; }
+.ss-corow { display: flex; align-items: center; gap: 9px; padding: 6px 9px; background: var(--canvas); border: 1px solid var(--line-2); border-radius: 8px; }
+.ss-coname { flex: 1; min-width: 0; font-size: 12px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-cofilings { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.ss-rating { font-size: 10px; font-weight: 800; letter-spacing: .2px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.ss-rating.strong { background: var(--positive-tint); color: var(--positive); }
+.ss-rating.moderate { background: var(--amber-tint); color: var(--amber); }
+.ss-rating.weak { background: #fef2f2; color: var(--danger); }
+.ss-empty { font-size: 11px; color: var(--muted); padding: 4px 2px; }
+
+/* ===== O1 · collapsible investment mandates ===== */
+.fw-mandates { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin: 14px 14px 0; overflow: hidden; }
+.fw-mandates-hd { width: 100%; display: flex; align-items: center; gap: 11px; padding: 13px 15px; background: transparent; border: none; font-family: inherit; cursor: pointer; text-align: left; }
+.fw-mandates-hd:hover { background: var(--canvas); }
+.fw-mandates-caret { font-size: 12px; color: var(--muted); width: 12px; }
+.fw-mandates-titles { flex: 1; min-width: 0; }
+.fw-mandates-title { font-size: 13.5px; font-weight: 800; color: var(--ink); }
+.fw-mandates-sub { font-size: 10.5px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.fw-mandates-sub .tier-badge { margin-right: 2px; }
+.fw-mandates-count { font-size: 11px; font-weight: 700; color: var(--primary); background: rgba(37,99,235,.08); border-radius: 10px; padding: 3px 10px; white-space: nowrap; }
+.fw-mandates .fw-tree { padding: 4px 14px 16px; }
+
+/* ===== O1 · ranked targets full-width at the bottom ===== */
+.scored.full { padding: 16px; }
+.scored.full .scored-hd .m365-title { font-size: 14px; font-weight: 800; color: var(--ink); }
+.scored-research-toggle { margin-top: 7px; background: none; border: none; padding: 0; font-family: inherit; font-size: 11px; font-weight: 650; color: var(--primary); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.scored-research-toggle:hover { text-decoration: underline; }
+.scored-research { margin: 10px 0 2px 54px; border-left: 2px solid var(--line); padding-left: 14px; }
+.scored-research .rc-body { padding: 0; }
+@media (max-width: 720px) { .scored-research { margin-left: 0; } }
 
 /* ===== Pipeline page ===== */
 .pipe-page { padding: 22px 26px 40px; overflow-y: auto; }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AnalystResearch, ResearchCompany, ResearchView } from '../types';
+import type { AnalystResearch, ResearchCompany, ResearchView, CompanyResearch } from '../types';
 import { api } from '../api';
 import { timeAgo } from './Bits';
 
@@ -80,58 +80,65 @@ function ResearchCard({ c, open, onToggle }: { c: ResearchCompany; open: boolean
         <span className="rc-outlook" style={{ background: outlook.tint, color: outlook.color }}>Sector · {outlook.label}</span>
       </button>
 
-      {open && (
-        <div className="rc-body">
-          <div className="rc-thesis">💡 {r.thesis}</div>
+      {open && <ResearchDetail r={r} />}
+    </div>
+  );
+}
 
-          <div className="rc-grid">
-            {/* Sector outlook */}
-            <div className="rc-panel">
-              <div className="rc-panel-hd"><span className="rc-ic">🌍</span>Sector outlook</div>
-              <div className="rc-sector-name">{r.sector.name}</div>
-              <div className="rc-stats">
-                <span><i>Market</i>{r.sector.market}</span>
-                <span><i>Growth</i>{r.sector.growth}</span>
-                <span><i>Horizon</i>{r.sector.horizon}</span>
-                <span><i>Outlook</i><b style={{ color: outlook.color }}>{outlook.label}</b></span>
-              </div>
-              <div className="rc-summary">{r.sector.summary}</div>
-              <div className="rc-sources">{r.sector.sources.map((s) => <span className="rc-src" key={s}>{s}</span>)}</div>
-            </div>
+// The analyst-research body (sector outlook · competitive rank · sell-side view).
+// Reused both on the Analyst Reports page and inline under each ranked target.
+export function ResearchDetail({ r }: { r: CompanyResearch }) {
+  const outlook = OUTLOOK_META[r.sector.outlook];
+  return (
+    <div className="rc-body">
+      <div className="rc-thesis">💡 {r.thesis}</div>
 
-            {/* Competitive rank */}
-            <div className="rc-panel">
-              <div className="rc-panel-hd"><span className="rc-ic">🏆</span>Competitive rank</div>
-              <div className="rc-rank">
-                <span className="rc-rank-badge">#{r.competitive.rank}</span>
-                <span className="rc-rank-of">of {r.competitive.of}</span>
-                <span className="rc-rank-label">{r.competitive.label}</span>
-              </div>
-              <div className="rc-moat"><b>Moat:</b> {r.competitive.moat}</div>
-              <div className="rc-peers">
-                {r.competitive.peers.map((p) => (
-                  <div className="rc-peer" key={p.name}>
-                    <span className={`peer-dot ${p.listed ? 'listed' : 'private'}`} />
-                    <span className="rc-peer-name">{p.name}</span>
-                    <span className="rc-peer-note">{p.note}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      <div className="rc-grid">
+        {/* Sector outlook */}
+        <div className="rc-panel">
+          <div className="rc-panel-hd"><span className="rc-ic">🌍</span>Sector outlook</div>
+          <div className="rc-sector-name">{r.sector.name}</div>
+          <div className="rc-stats">
+            <span><i>Market</i>{r.sector.market}</span>
+            <span><i>Growth</i>{r.sector.growth}</span>
+            <span><i>Horizon</i>{r.sector.horizon}</span>
+            <span><i>Outlook</i><b style={{ color: outlook.color }}>{outlook.label}</b></span>
           </div>
+          <div className="rc-summary">{r.sector.summary}</div>
+          <div className="rc-sources">{r.sector.sources.map((s) => <span className="rc-src" key={s}>{s}</span>)}</div>
+        </div>
 
-          {/* Sell-side / expert views */}
-          <div className="rc-panel wide">
-            <div className="rc-panel-hd"><span className="rc-ic">📑</span>Sell-side &amp; expert view</div>
-            <div className="rc-views">
-              {r.views.map((v, i) => <ViewRow key={i} v={v} />)}
-            </div>
-            {r.coverage === 'read-across' && (
-              <div className="rc-note">Private target — no direct equity research; context is read-across from listed comps, sector research and expert-network calls.</div>
-            )}
+        {/* Competitive rank */}
+        <div className="rc-panel">
+          <div className="rc-panel-hd"><span className="rc-ic">🏆</span>Competitive rank</div>
+          <div className="rc-rank">
+            <span className="rc-rank-badge">#{r.competitive.rank}</span>
+            <span className="rc-rank-of">of {r.competitive.of}</span>
+            <span className="rc-rank-label">{r.competitive.label}</span>
+          </div>
+          <div className="rc-moat"><b>Moat:</b> {r.competitive.moat}</div>
+          <div className="rc-peers">
+            {r.competitive.peers.map((p) => (
+              <div className="rc-peer" key={p.name}>
+                <span className={`peer-dot ${p.listed ? 'listed' : 'private'}`} />
+                <span className="rc-peer-name">{p.name}</span>
+                <span className="rc-peer-note">{p.note}</span>
+              </div>
+            ))}
           </div>
         </div>
-      )}
+      </div>
+
+      {/* Sell-side / expert views */}
+      <div className="rc-panel wide">
+        <div className="rc-panel-hd"><span className="rc-ic">📑</span>Sell-side &amp; expert view</div>
+        <div className="rc-views">
+          {r.views.map((v, i) => <ViewRow key={i} v={v} />)}
+        </div>
+        {r.coverage === 'read-across' && (
+          <div className="rc-note">Private target — no direct equity research; context is read-across from listed comps, sector research and expert-network calls.</div>
+        )}
+      </div>
     </div>
   );
 }

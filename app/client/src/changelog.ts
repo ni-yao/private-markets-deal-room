@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.9.0',
+    date: '2026-07-03',
+    image: 'dealroom-app:v12',
+    revision: 'ca-dealroom-orch-dev-swc--0000008',
+    title: 'Deal Sourcing page rebuilt · signals-forward',
+    tag: 'feature',
+    highlights: [
+      'Deal Sourcing (O1) is restructured: CxO Signals (left) and News & Filings (right) are now their own summary cards at the top — CxO shows email/chat/meeting-note counts and targets identified; News lists the companies in the news with filings pulled and their Morningstar rating. The old Inputs box is gone.',
+      'The three-tier investment-mandate hierarchy (GATE · GUIDE · RANK) now lives in a collapsible section that starts collapsed, and the Ranked Targets moved to the bottom of the page.',
+      'Analyst research is attached inline to each ranked target — expand a target to see its sector outlook, competitive rank and sell-side view (no more separate Analyst Reports page needed).',
+      'News & Filings desk: “In the news” starts collapsed, the Morningstar quality check auto-runs for every identified company, and “Find more news” now auto-runs both filings and the quality check on any newly discovered company. The CxO desk’s target list also starts collapsed.'
+    ]
+  },
+  {
     version: 'v0.8.0',
     date: '2026-07-03',
     image: 'dealroom-app:v11',

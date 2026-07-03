@@ -222,7 +222,6 @@ export default function App() {
                 onJumpCurrent={() => setViewStep(deal.currentStep)}
                 onOpenSignals={() => setSignalsOpen(true)}
                 onOpenNews={() => setNewsOpen(true)}
-                onOpenResearch={() => setResearchOpen(true)}
                 mdOptions={mdOptions}
                 onAssignSwimlane={assignSwimlane}
                 onCycleChecklist={cycleChecklist}

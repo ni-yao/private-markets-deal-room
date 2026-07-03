@@ -5,6 +5,7 @@ import { SourcingFramework } from './SourcingFramework';
 import { ScreeningGate } from './ScreeningGate';
 import { CohortDesk } from './CohortDesk';
 import { Workspace } from './Workspace';
+import { CxoSummary, NewsSummary } from './SourcingSummaries';
 
 interface Props {
   flow: Flow;
@@ -20,7 +21,6 @@ interface Props {
   onJumpCurrent: () => void;
   onOpenSignals: () => void;
   onOpenNews: () => void;
-  onOpenResearch: () => void;
   mdOptions: MdOption[];
   onAssignSwimlane: (lane: string, md: string) => void;
   onCycleChecklist: (itemId: string) => void;
@@ -38,7 +38,7 @@ const LANE_META: Record<string, { label: string; color: string }> = {
   operations: { label: 'Operations', color: '#ea580c' }
 };
 
-export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, onOpenResearch, mdOptions, onAssignSwimlane, onCycleChecklist, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
+export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onCycleChecklist, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
   const run = deal.stepRuns[step.key];
   const produced = relation === 'done' || !!run;
   const idx = flow.steps.findIndex((s) => s.key === step.key);
@@ -68,58 +68,42 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
 
       <p className="st-what">{step.what}</p>
 
-      <div className="st-grid">
-        <div className="panel">
-          <div className="ph"><span className="ic">↳</span><h3>Inputs</h3></div>
-          <div className="pb">
-            <div className="taglist">
-              {step.inputs.map((t) => {
-                if (step.key === 'O1' && t === 'CxO signals') {
-                  return (
-                    <button key={t} className="tag input-btn" onClick={onOpenSignals}>
-                      ✦ {t} <span className="input-btn-go">explore →</span>
-                    </button>
-                  );
-                }
-                if (step.key === 'O1' && t === 'News & filings') {
-                  return (
-                    <button key={t} className="tag input-btn news" onClick={onOpenNews}>
-                      📰 {t} <span className="input-btn-go">explore →</span>
-                    </button>
-                  );
-                }
-                if (step.key === 'O1' && t === 'Analyst reports') {
-                  return (
-                    <button key={t} className="tag input-btn research" onClick={onOpenResearch}>
-                      📑 {t} <span className="input-btn-go">context →</span>
-                    </button>
-                  );
-                }
-                return <span className="tag" key={t}>{t}</span>;
-              })}
-            </div>
-            {step.stage === 'origination' && (
-              <div className="subtle">
-                Data sources: {stage.dataSources.map((g) => g.items.join(', ')).join(' · ')}
+      {step.key === 'O1' ? (
+        <div className="o1-summaries">
+          <CxoSummary onOpen={onOpenSignals} />
+          <NewsSummary onOpen={onOpenNews} />
+        </div>
+      ) : (
+        <div className="st-grid">
+          <div className="panel">
+            <div className="ph"><span className="ic">↳</span><h3>Inputs</h3></div>
+            <div className="pb">
+              <div className="taglist">
+                {step.inputs.map((t) => <span className="tag" key={t}>{t}</span>)}
               </div>
-            )}
+              {step.stage === 'origination' && (
+                <div className="subtle">
+                  Data sources: {stage.dataSources.map((g) => g.items.join(', ')).join(' · ')}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="panel">
+            <div className="ph"><span className="ic">◇</span><h3>M365 + CRM · Owner</h3></div>
+            <div className="pb">
+              <div className="taglist">
+                {step.m365.map((t) => <span className="tag m365" key={t}>{t}</span>)}
+              </div>
+              <div className="subtle">{step.m365Action}</div>
+              {step.stage === 'origination' && (
+                <div className="taglist" style={{ marginTop: 10 }}>
+                  {stage.skills.map((s) => <span className="tag skill" key={s}>{s}</span>)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-        <div className="panel">
-          <div className="ph"><span className="ic">◇</span><h3>M365 + CRM · Owner</h3></div>
-          <div className="pb">
-            <div className="taglist">
-              {step.m365.map((t) => <span className="tag m365" key={t}>{t}</span>)}
-            </div>
-            <div className="subtle">{step.m365Action}</div>
-            {step.stage === 'origination' && (
-              <div className="taglist" style={{ marginTop: 10 }}>
-                {stage.skills.map((s) => <span className="tag skill" key={s}>{s}</span>)}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Sourcing framework (O1 only) */}
       {step.key === 'O1' && (
