@@ -40,8 +40,12 @@ export default function App() {
       setConfig(cfg);
       setFlow(fl);
       setDeals(ds);
-      const first = await api.deal(ds[0].id);
-      setDeal(first);
+      // Empty start: there may be no deals yet — the pipeline fills as real
+      // companies are sourced and pursued through the Screening Gate.
+      if (ds.length > 0) {
+        const first = await api.deal(ds[0].id);
+        setDeal(first);
+      }
       // Land on the Home command centre — not whatever step the first deal is on.
       setViewStep(HOME);
       api.pipeline().then(setPipeline).catch(() => {});
@@ -158,7 +162,7 @@ export default function App() {
     await api.deals().then(setDeals);
   }
 
-  if (!ready || !config || !flow || !deal) {
+  if (!ready || !config || !flow) {
     return (
       <div className="loading">
         <div>
@@ -177,7 +181,7 @@ export default function App() {
   const barStageId = (isReady || isPipeline) ? 'origination' : step.stage;
   const viewIdx = flow.steps.findIndex((s) => s.key === viewStep);
   const relation: 'done' | 'current' | 'upcoming' =
-    viewIdx < deal.stepIndex ? 'done' : viewIdx === deal.stepIndex ? 'current' : 'upcoming';
+    !deal ? 'upcoming' : viewIdx < deal.stepIndex ? 'done' : viewIdx === deal.stepIndex ? 'current' : 'upcoming';
 
   return (
     <div className="app">
@@ -219,14 +223,14 @@ export default function App() {
                 onRun={runStep}
                 onAdvance={advance}
                 onBack={back}
-                onJumpCurrent={() => setViewStep(deal.currentStep)}
+                onJumpCurrent={() => deal && setViewStep(deal.currentStep)}
                 onOpenSignals={() => setSignalsOpen(true)}
                 onOpenNews={() => setNewsOpen(true)}
                 mdOptions={mdOptions}
                 onAssignSwimlane={assignSwimlane}
                 onCycleChecklist={cycleChecklist}
-                onLaunchDeal={() => launchDeal(deal.id)}
-                launching={launchingId === deal.id}
+                onLaunchDeal={() => deal && launchDeal(deal.id)}
+                launching={!!deal && launchingId === deal.id}
                 launchingId={launchingId}
                 onCohortChanged={onCohortChanged}
                 onLaunchScreened={launchDeal}

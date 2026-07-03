@@ -9,7 +9,7 @@ import { CxoSummary, NewsSummary } from './SourcingSummaries';
 
 interface Props {
   flow: Flow;
-  deal: Deal;
+  deal: Deal | null;
   deals: DealSummary[];
   step: FlowStep;
   stage: FlowStage;
@@ -39,7 +39,7 @@ const LANE_META: Record<string, { label: string; color: string }> = {
 };
 
 export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onCycleChecklist, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
-  const run = deal.stepRuns[step.key];
+  const run = deal?.stepRuns[step.key];
   const produced = relation === 'done' || !!run;
   const idx = flow.steps.findIndex((s) => s.key === step.key);
   const nextStep = flow.steps[idx + 1];
@@ -47,6 +47,29 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
   // Stage-1 origination steps are COHORT desks (a list is filtered), not a
   // single-deal walk — so we suppress the single-deal agent/deliverables/advance.
   const isOrigination = step.stage === 'origination';
+
+  // Diligence steps need an active deal; on an empty pipeline there's none yet.
+  if (!isOrigination && !deal) {
+    return (
+      <div className="station">
+        <div className="st-eyebrow">
+          <span className="badge" style={{ background: stage.accent }}>Stage {stage.num}</span>
+          <span className="ph">{stage.name} · {stage.tagline}</span>
+        </div>
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="pb">
+            <div className="finding empty">
+              No deals in diligence yet. Source companies in <b>Deal Sourcing</b>, advance them through
+              the cohort funnel, and record <b>PURSUE</b> at the Screening Gate to launch a deal here.
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button className="btn primary" onClick={onOpenPipeline}>View the Stage-1 pipeline →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="station">
@@ -175,7 +198,7 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
           </div>
           <div className="pb" style={{ padding: 0 }}>
             <Workspace
-              deal={deal}
+              deal={deal!}
               mdOptions={mdOptions}
               onAssign={onAssignSwimlane}
               onCycleChecklist={onCycleChecklist}
@@ -254,7 +277,7 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
           </div>
 
           {/* Step-specific data panel */}
-          {step.panel && <DataPanel deal={deal} panel={step.panel} />}
+          {step.panel && <DataPanel deal={deal!} panel={step.panel} />}
 
           {/* Advance bar */}
           <div className="advance">

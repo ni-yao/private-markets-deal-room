@@ -40,7 +40,7 @@ async function callAgent(input) {
       continue;
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 90_000);
+    const timer = setTimeout(() => controller.abort(), 150_000);
     try {
       const resp = await fetch(RESPONSES_URL, {
         method: 'POST',

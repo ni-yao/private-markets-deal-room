@@ -2,7 +2,7 @@ import type { DealSummary, Deal, PipelineFunnel, Flow } from '../types';
 
 interface Props {
   deals: DealSummary[];
-  deal: Deal;
+  deal: Deal | null;
   stageId: string;
   pipeline: PipelineFunnel | null;
   flow: Flow;
@@ -57,7 +57,7 @@ function PipelineBar({ pipeline, onFunnelClick }: { pipeline: PipelineFunnel | n
 }
 
 /* ---------------- Stage 2 · Deals-in-diligence distribution ---------------- */
-function StageTwoBar({ deals, deal, flow }: { deals: DealSummary[]; deal: Deal; flow: Flow }) {
+function StageTwoBar({ deals, deal, flow }: { deals: DealSummary[]; deal: Deal | null; flow: Flow }) {
   const dSteps = flow.steps.filter((s) => s.stage === 'diligence');
   const inDiligence = deals.filter((d) => d.stageId === 'diligence');
   const countFor = (key: string) => inDiligence.filter((d) => d.stage === key).length;
@@ -66,15 +66,15 @@ function StageTwoBar({ deals, deal, flow }: { deals: DealSummary[]; deal: Deal; 
     <div className="dealbar stagetwo">
       <div className="pl-fund">
         <div className="s2-eyebrow">Diligence &amp; Approval</div>
-        <div className="co">{deal.company}</div>
-        <div className="mt">{deal.currency} {deal.dealSize}M · {deal.sector}</div>
+        <div className="co">{deal ? deal.company : 'No deal selected'}</div>
+        <div className="mt">{deal ? `${deal.currency} ${deal.dealSize}M · ${deal.sector}` : 'Pursue a company through the Screening Gate to start diligence'}</div>
       </div>
 
       <div className="grow" />
 
       <div className="dist" title="How many deals currently sit in each diligence step">
         {dSteps.map((s) => {
-          const active = s.key === deal.stage;
+          const active = deal ? s.key === deal.stage : false;
           return (
             <div className={`dist-stage ${active ? 'active' : ''}`} key={s.key}>
               <div className="dist-count">{countFor(s.key)}</div>

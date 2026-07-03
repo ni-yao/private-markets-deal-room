@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.11.0',
+    date: '2026-07-04',
+    image: 'dealroom-app:v16',
+    revision: 'ca-dealroom-orch-dev-swc--0000012',
+    title: 'Real datastore · empty-start · durable pipeline',
+    tag: 'feature',
+    highlights: [
+      'The app no longer ships with seeded companies or deals — it starts empty and fills up only with real targets discovered by the sourcing methods. All prior demo data was archived to retrievable JSON.',
+      'A canonical Company profile is now persisted in Azure Cosmos DB for NoSQL (serverless), reached over managed identity with no keys. Companies discovered by the live news agent, plus deals and a workflow event log, are written through a repository seam and survive restarts and replica cycling.',
+      'The live news scout runs on its own dedicated gpt-5-mini deployment (gpt-5-mini-news, 300K TPM) so Bing-grounded, reasoning-heavy searches no longer contend with the interactive app model; the invocation timeout was raised to 150s to accommodate multi-round Bing grounding.',
+      'Entity resolution de-duplicates discovered targets by a normalized key (dropping legal suffixes, aliases and punctuation) so re-searching the same company merges into one profile instead of creating duplicates.',
+      'Verified end-to-end: an empty boot discovers real European mid-market targets (e.g. Spire Healthcare, Louis Dreyfus Armateurs) via Bing grounding, persists them to Cosmos, and reloads them on the next restart. /api/config now reports the active datastore (cosmos) and news-agent (live) modes.'
+    ]
+  },
+  {
     version: 'v0.10.0',
     date: '2026-07-03',
     image: 'dealroom-app:v14',

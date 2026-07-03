@@ -1,12 +1,15 @@
-// In-memory deal store with derived metrics. State is seeded at startup and
-// mutated for the session — enough to make the workspace fully interactive.
+// Production data store. Companies/candidates/deals are persisted to Azure
+// Cosmos DB via lib/repo (managed identity) and rehydrated at startup; they
+// start EMPTY and are populated only by the sourcing input methods. Fund /
+// themes / screens / flow / personas remain in-memory config. lib/repo falls
+// back to an in-memory Map when COSMOS_ENDPOINT is unset so local dev still runs.
 
-import { seedDeals, seedSourcing } from '../data/deals.js';
+import { seedSourcing } from '../data/deals.js';
 import { personas } from '../data/personas.js';
 import { STAGES, STEPS, STEP_KEYS, FLOW, GATE, stepByKey, stepIndex } from '../data/flow.js';
 import { runStep as runStepAgent } from './agents.js';
 import { mailbox, companiesWithSignals, crmForCompany } from '../data/signals.js';
-import { SOURCES, catalysts, catalystById, deskCompanies } from '../data/news.js';
+import { SOURCES, catalysts, catalystById } from '../data/news.js';
 import { researchFor } from '../data/research.js';
 import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage } from './agents.js';
 import { scoutNews, newsAgentConfigured } from './newsAgent.js';
@@ -14,12 +17,12 @@ import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
 import {
-  seedCandidates,
   PASS_REASONS,
   PARK_REASONS,
   reasonLabel,
   stageIndex as candStageIndex
 } from '../data/candidates.js';
+import { initRepo, repoMode, companies as coRepo, deals as dealRepo, recordEvent } from './repo/index.js';
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
@@ -43,17 +46,53 @@ function attachWorkspaces(list) {
   return list;
 }
 
-let deals = attachWorkspaces(clone(seedDeals));
-let sourcing = clone(seedSourcing);
+let deals = [];
+let sourcing = clone(seedSourcing);   // O1 signal-source config (not companies)
 let fund = clone(fundMandate);
 let themes = clone(seedThemes);
 let screens = clone(seedScreens);
 let screenSeq = 1;
 let dealSeq = 1;
 let candSeq = 1;
-let candidates = clone(seedCandidates);
-let desk = clone(deskCompanies);
-let sources = clone(SOURCES);
+let candidates = [];
+let desk = [];
+let sources = clone(SOURCES);         // news-desk source connectors (config)
+
+// ---- persistence seam (P1 / P5) -------------------------------------------
+// Companies (desk targets + funnel candidates) and deals persist to Cosmos via
+// lib/repo. Writes are fire-and-forget so the store's synchronous API is
+// unchanged; the in-memory arrays are the session source of truth and Cosmos is
+// the durable mirror rehydrated at boot. Desk companies and candidates share the
+// `companies` container, tagged by `kind` for rehydration.
+function persistDesk(c) {
+  coRepo.upsert({ ...c, kind: 'desk' }).catch(() => {});
+}
+function persistCand(c) {
+  coRepo.upsert({ ...c, kind: 'candidate' }).catch(() => {});
+}
+function persistDeal(d) {
+  dealRepo.upsert(d).catch(() => {});
+}
+function logEvent(companyId, type, detail) {
+  recordEvent({ companyId, type, detail }).catch(() => {});
+}
+
+// Load persisted state from Cosmos at startup (empty on a fresh datastore).
+export async function hydrate() {
+  const info = await initRepo();
+  if (repoMode() !== 'cosmos') return { mode: repoMode(), companies: 0, deals: 0 };
+  try {
+    const cos = await coRepo.list();
+    desk = cos.filter((c) => c.kind === 'desk');
+    candidates = cos.filter((c) => c.kind === 'candidate');
+    const ds = await dealRepo.list();
+    deals = attachWorkspaces(ds);
+  } catch {
+    /* keep empty in-memory state on a read failure */
+  }
+  return { mode: 'cosmos', companies: desk.length + candidates.length, deals: deals.length };
+}
+
 
 // A screened deal (Stage-2 entry, pre-launch) built from a pursued candidate.
 function makeScreenedDeal(cand, when) {
@@ -350,19 +389,47 @@ export async function searchMoreNews({ focus } = {}) {
   } catch (err) {
     return { source: 'fallback', error: String(err?.message || err), ...findMoreNews() };
   }
-  // Keep only companies we don't already have on the desk (by name).
-  const known = new Set(desk.map((c) => c.name.toLowerCase()));
-  const fresh = scouted.filter((c) => !known.has(c.name.toLowerCase()));
+  // Entity resolution: match by a normalized key (strip legal suffixes,
+  // parenthetical aliases, and punctuation) so re-discovered companies merge
+  // instead of creating duplicate profiles. De-dupes against the desk (which is
+  // rehydrated from Cosmos at boot) and within the incoming batch.
+  const known = new Set(desk.map((c) => entityKey(c.name)));
+  const fresh = [];
+  for (const c of scouted) {
+    const key = entityKey(c.name);
+    if (!key || known.has(key)) continue;
+    known.add(key);
+    fresh.push(c);
+  }
   if (fresh.length === 0) {
     return { source: 'fallback', ...findMoreNews() };
   }
-  for (const c of fresh) desk.push(c);
+  for (const c of fresh) {
+    desk.push(c);
+    persistDesk(c);
+    logEvent(c.id, 'discovered', { via: 'news-agent', name: c.name });
+  }
   return {
     source: 'live',
     revealed: fresh.map(publicCompany),
     revealedCount: fresh.length,
     desk: getSourcingDesk()
   };
+}
+
+// Normalized entity-resolution key: lowercase, drop parenthetical aliases and
+// anything after a slash, strip common legal/entity suffixes and punctuation.
+const LEGAL_SUFFIXES = /\b(plc|inc|ltd|llc|lp|llp|gmbh|ag|sa|sas|sarl|nv|bv|spa|srl|as|ab|oyj|oy|aps|kg|co|corp|corporation|company|group|holding|holdings|international|global|the)\b/g;
+function entityKey(name) {
+  if (!name) return '';
+  return String(name)
+    .toLowerCase()
+    .split('/')[0]                    // "X / X alt spelling" -> "X"
+    .replace(/\([^)]*\)/g, ' ')       // drop "(LDA)" etc.
+    .replace(/&/g, ' and ')
+    .replace(LEGAL_SUFFIXES, ' ')
+    .replace(/[^a-z0-9]+/g, '')       // punctuation + spaces
+    .trim();
 }
 
 export function setFindingCatalyst(findingId, catalystId) {
@@ -372,6 +439,7 @@ export function setFindingCatalyst(findingId, catalystId) {
     if (n) {
       n.catalyst = catalystId;
       n.manualOverride = true;
+      persistDesk(c);
       return { findingId, catalyst: catalystId, companyId: c.id };
     }
   }
@@ -686,7 +754,7 @@ async function ensureAssessment(c, force) {
   if (c.assessments[c.stage] && !force) return c.assessments[c.stage];
   const knowledge = candidateKnowledge(c);
   const a = await assessCandidate({ candidate: publicCandidate(c), stage: c.stage, knowledge });
-  if (a) c.assessments[c.stage] = a;
+  if (a) { c.assessments[c.stage] = a; persistCand(c); }
   return a;
 }
 
@@ -729,6 +797,7 @@ export async function chatCandidateById(id, message) {
     stage: c.stage, agent: agentForStage(c.stage), knowledge, assessment, message: text, history
   });
   c.chatLog.push({ role: 'agent', content: out.reply, at: new Date().toISOString(), source: out.source });
+  persistCand(c);
   return { reply: out.reply, source: out.source, log: c.chatLog };
 }
 
@@ -774,6 +843,8 @@ export function screenCandidate(id, action, reason, note) {
   const c = candidates.find((x) => x.id === id);
   if (!c || c.stage !== 'O2' || c.disposition !== 'active') return { error: 'not-actionable' };
   transition(c, 'O2', action, reason, note);
+  persistCand(c);
+  logEvent(c.deskId || c.id, 'screen', { action, reason: reason || null });
   return { ok: true, candidate: publicCandidate(c) };
 }
 
@@ -781,6 +852,8 @@ export function triageCandidate(id, action, reason, note) {
   const c = candidates.find((x) => x.id === id);
   if (!c || c.stage !== 'O3' || c.disposition !== 'active') return { error: 'not-actionable' };
   transition(c, 'O3', action, reason, note);
+  persistCand(c);
+  logEvent(c.deskId || c.id, 'triage', { action, reason: reason || null });
   return { ok: true, candidate: publicCandidate(c) };
 }
 
@@ -798,9 +871,14 @@ export function gateCandidate(id, action, reason, note) {
     c.passReason = null;
     const deal = makeScreenedDeal(c, new Date().toISOString());
     deals.push(deal);
+    persistCand(c);
+    persistDeal(deal);
+    logEvent(c.deskId || c.id, 'pursue', { deal: deal.id, company: c.company });
     return { ok: true, candidate: publicCandidate(c), deal: getDeal(deal.id) };
   }
   transition(c, 'O4', action, reason, note);
+  persistCand(c);
+  logEvent(c.deskId || c.id, 'gate', { action, reason: reason || null });
   return { ok: true, candidate: publicCandidate(c) };
 }
 
@@ -835,6 +913,8 @@ export function sendToScreening(deskId) {
     sourcedAt: new Date().toISOString()
   };
   candidates.push(c);
+  persistCand(c);
+  logEvent(d.id, 'sent-to-screening', { candidate: c.id, company: c.company });
   return { ok: true, candidate: publicCandidate(c) };
 }
 
@@ -858,6 +938,8 @@ export function launchDeal(id) {
     { actor: 'Power Automate', action: `PURSUE — ${GATE.detail}`, when: new Date().toISOString() },
     { actor: 'Gate-Orchestration Agent', action: 'Provisioned Teams + SharePoint workspace, DD checklist & templates', when: new Date().toISOString() }
   );
+  persistDeal(deal);
+  logEvent(deal.id, 'launch', { company: deal.company });
   return { deal: getDeal(id) };
 }
 
@@ -875,6 +957,7 @@ export function assignSwimlane(id, lane, md) {
   sl.md = md;
   const ws = deal.workstreams.find((w) => w.lane === lane);
   if (ws) ws.owner = md;
+  persistDeal(deal);
   return { deal: getDeal(id) };
 }
 
@@ -887,6 +970,7 @@ export function cycleChecklistItem(id, itemId) {
     const it = sec.items.find((x) => x.id === itemId);
     if (it) {
       it.status = order[(order.indexOf(it.status) + 1) % order.length];
+      persistDeal(deal);
       return { deal: getDeal(id) };
     }
   }
@@ -907,6 +991,7 @@ export function advanceDeal(id) {
       when: new Date().toISOString()
     });
   }
+  persistDeal(deal);
   return getDeal(id);
 }
 
@@ -915,6 +1000,7 @@ export function regressDeal(id) {
   if (!deal) return null;
   const idx = stepIndex(deal.stage);
   if (idx > 0) deal.stage = STEP_KEYS[idx - 1];
+  persistDeal(deal);
   return getDeal(id);
 }
 
@@ -924,19 +1010,21 @@ export async function runStep(id, stepKey) {
   const step = stepByKey(stepKey);
   if (!step) return null;
   const result = await runStepAgent({ deal, step });
+  persistDeal(deal);
   return { result, deal: getDeal(id) };
 }
 
 export function portfolioStats() {
   const list = deals.map(derive);
+  const n = list.length;
   const totalHours = list.reduce((s, d) => s + (d.hoursSaved || 0), 0);
-  const avgReadiness = Math.round(list.reduce((s, d) => s + d.readiness, 0) / list.length);
+  const avgReadiness = n ? Math.round(list.reduce((s, d) => s + d.readiness, 0) / n) : 0;
   const inDiligence = list.filter((d) => d.stage.startsWith('D')).length;
-  const avgDaysSaved = Math.round(list.reduce((s, d) => s + d.projectedDaysSaved, 0) / list.length);
+  const avgDaysSaved = n ? Math.round(list.reduce((s, d) => s + d.projectedDaysSaved, 0) / n) : 0;
   const baseline = list[0]?.baselineDays || 45;
-  const cycleReduction = Math.round((avgDaysSaved / baseline) * 100);
+  const cycleReduction = baseline ? Math.round((avgDaysSaved / baseline) * 100) : 0;
   return {
-    deals: list.length,
+    deals: n,
     inDiligence,
     totalHoursSaved: totalHours,
     avgReadiness,
@@ -947,8 +1035,10 @@ export function portfolioStats() {
   };
 }
 
+// Reset to a clean EMPTY production state (no seed companies). Persisted state in
+// Cosmos is untouched; callers that want a fresh datastore clear it out-of-band.
 export function resetStore() {
-  deals = attachWorkspaces(clone(seedDeals));
+  deals = [];
   sourcing = clone(seedSourcing);
   fund = clone(fundMandate);
   themes = clone(seedThemes);
@@ -956,8 +1046,7 @@ export function resetStore() {
   screenSeq = 1;
   dealSeq = 1;
   candSeq = 1;
-  candidates = clone(seedCandidates);
-  desk = clone(deskCompanies);
+  candidates = [];
+  desk = [];
   sources = clone(SOURCES);
-  initScreenedFromCandidates();
 }

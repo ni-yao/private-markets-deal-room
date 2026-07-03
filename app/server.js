@@ -50,12 +50,14 @@ import {
   advanceDeal,
   regressDeal,
   runStep,
-  portfolioStats
+  portfolioStats,
+  hydrate
 } from './lib/store.js';
 import { personaById } from './data/personas.js';
 import { runAction, chat } from './lib/agents.js';
 import { getModelInfo } from './lib/ai.js';
 import { newsAgentConfigured } from './lib/newsAgent.js';
+import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -76,7 +78,8 @@ api.get('/config', (_req, res) => {
     ...info,
     region: process.env.DEAL_ROOM_REGION || 'swedencentral',
     appName: 'The Deal Room',
-    newsAgent: newsAgentConfigured() ? 'live' : 'demo'
+    newsAgent: newsAgentConfigured() ? 'live' : 'demo',
+    datastore: repoMode()
   });
 });
 
@@ -315,7 +318,14 @@ if (existsSync(clientDist)) {
 }
 
 const port = process.env.PORT || 8080;
-app.listen(port, () => {
-  const info = getModelInfo();
-  console.log(`The Deal Room listening on :${port} — AI mode: ${info.mode} (${info.model})`);
-});
+
+// Rehydrate persisted state from Cosmos before accepting traffic (P1/P5).
+hydrate()
+  .then((h) => console.log(`Datastore: ${h.mode} — ${h.companies ?? 0} companies, ${h.deals ?? 0} deals`))
+  .catch((e) => console.log(`Datastore init issue: ${String(e?.message || e)}`))
+  .finally(() => {
+    app.listen(port, () => {
+      const info = getModelInfo();
+      console.log(`The Deal Room listening on :${port} — AI mode: ${info.mode} (${info.model})`);
+    });
+  });

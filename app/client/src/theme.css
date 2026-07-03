@@ -772,6 +772,7 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 
 .spine-dealsel { margin: 4px 12px 8px; position: relative; }
 .sds-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: #64748b; margin: 2px 0 4px 4px; }
+.sds-empty { font-size: 10.5px; color: #64748b; padding: 8px 10px; margin: 2px 2px; border: 1px dashed #334155; border-radius: 9px; background: rgba(255,255,255,.02); }
 .sds-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); color: #e2e8f0; text-align: left; }
 .sds-btn:hover { background: rgba(255,255,255,.08); }
 .sds-co { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

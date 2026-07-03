@@ -3,7 +3,7 @@ import type { Flow, Deal, DealSummary, AppConfig } from '../types';
 
 interface Props {
   flow: Flow;
-  deal: Deal;
+  deal: Deal | null;
   deals: DealSummary[];
   viewStep: string;
   onSelect: (key: string) => void;
@@ -14,7 +14,7 @@ interface Props {
 
 export function FlowNav({ flow, deal, deals, viewStep, onSelect, onPickDeal, onOpenPipeline, config }: Props) {
   const stepKeys = flow.steps.map((s) => s.key);
-  const currentIdx = deal.stepIndex;
+  const currentIdx = deal ? deal.stepIndex : -1;
   const stage2Deals = deals.filter((d) => d.stageId === 'diligence');
 
   const stateOf = (key: string) => {
@@ -60,7 +60,9 @@ export function FlowNav({ flow, deal, deals, viewStep, onSelect, onPickDeal, onO
               </button>
 
               {stage.id === 'diligence' && (
-                <DealSelect deals={stage2Deals} deal={deal} onPick={onPickDeal} />
+                stage2Deals.length > 0 && deal
+                  ? <DealSelect deals={stage2Deals} deal={deal} onPick={onPickDeal} />
+                  : <div className="sds-empty">No deals in diligence yet</div>
               )}
 
               {steps.map((step) => {
