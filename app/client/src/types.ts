@@ -471,6 +471,35 @@ export interface SourceTestResult {
   message: string;
 }
 
+// ---- Data-source connectivity (Home panel) ----
+export interface Connector {
+  id: string;
+  name: string;
+  kind: 'web' | 'mcp' | 'database';
+  provider: string | null;
+  role: 'discover' | 'confirm' | 'quality';
+  primaryJob: string;
+  sweetSpot: string;
+  configured: boolean;
+  testable: boolean;
+  connectable: boolean;
+  status: 'connected' | 'degraded' | 'disconnected' | 'unknown';
+  latencyMs: number | null;
+  lastSync: string | null;
+  message: string | null;
+}
+
+export interface ConnectorTest {
+  id: string;
+  name: string;
+  ok: boolean;
+  status: 'connected' | 'degraded' | 'disconnected';
+  latencyMs: number | null;
+  checkedAt: string;
+  lastSync: string | null;
+  message: string;
+}
+
 // ---- Analyst reports (thesis context) ----
 export interface ResearchSector {
   name: string;

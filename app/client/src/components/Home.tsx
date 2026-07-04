@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AppConfig, PipelineFunnel, DealSummary } from '../types';
 import { CHANGELOG } from '../changelog';
+import { ConnectivityPanel } from './ConnectivityPanel';
 
 interface Props {
   config: AppConfig;
@@ -145,6 +146,9 @@ export function Home({ config, pipeline, deals, onNavigate, onGoToDeal, onOpenPi
           </button>
         )}
       </div>
+
+      {/* Data-source connectivity */}
+      <ConnectivityPanel />
 
       {/* Release history — collapsed by default */}
       <Changelog />

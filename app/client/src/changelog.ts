@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.14.0',
+    date: '2026-07-04',
+    image: 'dealroom-app:v19',
+    revision: 'ca-dealroom-orch-dev-swc--0000015',
+    title: 'Data-source connectivity panel on Home · real tests',
+    tag: 'feature',
+    highlights: [
+      'The data-source connectivity table now lives on the Home page (above the changelog) as a live status panel, instead of being buried in the News & Filings desk.',
+      'Test connectivity is now REAL, not faked: Web runs an actual reachability probe of the Bing-grounded agent endpoint, and Morningstar runs a real OAuth token refresh + MCP session handshake — each returning a true connection status, measured latency, and last-sync time. The panel auto-tests on load.',
+      'Unwired vendor sources (PitchBook, FactSet, Capital IQ) now honestly report Disconnected instead of a fabricated \u201cConnected\u201d, and LSEG / Moody\u2019s appear as connectable MCP sources awaiting sign-in.',
+      'New /api/connectors endpoints back the panel; the old fake per-source latency/last-sync generator was removed.'
+    ]
+  },
+  {
     version: 'v0.13.0',
     date: '2026-07-04',
     image: 'dealroom-app:v18',

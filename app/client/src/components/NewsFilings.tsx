@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SourcingDesk, DeskSource, DeskCompany, DeskNews, DeskCatalyst, SourceTestResult } from '../types';
+import type { SourcingDesk, DeskSource, DeskCompany, DeskNews, DeskCatalyst } from '../types';
 import { api } from '../api';
 import { timeAgo } from './Bits';
 
@@ -7,17 +7,8 @@ interface Props {
   onBack: () => void;
 }
 
-const ROLE_META: Record<string, { tag: string; color: string }> = {
-  discover: { tag: 'Discover', color: '#2563eb' },
-  confirm: { tag: 'Confirm', color: '#7c3aed' },
-  quality: { tag: 'Quality', color: '#0d9488' }
-};
-
 export function NewsFilings({ onBack }: Props) {
   const [desk, setDesk] = useState<SourcingDesk | null>(null);
-  const [expandedSource, setExpandedSource] = useState<string | null>(null);
-  const [tests, setTests] = useState<Record<string, SourceTestResult>>({});
-  const [testing, setTesting] = useState<string | null>(null);
 
   const [openNews, setOpenNews] = useState<Set<string>>(new Set());
   const [openFilings, setOpenFilings] = useState<Set<string>>(new Set());
@@ -63,17 +54,6 @@ export function NewsFilings({ onBack }: Props) {
 
   const catById = Object.fromEntries(desk.catalysts.map((c) => [c.id, c]));
   const sourcesByRole = (role: string) => desk.sources.filter((s) => s.role === role);
-
-  async function testSource(id: string) {
-    setTesting(id);
-    setExpandedSource(id);
-    try {
-      const r = await api.testSource(id);
-      setTests((t) => ({ ...t, [id]: r }));
-    } finally {
-      setTesting(null);
-    }
-  }
 
   async function findMore() {
     if (findingMore) return;
@@ -155,27 +135,6 @@ export function NewsFilings({ onBack }: Props) {
           </div>
         </div>
         <div className="l1-note">Filtering the news universe to what this fund can actually deploy into.</div>
-      </div>
-
-      {/* Source table */}
-      <div className="src-table">
-        <div className="src-row src-th">
-          <div>Source</div>
-          <div>Primary job in News &amp; filings</div>
-          <div>Sweet spot</div>
-          <div>Role</div>
-        </div>
-        {desk.sources.map((s) => (
-          <SourceRow
-            key={s.id}
-            s={s}
-            expanded={expandedSource === s.id}
-            test={tests[s.id]}
-            testing={testing === s.id}
-            onToggle={() => setExpandedSource(expandedSource === s.id ? null : s.id)}
-            onTest={() => testSource(s.id)}
-          />
-        ))}
       </div>
 
       {/* Three-column workflow */}
@@ -333,41 +292,10 @@ function ColHeader({ n, title, sub, sources }: { n: number; title: string; sub: 
       </div>
       <div className="col-sources">
         {sources.map((s) => (
-          <span key={s.id} className="col-src"><span className={`sdot2 ${s.status}`} />{s.name}</span>
+          <span key={s.id} className="col-src"><span className="sdot2 neutral" />{s.name}</span>
         ))}
       </div>
     </div>
-  );
-}
-
-function SourceRow({ s, expanded, test, testing, onToggle, onTest }: {
-  s: DeskSource; expanded: boolean; test?: SourceTestResult; testing: boolean; onToggle: () => void; onTest: () => void;
-}) {
-  const role = ROLE_META[s.role];
-  return (
-    <>
-      <button className={`src-row ${expanded ? 'exp' : ''}`} onClick={onToggle}>
-        <div className="src-name"><span className={`sdot2 ${s.status}`} />{s.name}</div>
-        <div className="src-job">{s.primaryJob}</div>
-        <div className="src-sweet">{s.sweetSpot}</div>
-        <div><span className="role-tag" style={{ background: role.color }}>{role.tag}</span></div>
-      </button>
-      {expanded && (
-        <div className="src-detail">
-          <div className="src-detail-grid">
-            <span><i>Connection</i><b className={`conn ${s.status}`}>{s.status === 'connected' ? '● Connected' : '◐ Degraded'}</b></span>
-            <span><i>Latency</i>{s.latencyMs} ms</span>
-            <span><i>Last sync</i>{s.lastSyncMin === 0 ? 'just now' : `${s.lastSyncMin} min ago`}</span>
-          </div>
-          <div className="src-detail-actions">
-            <button className="btn" onClick={onTest} disabled={testing}>{testing ? 'Testing…' : '⚡ Test connectivity'}</button>
-            {test && (
-              <span className={`test-result ${test.ok ? 'ok' : 'warn'}`}>{test.ok ? '✓' : '⚠'} {test.message}</span>
-            )}
-          </div>
-        </div>
-      )}
-    </>
   );
 }
 

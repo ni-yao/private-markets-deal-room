@@ -24,7 +24,6 @@ import {
   setFindingCatalyst,
   runMorningstarQuality,
   morningstarReady,
-  testSource,
   getAnalystResearch,
   getFramework,
   setScreenSelected,
@@ -59,6 +58,7 @@ import { personaById } from './data/personas.js';
 import { runAction, chat } from './lib/agents.js';
 import { getModelInfo } from './lib/ai.js';
 import { newsAgentConfigured } from './lib/newsAgent.js';
+import { listConnectors, testConnector } from './lib/connectors.js';
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 
@@ -187,6 +187,19 @@ api.get('/signals/companies/:id/crm', (req, res) => {
   res.json(crm);
 });
 
+// Data-source connectivity (Home connectivity panel). Real tests for Web + MCP
+// connectors; unwired vendor DBs report disconnected honestly.
+api.get('/connectors', (_req, res) => res.json(listConnectors()));
+api.post('/connectors/:id/test', async (req, res) => {
+  try {
+    const out = await testConnector(req.params.id, { force: true });
+    if (!out) return res.status(404).json({ error: 'unknown connector' });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'connectivity test failed', detail: String(err?.message || err) });
+  }
+});
+
 // O1 · Deal Sourcing — News & filings desk
 api.get('/news/desk', (_req, res) => res.json(getSourcingDesk()));
 // Live news search via the Bing-grounded Foundry agent (seed fallback on failure).
@@ -212,11 +225,6 @@ api.post('/news/companies/:id/quality', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'quality check failed', detail: String(err?.message || err) });
   }
-});
-api.post('/news/sources/:id/test', (req, res) => {
-  const out = testSource(req.params.id);
-  if (!out) return res.status(404).json({ error: 'unknown source' });
-  res.json(out);
 });
 
 // O1 · Deal Sourcing — Analyst reports (thesis context per discovered company)

@@ -471,6 +471,7 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 .sdot2.connected { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.16); }
 .sdot2.degraded { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.16); }
 .sdot2.disconnected { background: #ef4444; }
+.sdot2.neutral { background: #94a3b8; }
 .role-tag { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: #fff; padding: 3px 9px; border-radius: 6px; }
 
 .src-detail { background: var(--canvas); border-bottom: 1px solid var(--line-2); padding: 14px 16px; }
@@ -483,6 +484,23 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 .test-result { font-size: 12px; font-weight: 600; }
 .test-result.ok { color: var(--positive); }
 .test-result.warn { color: var(--amber); }
+
+/* Home connectivity panel */
+.conn-panel { margin: 22px 0 8px; }
+.conn-panel-hd { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+.conn-panel-eyebrow { font-size: 15px; font-weight: 800; color: var(--ink); letter-spacing: -.2px; }
+.conn-panel-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.conn-panel-count { font-size: 11.5px; font-weight: 750; color: var(--ink-2); background: var(--canvas); border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
+.conn-table { margin-bottom: 0; }
+.conn-note { font-size: 12px; color: var(--muted); font-style: italic; }
+.conn-connect { font-size: 12px; font-weight: 750; color: #fff; background: var(--primary); border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; transition: filter .12s; }
+.conn-connect:hover:not(:disabled) { filter: brightness(1.08); }
+.conn-connect:disabled { opacity: .55; cursor: default; }
+/* At narrower widths .src-row collapses to 3 columns; drop the Sweet-spot cell
+   (3rd) in the connectivity table so Role doesn't wrap onto a new line. */
+@media (max-width: 1180px) {
+  .conn-table .src-row > :nth-child(3) { display: none; }
+}
 
 /* Three columns */
 .desk-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: start; }

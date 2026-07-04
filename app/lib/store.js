@@ -14,6 +14,7 @@ import { researchFor } from '../data/research.js';
 import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage } from './agents.js';
 import { scoutNews, newsAgentConfigured } from './newsAgent.js';
 import { morningstarConfigured, quality as morningstarQuality } from './mcp/morningstar.js';
+import { markSync } from './connectors.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
@@ -459,6 +460,7 @@ export async function searchMoreNews({ focus } = {}) {
     persistDesk(c);
     logEvent(c.id, 'discovered', { via: 'news-agent', name: c.name });
   }
+  markSync('web');
   return {
     source: 'live',
     revealed: fresh.map(publicCompany),
@@ -510,6 +512,7 @@ export async function runMorningstarQuality(deskId) {
     const q = await morningstarQuality(c.name, c.ticker || null);
     c.quality = q;
     persistDesk(c);
+    markSync('morningstar');
     logEvent(c.id, 'morningstar-quality', { rating: q.rating, score: q.score });
     return { ...q, configured: true };
   } catch (err) {
@@ -519,25 +522,6 @@ export async function runMorningstarQuality(deskId) {
 
 export function morningstarReady() {
   return morningstarConfigured();
-}
-
-export function testSource(id) {
-  const s = sources.find((x) => x.id === id);
-  if (!s) return null;
-  const base = s.latencyMs;
-  const jitter = Math.round((Math.random() - 0.5) * 80);
-  const latencyMs = Math.max(40, base + jitter);
-  const ok = s.status === 'connected';
-  s.lastSyncMin = 0;
-  return {
-    id: s.id,
-    name: s.name,
-    ok,
-    status: s.status,
-    latencyMs,
-    checkedAt: new Date().toISOString(),
-    message: ok ? `Healthy · responded in ${latencyMs}ms` : `Reachable but degraded · ${latencyMs}ms (elevated latency)`
-  };
 }
 
 // ---- O1 Analyst reports (thesis context attached to discovered companies) ---
