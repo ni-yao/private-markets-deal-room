@@ -434,6 +434,9 @@ export interface DeskQuality {
   trend: 'improving' | 'stable' | 'weakening';
   flags: string[];
   note: string;
+  live?: boolean;
+  morningstarId?: string | null;
+  ticker?: string | null;
 }
 
 export interface DeskCompany {

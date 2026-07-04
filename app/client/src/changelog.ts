@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.13.0',
+    date: '2026-07-04',
+    image: 'dealroom-app:v18',
+    revision: 'ca-dealroom-orch-dev-swc--0000014',
+    title: 'Live Morningstar quality check via MCP',
+    tag: 'feature',
+    highlights: [
+      'The O1 \u201cMorningstar quality check\u201d is now REAL: the app calls Morningstar\u2019s MCP server over an OAuth 2.1 (authorization_code + PKCE + refresh_token) connection and returns each target\u2019s live economic-moat, star rating, fair value, financial-health and valuation signals \u2014 no longer a placeholder.',
+      'For every identified company the check auto-runs once and the result (rating, 0\u201310 score, trend, risk flags, note) persists to Cosmos. Verified live: Peloton (4-star, no moat, $8.98 fair value, undervalued), Allbirds (no moat, weak financial health).',
+      'Entity-match guard: a company only resolves to a Morningstar security on an exact ticker or a confident name match \u2014 otherwise it reports \u201cNo public coverage\u201d rather than risk wrong-company data (e.g. \u201cDenny\u2019s\u201d never resolves to \u201cAvery Dennison\u201d). Private mid-market targets correctly show no public coverage.',
+      'New reusable MCP access layer (lib/mcp): OAuth client with a headless refresh-token seam, an MCP Streamable-HTTP JSON-RPC client, and one-time login + verify scripts. The same seam extends to LSEG and Moody\u2019s. /api/config now reports the Morningstar connection state.'
+    ]
+  },
+  {
     version: 'v0.12.0',
     date: '2026-07-04',
     image: 'dealroom-app:v17',

@@ -9,6 +9,7 @@ import type {
   CrmRelationship,
   SourcingDesk,
   SourceTestResult,
+  DeskQuality,
   AnalystResearch,
   Framework,
   Screen,
@@ -110,6 +111,7 @@ export const api = {
   findMoreNews: () => post<{ revealed: unknown; desk: SourcingDesk }>('/api/news/find-more', {}),
   setFindingCatalyst: (id: string, catalyst: string) =>
     post<{ findingId: string; catalyst: string; companyId: string }>(`/api/news/findings/${id}/catalyst`, { catalyst }),
+  runQuality: (id: string) => post<DeskQuality & { configured?: boolean; error?: string }>(`/api/news/companies/${id}/quality`, {}),
   testSource: (id: string) => post<SourceTestResult>(`/api/news/sources/${id}/test`, {}),
   research: () => get<AnalystResearch>('/api/research'),
   framework: () => get<Framework>('/api/framework'),

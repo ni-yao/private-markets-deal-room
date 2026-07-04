@@ -29,12 +29,29 @@ export function NewsFilings({ onBack }: Props) {
   useEffect(() => {
     api.newsDesk().then((d) => {
       setDesk(d);
-      // "In the News" starts fully collapsed; every identified company gets its
-      // Morningstar quality check auto-run so no manual click is needed.
+      // "In the News" starts fully collapsed. Companies whose Morningstar check
+      // has already run (persisted, quality.live) show their card immediately;
+      // any not-yet-checked company auto-runs a real Morningstar check once.
       setOpenNews(new Set());
-      setQualityRun(new Set(d.companies.map((c) => c.id)));
+      setQualityRun(new Set(d.companies.filter((c) => c.quality?.live).map((c) => c.id)));
+      autoRunQuality(d.companies.filter((c) => !c.quality?.live).map((c) => c.id));
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Run the real Morningstar quality check for a batch of companies, one at a
+  // time (gentle on the MCP), updating each card as its result returns.
+  async function autoRunQuality(ids: string[]) {
+    for (const id of ids) {
+      try {
+        const q = await api.runQuality(id);
+        setDesk((d) => (d ? { ...d, companies: d.companies.map((c) => (c.id === id ? { ...c, quality: q } : c)) } : d));
+        setQualityRun((s) => new Set([...s, id]));
+      } catch {
+        /* leave the manual button available for a retry */
+      }
+    }
+  }
 
   if (!desk) {
     return (
@@ -70,7 +87,7 @@ export function NewsFilings({ onBack }: Props) {
       const newIds = d.companies.map((c) => c.id).filter((id) => !priorIds.has(id));
       if (newIds.length) {
         setOpenFilings((s) => new Set([...s, ...newIds]));
-        setQualityRun((s) => new Set([...s, ...newIds]));
+        autoRunQuality(newIds);
       }
     } finally {
       setFindingMore(false);
@@ -90,13 +107,19 @@ export function NewsFilings({ onBack }: Props) {
     setEditing((e) => (e ? { ...e, finding: { ...e.finding, catalyst, manualOverride: true } } : e));
   }
 
-  function runQuality(companyId: string) {
+  async function runQuality(companyId: string) {
     if (runningQuality) return;
     setRunningQuality(companyId);
-    setTimeout(() => {
+    try {
+      const q = await api.runQuality(companyId);
+      setDesk((d) => {
+        if (!d) return d;
+        return { ...d, companies: d.companies.map((c) => (c.id === companyId ? { ...c, quality: q } : c)) };
+      });
       setQualityRun((s) => new Set([...s, companyId]));
+    } finally {
       setRunningQuality(null);
-    }, 850);
+    }
   }
 
   const toggleNews = (id: string) =>

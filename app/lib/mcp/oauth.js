@@ -167,25 +167,43 @@ async function refresh(tokenEndpoint, clientId, clientSecret, refreshToken) {
 }
 
 // ---- token store ----------------------------------------------------------
+// Local dev/login uses an on-disk file (data/oauth/<provider>.json, gitignored).
+// Deployed environments (no writable secret file) can inject the token record as
+// JSON via <PROVIDER>_TOKEN_JSON (e.g. MORNINGSTAR_TOKEN_JSON) — wired as a
+// Container App secret. The env record bootstraps the refresh_token; short-lived
+// access tokens are then refreshed in-process.
 function storePath(provider) {
   return path.join(TOKEN_DIR, `${provider}.json`);
 }
 
+function envTokenJson(provider) {
+  const raw = process.env[`${provider.toUpperCase()}_TOKEN_JSON`];
+  if (!raw) return null;
+  // Accept either raw JSON or base64-encoded JSON (base64 avoids shell/secret
+  // quoting issues when injected as a Container App secret).
+  try { return JSON.parse(raw); } catch { /* try base64 next */ }
+  try { return JSON.parse(Buffer.from(raw, 'base64').toString('utf8')); } catch { return null; }
+}
+
 export function hasLogin(provider) {
-  return fs.existsSync(storePath(provider));
+  return fs.existsSync(storePath(provider)) || !!envTokenJson(provider);
 }
 
 export function saveTokens(provider, record) {
-  fs.mkdirSync(TOKEN_DIR, { recursive: true });
-  fs.writeFileSync(storePath(provider), JSON.stringify(record, null, 2), 'utf8');
+  try {
+    fs.mkdirSync(TOKEN_DIR, { recursive: true });
+    fs.writeFileSync(storePath(provider), JSON.stringify(record, null, 2), 'utf8');
+  } catch {
+    /* read-only FS (e.g. container): in-process refresh still works this run */
+  }
 }
 
 export function loadTokens(provider) {
   const p = storePath(provider);
-  if (!fs.existsSync(p)) {
-    throw new NotLoggedInError(`No stored login for '${provider}'. Run: node scripts/${provider}_login.mjs`);
-  }
-  return JSON.parse(fs.readFileSync(p, 'utf8'));
+  if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  const env = envTokenJson(provider);
+  if (env) return env;
+  throw new NotLoggedInError(`No stored login for '${provider}'. Run: node scripts/${provider}_login.mjs`);
 }
 
 // Return a valid access token, refreshing via the stored refresh_token if needed.

@@ -22,6 +22,8 @@ import {
   findMoreNews,
   searchMoreNews,
   setFindingCatalyst,
+  runMorningstarQuality,
+  morningstarReady,
   testSource,
   getAnalystResearch,
   getFramework,
@@ -79,6 +81,7 @@ api.get('/config', (_req, res) => {
     region: process.env.DEAL_ROOM_REGION || 'swedencentral',
     appName: 'The Deal Room',
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
+    morningstar: morningstarReady() ? 'live' : 'demo',
     datastore: repoMode()
   });
 });
@@ -199,6 +202,16 @@ api.post('/news/findings/:id/catalyst', (req, res) => {
   const out = setFindingCatalyst(req.params.id, req.body?.catalyst);
   if (!out) return res.status(400).json({ error: 'unknown finding or catalyst' });
   res.json(out);
+});
+// Live Morningstar quality check for a desk company (real MCP; graceful fallback).
+api.post('/news/companies/:id/quality', async (req, res) => {
+  try {
+    const out = await runMorningstarQuality(req.params.id);
+    if (!out) return res.status(404).json({ error: 'unknown company' });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'quality check failed', detail: String(err?.message || err) });
+  }
 });
 api.post('/news/sources/:id/test', (req, res) => {
   const out = testSource(req.params.id);

@@ -13,6 +13,7 @@ import { SOURCES, catalysts, catalystById } from '../data/news.js';
 import { researchFor } from '../data/research.js';
 import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage } from './agents.js';
 import { scoutNews, newsAgentConfigured } from './newsAgent.js';
+import { morningstarConfigured, quality as morningstarQuality } from './mcp/morningstar.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
@@ -493,6 +494,31 @@ export function setFindingCatalyst(findingId, catalystId) {
     }
   }
   return null;
+}
+
+// Live Morningstar quality check for a desk company. Maps the company to its
+// Morningstar security, pulls analyst/quantitative research, and stores a real
+// DeskQuality on the company (persisted to Cosmos). Falls back to the existing
+// (pending) quality when the Morningstar MCP login isn't configured.
+export async function runMorningstarQuality(deskId) {
+  const c = desk.find((x) => x.id === deskId);
+  if (!c) return null;
+  if (!morningstarConfigured()) {
+    return { ...c.quality, configured: false };
+  }
+  try {
+    const q = await morningstarQuality(c.name, c.ticker || null);
+    c.quality = q;
+    persistDesk(c);
+    logEvent(c.id, 'morningstar-quality', { rating: q.rating, score: q.score });
+    return { ...q, configured: true };
+  } catch (err) {
+    return { ...c.quality, configured: true, error: String(err?.message || err) };
+  }
+}
+
+export function morningstarReady() {
+  return morningstarConfigured();
 }
 
 export function testSource(id) {
