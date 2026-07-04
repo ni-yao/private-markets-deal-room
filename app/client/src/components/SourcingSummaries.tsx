@@ -34,8 +34,20 @@ export function CxoSummary({ onOpen }: { onOpen: () => void }) {
         <div className="ss-metric"><span className="ss-n">{chats}</span><span className="ss-l">💬 Chats</span></div>
         <div className="ss-metric"><span className="ss-n">{meetings}</span><span className="ss-l">🗓 Meeting notes</span></div>
       </div>
-      <div className="ss-foot">
-        <span className="ss-foot-n">{targets}</span> target{targets === 1 ? '' : 's'} identified from signals
+
+      <div className="ss-colist">
+        <div className="ss-colist-hd">
+          <span className="ss-foot-n">{targets}</span> target{targets === 1 ? '' : 's'} identified from signals
+        </div>
+        {companies == null && <div className="ss-empty">Loading CxO signals…</div>}
+        {companies != null && targets === 0 && <div className="ss-empty">No CxO targets yet — signals will surface here.</div>}
+        {(companies ?? []).map((c) => (
+          <div className="ss-corow" key={c.id}>
+            <span className="ss-coname"><span className={`intent-dot ${c.intent}`} /> {c.name}</span>
+            <span className="ss-cometa">{c.sector}</span>
+            <span className="ss-cofilings">✉ {c.counts.total}</span>
+          </div>
+        ))}
       </div>
     </button>
   );
@@ -75,7 +87,8 @@ export function NewsSummary({ onOpen }: { onOpen: () => void }) {
       </div>
 
       <div className="ss-colist">
-        {companies.length === 0 && <div className="ss-empty">Loading the news desk…</div>}
+        {desk == null && <div className="ss-empty">Loading the news desk…</div>}
+        {desk != null && companies.length === 0 && <div className="ss-empty">No companies in the news yet — run “Find more news”.</div>}
         {companies.map((c) => (
           <div className="ss-corow" key={c.id}>
             <span className="ss-coname">{c.name}</span>

@@ -15,6 +15,7 @@
 import { newsAgentConfigured } from './newsAgent.js';
 import { McpSession } from './mcp/morningstar.js';
 import { hasLogin } from './mcp/oauth.js';
+import { testFilings, filingsConfigured } from './filings.js';
 
 export const CONNECTORS = [
   {
@@ -39,6 +40,11 @@ export const CONNECTORS = [
     primaryJob: 'Credit ratings, research & risk assessment',
     sweetSpot: 'Credit & default-risk cross-check',
     mcpUrl: process.env.MOODYS_MCP_URL || 'https://mcp.moodys.com/genai-ready-data/mcp'
+  },
+  {
+    id: 'edgar', name: 'SEC EDGAR', kind: 'edgar', role: 'confirm',
+    primaryJob: 'US regulatory filings — 10-K, 10-Q, 8-K, proxies (free, official)',
+    sweetSpot: 'Real public-company filings with clickable sources'
   },
   {
     id: 'pitchbook', name: 'PitchBook', kind: 'database', role: 'discover',
@@ -80,6 +86,7 @@ const lastResult = {};
 function isConfigured(c) {
   if (c.kind === 'web') return newsAgentConfigured();
   if (c.kind === 'mcp') return hasLogin(c.provider);
+  if (c.kind === 'edgar') return filingsConfigured();
   return false;
 }
 
@@ -123,6 +130,17 @@ async function testMcp(c) {
   }
 }
 
+async function testEdgar(c) {
+  const t0 = Date.now();
+  try {
+    const { latencyMs } = await testFilings();
+    markSync(c.id);
+    return result(c, { ok: true, status: 'connected', latencyMs, lastSync: getLastSync(c.id), message: `Healthy · SEC EDGAR reachable in ${latencyMs}ms (free, no key)` });
+  } catch (e) {
+    return result(c, { ok: false, status: 'degraded', latencyMs: Date.now() - t0, message: `Unreachable · ${String(e.message || e).slice(0, 80)}` });
+  }
+}
+
 // Run a real connectivity test for one connector. Databases (unwired) always
 // report disconnected. Soft-cached for CACHE_MS unless force=true.
 export async function testConnector(id, { force = false } = {}) {
@@ -133,6 +151,7 @@ export async function testConnector(id, { force = false } = {}) {
 
   if (c.kind === 'web') return testWeb(c);
   if (c.kind === 'mcp') return testMcp(c);
+  if (c.kind === 'edgar') return testEdgar(c);
   return result(c, { ok: false, status: 'disconnected', latencyMs: null, message: 'Integration not wired — no live connection.' });
 }
 
@@ -151,7 +170,7 @@ export function listConnectors() {
       primaryJob: c.primaryJob,
       sweetSpot: c.sweetSpot,
       configured,
-      testable: c.kind === 'web' ? true : c.kind === 'mcp' ? configured : false,
+      testable: c.kind === 'web' || c.kind === 'edgar' ? true : c.kind === 'mcp' ? configured : false,
       connectable: c.kind === 'mcp',                 // can be signed-in via OAuth
       status: cached ? cached.status : c.kind === 'database' ? 'disconnected' : configured ? 'unknown' : 'disconnected',
       latencyMs: cached ? cached.latencyMs : null,

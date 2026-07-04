@@ -137,9 +137,9 @@ export function CohortDesk({ stage, title, subtitle, advanceLabel, advanceClass,
                     <span className={`co-band ${c.band}`}>{BAND_LABEL[c.band]}</span>
                     {typeof c.rank === 'number' && <span className="co-scoretag">{c.score}</span>}
                   </div>
-                  <div className="co-meta">{c.sector} · {c.region} · €{c.dealSize}M · {c.ownership}</div>
+                  <div className="co-meta">{c.sector} · {c.region} · ${c.dealSize}M · {c.ownership}</div>
                   <div className="co-fin">
-                    <span>rev €{c.revenue}M</span><span>EBITDA €{c.ebitda}M</span>
+                    <span>rev ${c.revenue}M</span><span>EBITDA ${c.ebitda}M</span>
                     <span>{c.ebitdaMargin}% margin</span><span>{c.growth >= 0 ? '+' : ''}{c.growth}% growth</span>
                   </div>
                 </div>

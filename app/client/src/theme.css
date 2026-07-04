@@ -1212,8 +1212,10 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 .ss-foot-n { font-weight: 800; color: var(--ink); }
 .ss-colist { display: flex; flex-direction: column; gap: 5px; }
 .ss-corow { display: flex; align-items: center; gap: 9px; padding: 6px 9px; background: var(--canvas); border: 1px solid var(--line-2); border-radius: 8px; }
-.ss-coname { flex: 1; min-width: 0; font-size: 12px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-coname { flex: 1; min-width: 0; font-size: 12px; font-weight: 650; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
 .ss-cofilings { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.ss-cometa { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38%; }
+.ss-colist-hd { font-size: 12px; color: var(--ink-2); margin-bottom: 2px; }
 .ss-rating { font-size: 10px; font-weight: 800; letter-spacing: .2px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
 .ss-rating.strong { background: var(--positive-tint); color: var(--positive); }
 .ss-rating.moderate { background: var(--amber-tint); color: var(--amber); }

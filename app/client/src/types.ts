@@ -426,6 +426,8 @@ export interface DeskFiling {
   headline: string;
   confirms: string;
   detail: string;
+  url?: string | null;
+  live?: boolean;
 }
 
 export interface DeskQuality {
@@ -449,6 +451,7 @@ export interface DeskCompany {
   ownership: string;
   news: DeskNews[];
   filings: DeskFiling[];
+  filingsChecked?: boolean;
   quality: DeskQuality;
   live?: boolean;
   estimated?: boolean;

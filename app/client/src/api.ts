@@ -9,6 +9,7 @@ import type {
   CrmRelationship,
   SourcingDesk,
   DeskQuality,
+  DeskFiling,
   Connector,
   ConnectorTest,
   AnalystResearch,
@@ -115,6 +116,7 @@ export const api = {
   setFindingCatalyst: (id: string, catalyst: string) =>
     post<{ findingId: string; catalyst: string; companyId: string }>(`/api/news/findings/${id}/catalyst`, { catalyst }),
   runQuality: (id: string) => post<DeskQuality & { configured?: boolean; error?: string }>(`/api/news/companies/${id}/quality`, {}),
+  runFilings: (id: string) => post<{ matched: boolean; cik?: string | null; secName?: string | null; filings: DeskFiling[] }>(`/api/news/companies/${id}/filings`, {}),
   research: () => get<AnalystResearch>('/api/research'),
   framework: () => get<Framework>('/api/framework'),
   scoredTargets: () => get<ScoredTargets>('/api/targets/scored'),

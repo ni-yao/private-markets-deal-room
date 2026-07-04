@@ -30,10 +30,10 @@ export function gateCompany(company, fund) {
     reasons.push(`Geography outside the fund mandate (${company.region})`);
   }
   if (company.dealSize < fund.evMin) {
-    reasons.push(`EV €${company.dealSize}M below the mandate floor (€${fund.evMin}M)`);
+    reasons.push(`EV $${company.dealSize}M below the mandate floor ($${fund.evMin}M)`);
   }
   if (company.dealSize > fund.evMax) {
-    reasons.push(`EV €${company.dealSize}M above the mandate cap (€${fund.evMax}M)`);
+    reasons.push(`EV $${company.dealSize}M above the mandate cap ($${fund.evMax}M)`);
   }
   return { passes: reasons.length === 0, reasons };
 }
@@ -148,10 +148,10 @@ export function validateScreen(screen, theme, fund) {
     }
   }
   if (screen.evMin != null && screen.evMin < fund.evMin) {
-    errors.push(`EV floor €${screen.evMin}M is below the fund mandate floor of €${fund.evMin}M.`);
+    errors.push(`EV floor $${screen.evMin}M is below the fund mandate floor of $${fund.evMin}M.`);
   }
   if (screen.evMax != null && screen.evMax > fund.evMax) {
-    errors.push(`EV ceiling €${screen.evMax}M exceeds the fund mandate cap of €${fund.evMax}M.`);
+    errors.push(`EV ceiling $${screen.evMax}M exceeds the fund mandate cap of $${fund.evMax}M.`);
   }
 
   // Soft — parent theme

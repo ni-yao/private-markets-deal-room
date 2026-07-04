@@ -168,7 +168,7 @@ function FundCard({ fund, expanded, onToggle }: { fund: FundMandate; expanded: b
         <div className="fw-fund-body">
           <div className="fw-gate-note">Targets that breach any guardrail below are <b>excluded</b>, never scored.</div>
           <div className="fw-guardrails">
-            <span><i>EV band</i>€{fund.evMin}–{fund.evMax}M</span>
+            <span><i>EV band</i>${fund.evMin}–{fund.evMax}M</span>
             <span><i>Investment period</i>{fund.investmentPeriod}</span>
             <span><i>Term</i>{fund.term}</span>
             <span><i>Max equity / deal</i>{fund.maxEquityPerDeal}% of fund</span>
@@ -317,12 +317,12 @@ function ScreenRow({
           <div className="mand-crit">
             <span><i>Sector</i>{screen.sector || '—'}</span>
             <span><i>Regions</i>{screen.regions.join(', ') || '—'}</span>
-            <span><i>EV band</i>€{fmtBand(screen.evMin, screen.evMax, 'M')}</span>
+            <span><i>EV band</i>${fmtBand(screen.evMin, screen.evMax, 'M')}</span>
             <span><i>Ownership</i>{screen.ownership.join(', ') || 'any'}</span>
           </div>
           <div className="fw-thresholds">
-            <span className="thr"><i>Revenue</i>{fmtMin(screen.revenueMin, ' €M')}</span>
-            <span className="thr"><i>EBITDA</i>{fmtMin(screen.ebitdaMin, ' €M')}</span>
+            <span className="thr"><i>Revenue</i>{fmtMin(screen.revenueMin, ' $M')}</span>
+            <span className="thr"><i>EBITDA</i>{fmtMin(screen.ebitdaMin, ' $M')}</span>
             <span className="thr"><i>EBITDA margin</i>{fmtMin(screen.ebitdaMarginMin, '%')}</span>
             <span className="thr"><i>Growth</i>{fmtMin(screen.growthMin, '%')}</span>
           </div>
@@ -406,19 +406,19 @@ function ScreenForm({
         </div>
       )}
 
-      <label>Name<input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Convenience grocery · DACH · €150–400M" /></label>
+      <label>Name<input value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Convenience grocery · DACH · $150–400M" /></label>
       <div className="mand-form-row">
         <label>Sector<input value={f.sector} onChange={(e) => set('sector', e.target.value)} placeholder="Consumer & Retail" /></label>
         <label>Regions<input value={f.regions} onChange={(e) => set('regions', e.target.value)} placeholder="DACH, Nordics" /></label>
       </div>
       <div className="mand-form-row">
-        <label>EV min €M<input type="number" value={f.evMin} onChange={(e) => set('evMin', e.target.value)} /></label>
-        <label>EV max €M<input type="number" value={f.evMax} onChange={(e) => set('evMax', e.target.value)} /></label>
+        <label>EV min $M<input type="number" value={f.evMin} onChange={(e) => set('evMin', e.target.value)} /></label>
+        <label>EV max $M<input type="number" value={f.evMax} onChange={(e) => set('evMax', e.target.value)} /></label>
         <label>Ownership<input value={f.ownership} onChange={(e) => set('ownership', e.target.value)} placeholder="founder, family" /></label>
       </div>
       <div className="mand-form-row">
-        <label>Revenue min €M<input type="number" value={f.revenueMin} onChange={(e) => set('revenueMin', e.target.value)} /></label>
-        <label>EBITDA min €M<input type="number" value={f.ebitdaMin} onChange={(e) => set('ebitdaMin', e.target.value)} /></label>
+        <label>Revenue min $M<input type="number" value={f.revenueMin} onChange={(e) => set('revenueMin', e.target.value)} /></label>
+        <label>EBITDA min $M<input type="number" value={f.ebitdaMin} onChange={(e) => set('ebitdaMin', e.target.value)} /></label>
       </div>
       <div className="mand-form-row">
         <label>EBITDA margin min %<input type="number" value={f.ebitdaMarginMin} onChange={(e) => set('ebitdaMarginMin', e.target.value)} /></label>
@@ -457,7 +457,7 @@ function ScoredRow({ t, onSend, sending, research }: { t: ScoredTarget; onSend: 
             {t.name}
             <span className="gate-tag">excluded by gate</span>
           </div>
-          <div className="scored-meta">{t.sector} · {t.region} · €{t.dealSize}M · {t.ownership}</div>
+          <div className="scored-meta">{t.sector} · {t.region} · ${t.dealSize}M · {t.ownership}</div>
           <div className="gate-reasons">
             {t.gateReasons.map((r, i) => <span key={i} className="gate-reason">{r}</span>)}
           </div>
@@ -478,7 +478,7 @@ function ScoredRow({ t, onSend, sending, research }: { t: ScoredTarget; onSend: 
               {t.sources.map((s) => <span key={s} className={`src-tag ${s}`}>{s === 'cxo' ? 'CxO' : 'News'}</span>)}
             </span>
           </div>
-          <div className="scored-meta">{t.sector} · {t.region} · €{t.dealSize}M · {t.ownership}</div>
+          <div className="scored-meta">{t.sector} · {t.region} · ${t.dealSize}M · {t.ownership}</div>
           {t.matchedScreen ? (
             <div className="scored-match">
               best screen <b>{t.matchedScreen.name}</b>

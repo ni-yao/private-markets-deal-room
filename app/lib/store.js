@@ -14,6 +14,7 @@ import { researchFor } from '../data/research.js';
 import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage } from './agents.js';
 import { scoutNews, newsAgentConfigured } from './newsAgent.js';
 import { morningstarConfigured, quality as morningstarQuality } from './mcp/morningstar.js';
+import { fetchFilings } from './filings.js';
 import { markSync } from './connectors.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
@@ -112,7 +113,7 @@ function makeScreenedDeal(cand, when) {
     subSector: cand.subSector || cand.sector,
     hq: cand.hq || cand.country || cand.region,
     dealSize: cand.dealSize,
-    currency: 'EUR',
+    currency: 'USD',
     stage: 'SCR',
     status: 'screened',
     screenedAt: when || new Date().toISOString(),
@@ -122,8 +123,8 @@ function makeScreenedDeal(cand, when) {
     baselineDays: 45,
     thesis: `${cand.company} — ${cand.sector}. Cleared the Screening Gate; awaiting diligence launch.`,
     keyFigures: [
-      { label: 'Revenue (LTM)', value: `€${cand.revenue}M`, source: 'Screen', confidence: 'medium' },
-      { label: 'EBITDA (LTM)', value: `€${cand.ebitda}M`, source: 'Screen', confidence: 'medium' },
+      { label: 'Revenue (LTM)', value: `$${cand.revenue}M`, source: 'Screen', confidence: 'medium' },
+      { label: 'EBITDA (LTM)', value: `$${cand.ebitda}M`, source: 'Screen', confidence: 'medium' },
       { label: 'EBITDA margin', value: `${cand.ebitdaMargin}%`, source: 'Derived', confidence: 'medium' }
     ],
     workstreams: [
@@ -526,6 +527,25 @@ export function morningstarReady() {
   return morningstarConfigured();
 }
 
+// Live SEC EDGAR filings pull for a desk company. Resolves the company to its
+// EDGAR CIK and attaches real recent filings (with clickable sec.gov URLs);
+// private targets return no public filings (honest — they don't file with SEC).
+export async function runFilings(deskId) {
+  const c = desk.find((x) => x.id === deskId);
+  if (!c) return null;
+  try {
+    const res = await fetchFilings(c.name, c.ticker || null);
+    c.filings = res.filings;
+    c.filingsChecked = true;
+    persistDesk(c);
+    markSync('edgar');
+    logEvent(c.id, 'edgar-filings', { matched: res.matched, count: res.filings.length });
+    return { matched: res.matched, cik: res.cik || null, secName: res.name || null, filings: res.filings };
+  } catch (err) {
+    return { matched: false, error: String(err?.message || err), filings: c.filings || [] };
+  }
+}
+
 // ---- O1 Analyst reports (thesis context attached to discovered companies) ---
 export function getAnalystResearch() {
   const companies = desk
@@ -677,7 +697,7 @@ function screenRecommendation(c) {
   if (!gate.passes) knockouts.push({ reason: 'esg-exclusion', detail: gate.reasons[0] });
   if ((c.ebitdaMargin ?? 0) < 6) knockouts.push({ reason: 'business-model', detail: `EBITDA margin ${c.ebitdaMargin}% below viability floor` });
   if ((c.growth ?? 0) < -2) knockouts.push({ reason: 'revenue-quality', detail: `Revenue declining (${c.growth}% YoY)` });
-  if ((c.ebitda ?? 0) < 10) knockouts.push({ reason: 'size-floor', detail: `EBITDA €${c.ebitda}M below the size floor` });
+  if ((c.ebitda ?? 0) < 10) knockouts.push({ reason: 'size-floor', detail: `EBITDA $${c.ebitda}M below the size floor` });
   return { action: knockouts.length ? 'pass' : 'advance', knockouts };
 }
 
@@ -690,7 +710,7 @@ function candidateKnowledge(c) {
   const mandate = [
     `${fund.name} — ${fund.strategy}.`,
     `Permitted sectors: ${fund.sectorsPermitted.join(', ')}. LPA-excluded: ${fund.sectorsExcluded.join(', ')}.`,
-    `Geographies: ${fund.geographies.join(', ')}. EV band €${fund.evMin}–${fund.evMax}M.`,
+    `Geographies: ${fund.geographies.join(', ')}. EV band $${fund.evMin}–${fund.evMax}M.`,
     `ESG: ${fund.esgPolicy}. Leverage limit ${fund.leverageLimit}. Max ${fund.maxEquityPerDeal}% equity/deal, ${fund.maxSectorConcentration}% sector concentration.`
   ].join(' ');
   const gateSummary = sc.gate.passes
@@ -702,8 +722,8 @@ function candidateKnowledge(c) {
     : 'none tripped.';
   const candidateSummary = [
     `${c.company} — ${c.sector} / ${c.subSector}, ${c.region} (${c.country}), HQ ${c.hq}.`,
-    `Ownership: ${c.ownership}. Indicative EV €${c.dealSize}M.`,
-    `Revenue €${c.revenue}M, EBITDA €${c.ebitda}M (${c.ebitdaMargin}% margin), growth ${c.growth >= 0 ? '+' : ''}${c.growth}% YoY.`,
+    `Ownership: ${c.ownership}. Indicative EV $${c.dealSize}M.`,
+    `Revenue $${c.revenue}M, EBITDA $${c.ebitda}M (${c.ebitdaMargin}% margin), growth ${c.growth >= 0 ? '+' : ''}${c.growth}% YoY.`,
     `Angle/keywords: ${(c.keywords || []).join(', ') || '—'}.`
   ].join(' ');
   return {

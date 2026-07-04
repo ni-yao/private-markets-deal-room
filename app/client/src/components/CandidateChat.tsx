@@ -62,7 +62,7 @@ export function CandidateChat({ candidate, agent, onClose }: Props) {
       <div className="cchat-head">
         <div className="cchat-id">
           <div className="cchat-agent">✦ {agent}</div>
-          <div className="cchat-co">{candidate.company} · {candidate.sector} · €{candidate.dealSize}M</div>
+          <div className="cchat-co">{candidate.company} · {candidate.sector} · ${candidate.dealSize}M</div>
         </div>
         <button className="cchat-x" onClick={onClose} title="Close">✕</button>
       </div>

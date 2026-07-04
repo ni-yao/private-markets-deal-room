@@ -75,7 +75,7 @@ function ResearchCard({ c, open, onToggle }: { c: ResearchCompany; open: boolean
             {c.justDiscovered && <span className="new-badge">✦ new</span>}
             <span className={`coverage-tag ${r.coverage}`}>{r.coverage === 'direct' ? 'Direct coverage' : 'Read-across'}</span>
           </div>
-          <div className="rc-meta">{c.sector} · {c.region} · €{c.dealSize}M · {c.ownership}</div>
+          <div className="rc-meta">{c.sector} · {c.region} · ${c.dealSize}M · {c.ownership}</div>
         </div>
         <span className="rc-outlook" style={{ background: outlook.tint, color: outlook.color }}>Sector · {outlook.label}</span>
       </button>

@@ -23,6 +23,7 @@ import {
   searchMoreNews,
   setFindingCatalyst,
   runMorningstarQuality,
+  runFilings,
   morningstarReady,
   getAnalystResearch,
   getFramework,
@@ -227,6 +228,16 @@ api.post('/news/companies/:id/quality', async (req, res) => {
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: 'quality check failed', detail: String(err?.message || err) });
+  }
+});
+// Live SEC EDGAR filings pull for a desk company (real, free; private → none).
+api.post('/news/companies/:id/filings', async (req, res) => {
+  try {
+    const out = await runFilings(req.params.id);
+    if (!out) return res.status(404).json({ error: 'unknown company' });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'filings pull failed', detail: String(err?.message || err) });
   }
 });
 

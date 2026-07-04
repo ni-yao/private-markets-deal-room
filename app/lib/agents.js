@@ -86,13 +86,13 @@ const MOCKS = {
   }),
   'ai-readiness': (d) => ({
     heading: 'AI-readiness score',
-    markdown: `**AI-readiness — ${d.company}: 5.8 / 10 (moderate)**\n\n| Dimension | Score | Note |\n|---|---|---|\n| Data assets | 7 | Rich loyalty + transaction data |\n| Data foundation | 4 | Siloed in legacy POS — needs lakehouse |\n| Talent | 5 | No in-house data science |\n| Tech stack | 5 | On-prem; cloud migration required |\n| Adoption | 6 | Leadership sponsorship present |\n\n**Implication:** ~€6–9M, 18-month foundation unlock before AI pricing scales.\n\nSources: Tech/AI DD, Mgmt interviews.`,
+    markdown: `**AI-readiness — ${d.company}: 5.8 / 10 (moderate)**\n\n| Dimension | Score | Note |\n|---|---|---|\n| Data assets | 7 | Rich loyalty + transaction data |\n| Data foundation | 4 | Siloed in legacy POS — needs lakehouse |\n| Talent | 5 | No in-house data science |\n| Tech stack | 5 | On-prem; cloud migration required |\n| Adoption | 6 | Leadership sponsorship present |\n\n**Implication:** ~$6–9M, 18-month foundation unlock before AI pricing scales.\n\nSources: Tech/AI DD, Mgmt interviews.`,
     lane: 'techai',
     finding: { text: 'AI-readiness 5.8/10 — rich data but siloed; lakehouse foundation is the gating investment.', severity: 'caution', source: 'Tech/AI DD' }
   }),
   'value-levers': (d) => ({
     heading: 'Value-creation levers',
-    markdown: `**Value-creation plan — ${d.company}**\n\n1. **AI assortment & pricing** → +120–160 bps margin (data foundation required).\n2. **Private-label penetration** 21% → 28% → +90 bps.\n3. **Supply-chain & procurement** synergies → +40 bps.\n4. **Loyalty monetisation** (media network) → new €15–20M revenue stream.\n\n**Aggregate:** ~230 bps EBITDA-margin uplift over the hold — closes the gap to the leader.\n\nSources: Tech/AI DD, Commercial DD, Deal model.`,
+    markdown: `**Value-creation plan — ${d.company}**\n\n1. **AI assortment & pricing** → +120–160 bps margin (data foundation required).\n2. **Private-label penetration** 21% → 28% → +90 bps.\n3. **Supply-chain & procurement** synergies → +40 bps.\n4. **Loyalty monetisation** (media network) → new $15–20M revenue stream.\n\n**Aggregate:** ~230 bps EBITDA-margin uplift over the hold — closes the gap to the leader.\n\nSources: Tech/AI DD, Commercial DD, Deal model.`,
     lane: 'techai',
     section: 'value-creation',
     finding: { text: 'Value plan totals ~230 bps margin uplift; AI pricing is the largest single lever.', severity: 'positive', source: 'Value-creation plan' }
@@ -436,7 +436,7 @@ function assessMock(stage, knowledge) {
     return {
       action: 'advance',
       reasonCode: null,
-      rationale: `Clears the hard screen — ${k.sector} in ${k.region}, EV €${k.dealSize}M inside the €100–800M band, EBITDA €${k.ebitda}M at ${k.ebitdaMargin}% margin, ${k.growth >= 0 ? '+' : ''}${k.growth}% growth. No knockouts; advance to Triage.`,
+      rationale: `Clears the hard screen — ${k.sector} in ${k.region}, EV $${k.dealSize}M inside the $100–800M band, EBITDA $${k.ebitda}M at ${k.ebitdaMargin}% margin, ${k.growth >= 0 ? '+' : ''}${k.growth}% growth. No knockouts; advance to Triage.`,
       confidence: 0.78
     };
   }
@@ -521,13 +521,13 @@ function candidateChatMock(knowledge, assessment, message) {
   const q = (message || '').toLowerCase();
   const name = k.candidateSummary.split(' — ')[0];
   if (assessment && (q.includes('why') || q.includes('recommend') || q.includes('reason') || q.includes('rationale'))) {
-    return `${assessment.rationale} That's why I lean ${assessment.action.toUpperCase()} (confidence ${Math.round(assessment.confidence * 100)}%). Push me on any figure — EV €${k.dealSize}M, EBITDA €${k.ebitda}M at ${k.ebitdaMargin}% margin, ${k.growth >= 0 ? '+' : ''}${k.growth}% growth — and I'll re-weigh it.`;
+    return `${assessment.rationale} That's why I lean ${assessment.action.toUpperCase()} (confidence ${Math.round(assessment.confidence * 100)}%). Push me on any figure — EV $${k.dealSize}M, EBITDA $${k.ebitda}M at ${k.ebitdaMargin}% margin, ${k.growth >= 0 ? '+' : ''}${k.growth}% growth — and I'll re-weigh it.`;
   }
   if (q.includes('risk') || q.includes('concern') || q.includes('worry')) {
     return `Main things I'd watch on ${name}: ${k.knockouts.length ? k.knockouts.map((x) => x.detail).join('; ') : `durability of the ${k.growth >= 0 ? '+' : ''}${k.growth}% growth, the ${k.ebitdaMargin}% margin quality, and how defensible the ${k.sector} position is`}. None are fully resolvable from the screen — they'd be diligence items.`;
   }
   if (q.includes('comp') || q.includes('valuation') || q.includes('multiple') || q.includes('price') || q.includes('entry')) {
-    return `I don't have live comps in the record — I'd pull ${k.sector} precedents for an EV/EBITDA range against the implied entry on €${k.ebitda}M EBITDA. On mandate fit it scores ${k.score}/100 (${k.band}).`;
+    return `I don't have live comps in the record — I'd pull ${k.sector} precedents for an EV/EBITDA range against the implied entry on $${k.ebitda}M EBITDA. On mandate fit it scores ${k.score}/100 (${k.band}).`;
   }
   if (q.includes('diligence') || q.includes('next') || q.includes('advance') || q.includes('proceed')) {
     return `If we advance ${name}, first diligence: validate the ${k.ebitdaMargin}% margin and ${k.growth >= 0 ? '+' : ''}${k.growth}% growth, confirm the ${k.sector} thesis, and test ownership appetite. Fit is ${k.band} (${k.score}/100) against the mandate.`;

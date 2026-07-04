@@ -26,6 +26,7 @@ export function NewsFilings({ onBack }: Props) {
       setOpenNews(new Set());
       setQualityRun(new Set(d.companies.filter((c) => c.quality?.live).map((c) => c.id)));
       autoRunQuality(d.companies.filter((c) => !c.quality?.live).map((c) => c.id));
+      autoRunFilings(d.companies.filter((c) => !c.filingsChecked).map((c) => c.id));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -40,6 +41,19 @@ export function NewsFilings({ onBack }: Props) {
         setQualityRun((s) => new Set([...s, id]));
       } catch {
         /* leave the manual button available for a retry */
+      }
+    }
+  }
+
+  // Pull real SEC EDGAR filings for a batch of companies (public → real filings,
+  // private → none), updating each card's filings as results return.
+  async function autoRunFilings(ids: string[]) {
+    for (const id of ids) {
+      try {
+        const r = await api.runFilings(id);
+        setDesk((d) => (d ? { ...d, companies: d.companies.map((c) => (c.id === id ? { ...c, filings: r.filings, filingsChecked: true } : c)) } : d));
+      } catch {
+        /* leave prior state */
       }
     }
   }
@@ -68,6 +82,7 @@ export function NewsFilings({ onBack }: Props) {
       if (newIds.length) {
         setOpenFilings((s) => new Set([...s, ...newIds]));
         autoRunQuality(newIds);
+        autoRunFilings(newIds);
       }
     } finally {
       setFindingMore(false);
@@ -131,7 +146,7 @@ export function NewsFilings({ onBack }: Props) {
             <span>·</span>
             <span>{l1.region.join(' · ')}</span>
             <span>·</span>
-            <span>€{l1.sizeMin}–{l1.sizeMax}M EV</span>
+            <span>${l1.sizeMin}–{l1.sizeMax}M EV</span>
           </div>
         </div>
         <div className="l1-note">Filtering the news universe to what this fund can actually deploy into.</div>
@@ -149,7 +164,7 @@ export function NewsFilings({ onBack }: Props) {
                   <span className="cob-caret">{openNews.has(c.id) ? '▾' : '▸'}</span>
                   <div className="cob-main">
                     <div className="cob-name">{c.name}{c.live && <span className="live-badge">● LIVE</span>}</div>
-                    <div className="cob-meta">{c.sector} · {c.region} · €{c.dealSize}M{c.estimated ? ' (est.)' : ''} · {c.ownership}</div>
+                    <div className="cob-meta">{c.sector} · {c.region} · ${c.dealSize}M{c.estimated ? ' (est.)' : ''} · {c.ownership}</div>
                   </div>
                   <span className="cob-count">{c.news.length}</span>
                 </button>
@@ -199,21 +214,35 @@ export function NewsFilings({ onBack }: Props) {
                     <span className="cob-caret">{open ? '▾' : '▸'}</span>
                     <div className="cob-main">
                       <div className="cob-name">{c.name}</div>
-                      <div className="cob-meta">{c.filings.length} filing{c.filings.length === 1 ? '' : 's'} to validate</div>
+                      <div className="cob-meta">
+                        {c.filingsChecked && c.filings.length === 0
+                          ? 'No public SEC filings'
+                          : `${c.filings.length} filing${c.filings.length === 1 ? '' : 's'} to validate`}
+                      </div>
                     </div>
                     <span className="cob-count">📄 {c.filings.length}</span>
                   </button>
                   {open && (
                     <div className="co-block-body">
+                      {c.filings.length === 0 && (
+                        <div className="finding empty">
+                          {c.filingsChecked
+                            ? 'No public SEC EDGAR filings — this is a private company. Filings become available if it registers with the SEC.'
+                            : 'Checking SEC EDGAR for filings…'}
+                        </div>
+                      )}
                       {c.filings.map((f) => (
                         <div className="filing-find" key={f.id}>
                           <div className="nf-top">
                             <span className="filing-type">{f.filingType}</span>
-                            <span className="src-badge sm">{sourceName(desk.sources, f.source)}</span>
+                            <span className={`src-badge sm ${f.source === 'edgar' ? 'morningstar' : ''}`}>{f.source === 'edgar' ? 'SEC EDGAR' : sourceName(desk.sources, f.source)}</span>
                             <span className="nf-when">{timeAgo(f.when)}</span>
                           </div>
                           <div className="nf-headline">{f.headline}</div>
                           <div className="nf-detail">{f.detail}</div>
+                          {f.url && (
+                            <a className="nf-source" href={f.url} target="_blank" rel="noreferrer">🔗 View on SEC.gov</a>
+                          )}
                           <div className="confirms">✓ confirms <b>{catById[f.confirms]?.label}</b></div>
                         </div>
                       ))}

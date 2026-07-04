@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.16.0',
+    date: '2026-07-04',
+    image: 'dealroom-app:v21',
+    revision: 'ca-dealroom-orch-dev-swc--0000017',
+    title: 'US fund mandate · CxO targets on desk · live SEC filings',
+    tag: 'feature',
+    highlights: [
+      'The fund mandate is now a US mid-market buyout fund (USD enterprise-value bands, US geographies) — aligning the gate, screens and news scout with the US targets the desk actually sources. All € figures across the UI are now $.',
+      'The Deal Sourcing CxO Signals card now surfaces the actual target companies identified from your M365 signals (name, sector and signal count with an intent dot), not just aggregate counts.',
+      'Live SEC EDGAR filings: the “Quantify with Filings” step now pulls REAL 10-K / 10-Q / 8-K / proxy filings from the SEC’s free official API (with clickable SEC.gov links) for public companies, and honestly reports “no public filings — private company” for private targets. SEC EDGAR is added to the Home connectivity panel as a real, free, keyless connector.',
+      'Fixed empty CxO & news signals: Cosmos public network access had been disabled (governance reset), so the app had fallen back to empty in-memory mode — re-enabled and re-hydrated; the persisted signals and companies are back.'
+    ]
+  },
+  {
     version: 'v0.15.0',
     date: '2026-07-04',
     image: 'dealroom-app:v20',

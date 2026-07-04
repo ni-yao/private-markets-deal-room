@@ -104,8 +104,8 @@ function Row({ c }: { c: Candidate }) {
     <div className={`pipe-tr ${c.disposition}`}>
       <span className="pipe-co">{c.company}</span>
       <span className="pipe-dim">{c.sector} · {c.region}</span>
-      <span>€{c.dealSize}M</span>
-      <span className="pipe-fin">€{c.revenue}M rev · €{c.ebitda}M · {c.ebitdaMargin}% · {c.growth >= 0 ? '+' : ''}{c.growth}%</span>
+      <span>${c.dealSize}M</span>
+      <span className="pipe-fin">${c.revenue}M rev · ${c.ebitda}M · {c.ebitdaMargin}% · {c.growth >= 0 ? '+' : ''}{c.growth}%</span>
       <span><span className={`pipe-stage s-${c.disposition === 'pursued' ? 'pursued' : (c.passStage || c.stage).toLowerCase()}`}>{STAGE_LABEL[c.disposition === 'pursued' ? 'pursued' : (c.passStage || c.stage)] || c.stage}</span></span>
       <span><span className={`pipe-dispo d-${c.disposition}`}>{DISPO_LABEL[c.disposition]}</span></span>
       <span className={`pipe-score ${c.band}`}>{c.gated ? '—' : c.score}</span>
