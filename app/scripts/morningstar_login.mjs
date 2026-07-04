@@ -15,6 +15,9 @@
 
 import http from 'node:http';
 import crypto from 'node:crypto';
+import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
   discover, registerClient, pkcePair, buildAuthorizationUrl, exchangeCode, saveTokens, hasLogin, loadTokens
@@ -34,11 +37,28 @@ const MCP_URL = arg('--mcp-url') || process.env.MORNINGSTAR_MCP_URL || 'https://
 
 function openBrowser(url) {
   // Best-effort; the URL is also printed so the user can open it manually.
+  //
+  // Robustness note: on Windows, `cmd /c start <url>` truncates the URL at the
+  // first `&` (cmd treats it as a command separator), which drops client_id and
+  // code_challenge and yields "invalid_request: Field required". To be immune to
+  // any command-line parsing, we DON'T put the URL on a command line at all —
+  // we write it into a tiny local HTML file that redirects to it, and open that
+  // file with the default handler (the file path has no `&`). All openers below
+  // are spawned directly (no shell).
   try {
-    if (process.platform === 'win32') spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
-    else if (process.platform === 'darwin') spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    else spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
-  } catch { /* ignore */ }
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const html =
+      '<!doctype html><meta charset="utf-8">' +
+      `<meta http-equiv="refresh" content="0;url=${esc(url)}">` +
+      '<body style="font-family:sans-serif;padding:2rem">' +
+      '<p>Redirecting to the Morningstar sign-in\u2026</p>' +
+      `<p>If nothing happens, <a href="${esc(url)}">click here to continue</a>.</p></body>`;
+    const file = path.join(os.tmpdir(), `dealroom-morningstar-login-${Date.now()}.html`);
+    fs.writeFileSync(file, html, 'utf8');
+    if (process.platform === 'win32') spawn('explorer.exe', [file], { detached: true, stdio: 'ignore' }).unref();
+    else if (process.platform === 'darwin') spawn('open', [file], { detached: true, stdio: 'ignore' }).unref();
+    else spawn('xdg-open', [file], { detached: true, stdio: 'ignore' }).unref();
+  } catch { /* ignore — the URL is printed for manual open */ }
 }
 
 function waitForCode(expectedState) {
