@@ -26,8 +26,17 @@ export function gateCompany(company, fund) {
   if (fund.sectorsPermitted?.length && !fund.sectorsPermitted.includes(company.sector)) {
     reasons.push(`Sector outside the fund mandate (${company.sector})`);
   }
-  if (fund.geographies?.length && !fund.geographies.includes(company.region)) {
-    reasons.push(`Geography outside the fund mandate (${company.region})`);
+  if (fund.geographies?.length) {
+    // A US-wide mandate (geographies include "United States") admits any US
+    // company regardless of the specific sub-region label the source used
+    // (e.g. "California" vs "West / California", "US", "Texas"). Only gate on
+    // geography when the company clearly isn't in a permitted region/country.
+    const usWide = fund.geographies.some((g) => /united states|^us$|u\.s\.?/i.test(g));
+    const isUS = /united states|^us$|u\.s\.?|usa/i.test(`${company.country || ''} ${company.region || ''}`);
+    const inRegion = fund.geographies.includes(company.region);
+    if (!inRegion && !(usWide && isUS)) {
+      reasons.push(`Geography outside the fund mandate (${company.region})`);
+    }
   }
   if (company.dealSize < fund.evMin) {
     reasons.push(`EV $${company.dealSize}M below the mandate floor ($${fund.evMin}M)`);

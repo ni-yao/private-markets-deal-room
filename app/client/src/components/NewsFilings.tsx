@@ -176,7 +176,7 @@ export function NewsFilings({ onBack }: Props) {
                 <button className="co-block-hd" onClick={() => toggleNews(c.id)}>
                   <span className="cob-caret">{openNews.has(c.id) ? '▾' : '▸'}</span>
                   <div className="cob-main">
-                    <div className="cob-name">{c.name}{c.live && <span className="live-badge">● LIVE</span>}</div>
+                    <div className="cob-name">{c.name}{c.ticker && <span className="ticker-badge">{c.ticker}</span>}{c.live && <span className="live-badge">● LIVE</span>}</div>
                     <div className="cob-meta">{c.sector} · {c.region} · ${c.dealSize}M{c.estimated ? ' (est.)' : ''} · {c.ownership}</div>
                   </div>
                   <span className="cob-count">{c.news.length}</span>
@@ -284,7 +284,7 @@ export function NewsFilings({ onBack }: Props) {
                 <div className="co-block quality" key={c.id}>
                   <div className="co-block-hd static">
                     <div className="cob-main">
-                      <div className="cob-name">{c.name}</div>
+                      <div className="cob-name">{c.name}{c.ticker && <span className="ticker-badge">{c.ticker}</span>}</div>
                       <div className="cob-meta">{c.sector} · {c.region}</div>
                     </div>
                   </div>

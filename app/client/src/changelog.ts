@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.18.0',
+    date: '2026-07-05',
+    image: 'dealroom-app:v24',
+    revision: 'ca-dealroom-orch-dev-swc--0000020',
+    title: 'CxO targets in Ranked Targets · public take-private news',
+    tag: 'feature',
+    highlights: [
+      'Companies discovered through your CxO signals (e.g. Peloton, Allbirds, Fairway) now flow into Ranked Targets on the Deal Sourcing page, scored against the fund mandate and screens alongside news-sourced companies — each tagged with its origin (CxO / News). Previously CxO signal companies lived in a separate store and never reached the ranked list.',
+      'CxO-sourced targets are now fully pursuable: “Send to screening” works end-to-end for a company that originated from a CxO signal, materialising it as a screened candidate with the right sector, region and source lineage.',
+      'The live news scout now also surfaces publicly-listed US companies that meet the acquisition threshold — small/micro-cap and orphaned public names whose market cap / enterprise value sits inside the fund’s EV band and that are plausible take-private candidates — and captures their ticker so the Morningstar quality check and SEC EDGAR filings resolve cleanly.',
+      'Fixed a geography-gate bug: US companies returned with a state-level region (e.g. “California”) were being wrongly excluded when the mandate lists “United States”. The gate is now US-wide-aware, so legitimate domestic targets pass geography and are only gated on genuine mandate breaches (e.g. EV above the $800M cap).'
+    ]
+  },
+  {
     version: 'v0.17.0',
     date: '2026-07-04',
     image: 'dealroom-app:v22',

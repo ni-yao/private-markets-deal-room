@@ -118,6 +118,7 @@ function toDeskCompany(raw, idx) {
   return {
     id: `live-${slug(raw?.name)}-${idx}`,
     name: raw?.name || 'Unnamed target',
+    ticker: typeof raw?.ticker === 'string' ? raw.ticker.toUpperCase().replace(/[^A-Z.]/g, '').slice(0, 6) || null : null,
     sector: raw?.sector || 'Business Services',
     region: raw?.region || 'US',
     country: raw?.country || 'United States',
@@ -165,9 +166,10 @@ function buildQuery(mandate, focus) {
   return [
     `Fund mandate: US mid-market buyout fund (${mandate?.name || 'US mid-market buyout'}).`,
     `Permitted sectors: ${sectors}. Excluded: ${excl}.`,
-    `Geography: United States. Enterprise value USD ${evLo}-${evHi}M.`,
+    `Geography: United States. Enterprise value USD ${evLo}-${evHi}M (the acquisition threshold).`,
     focus ? `Focus themes: ${focus}.` : 'Focus: ownership/succession, sponsor-exit, take-private and carve-out catalysts.',
-    'Find US-based mid-market target companies with recent catalysts covered in US business news (e.g. WSJ, Bloomberg, CNBC, Reuters US, Axios, PE Hub). Return only US companies.'
+    `Return a mix of (a) private/founder/sponsor-owned targets AND (b) PUBLICLY-LISTED US companies that MEET THE ACQUISITION THRESHOLD — i.e. their market cap or enterprise value sits inside the USD ${evLo}-${evHi}M band and they are plausible take-private / buyout candidates (undervalued small- or micro-caps, activist involvement, strategic review, "exploring alternatives", proxy fights, orphaned/underfollowed public companies, or sector-consolidation targets).`,
+    'For any public company include its stock ticker. Ground every company in recent US business news (WSJ, Bloomberg, CNBC, Reuters US, Axios, PE Hub, Barron\'s, Seeking Alpha). Return only US companies.'
   ].join(' ');
 }
 

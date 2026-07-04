@@ -444,6 +444,7 @@ export interface DeskQuality {
 export interface DeskCompany {
   id: string;
   name: string;
+  ticker?: string | null;
   sector: string;
   region: string;
   country: string;

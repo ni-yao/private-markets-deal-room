@@ -392,6 +392,7 @@ function publicCompany(c) {
   return {
     id: c.id,
     name: c.name,
+    ticker: c.ticker || null,
     sector: c.sector,
     region: c.region,
     country: c.country,
@@ -699,14 +700,90 @@ export function createScreen(input) {
   return { screen: candidate, warnings: check.warnings };
 }
 
+// A CxO signal company is a real sourced target too — but it lives in its own
+// store and lacks the firmographic fields the mandate scoring needs. Adapt it
+// into the scorable target shape: map its descriptive sector to a permitted
+// mandate sector, its HQ to a fund region, and estimate the financials (flagged)
+// so it can be gated, ranked and pursued alongside news-desk targets.
+function signalTargetSector(sector) {
+  const t = (sector || '').toLowerCase();
+  if (/consumer|retail|grocery|food|footwear|apparel|fitness|wellness|brand|dtc/.test(t)) return 'Consumer & Retail';
+  if (/software|saas|\bai\b|tech|platform|analytics|\bdata\b/.test(t)) return 'Software';
+  if (/industrial|manufactur|logistics|component|packaging|machin/.test(t)) return 'Industrials';
+  if (/health|medical|biotech|pharma|clinical|care\b/.test(t)) return 'Healthcare';
+  if (/business services|\bservices\b|financial|insurance|staffing/.test(t)) return 'Business Services';
+  return 'Consumer & Retail';
+}
+function signalTargetRegion(hq) {
+  const t = (hq || '').toLowerCase();
+  if (/\bny\b|new york|boston|massachusetts|\bnj\b|new jersey|pennsylvania|philadelphia|connecticut|\bma\b|\bpa\b|\bct\b/.test(t)) return 'Northeast';
+  if (/\bca\b|california|san francisco|los angeles|san diego|seattle|washington|oregon|portland|\bwa\b|\bor\b/.test(t)) return 'West / California';
+  if (/\btx\b|texas|austin|dallas|houston|san antonio/.test(t)) return 'Texas';
+  if (/florida|\bfl\b|georgia|atlanta|carolina|tennessee|nashville|miami|virginia|\bga\b|\bnc\b|\bsc\b|\btn\b/.test(t)) return 'Southeast';
+  if (/illinois|chicago|ohio|michigan|minnesota|wisconsin|indiana|missouri|\bil\b|\boh\b|\bmi\b|\bmn\b/.test(t)) return 'Midwest';
+  return 'United States';
+}
+const SECTOR_KEYWORDS = {
+  'Consumer & Retail': ['consumer', 'brand'],
+  Software: ['software'],
+  Industrials: ['reshoring'],
+  Healthcare: ['healthcare'],
+  'Business Services': ['services']
+};
+function signalToTarget(sig) {
+  const sector = signalTargetSector(sig.sector);
+  const region = signalTargetRegion(sig.hq);
+  const ev = Number.isFinite(sig.dealSize) ? Math.round(sig.dealSize) : 300;
+  const revenue = Math.round(ev * 1.25);
+  const ebitda = Math.round(ev * 0.12);
+  return {
+    id: sig.id,
+    name: sig.name,
+    sector,
+    region,
+    country: 'United States',
+    dealSize: ev,
+    ownership: sig.ownership || 'founder',
+    keywords: SECTOR_KEYWORDS[sector] || [],
+    sources: ['cxo'],
+    revenue,
+    ebitda,
+    ebitdaMargin: +((ebitda / revenue) * 100).toFixed(1),
+    growth: 6,
+    estimated: true,
+    visible: true,
+    justDiscovered: false,
+    intent: sig.intent
+  };
+}
+
+// The full sourced-target set feeding Ranked Targets: news-desk companies plus
+// CxO signal companies (adapted), de-duped by entity key (desk wins on overlap).
+function sourcingTargets() {
+  const deskTargets = desk.filter((c) => c.visible);
+  const deskKeys = new Set(deskTargets.map((c) => entityKey(c.name)));
+  const cxoTargets = signalCompanies
+    .filter((s) => s && s.name && !deskKeys.has(entityKey(s.name)))
+    .map(signalToTarget);
+  return [...deskTargets, ...cxoTargets];
+}
+
+// Find a sourced target by id across the desk and the CxO signal companies.
+function findSourcingTarget(id) {
+  const d = desk.find((x) => x.id === id);
+  if (d) return d;
+  const sig = signalCompanies.find((x) => x.id === id);
+  return sig ? signalToTarget(sig) : null;
+}
+
 export function getScoredTargets() {
   const sel = selectedScreens();
-  const list = desk.filter((c) => c.visible);
+  const list = sourcingTargets();
   const targets = scoreTargets(list, sel, fund);
   const inFunnel = new Set(candidates.map((c) => c.company.toLowerCase()));
   return {
     selectedCount: sel.length,
-    discoveredCount: desk.filter((c) => c.justDiscovered).length,
+    discoveredCount: list.filter((c) => c.justDiscovered).length,
     totalCount: list.length,
     gatedCount: targets.filter((t) => t.gated).length,
     targets: targets.map((t) => ({ ...t, inFunnel: inFunnel.has(t.name.toLowerCase()) }))
@@ -1009,7 +1086,7 @@ export function gateCandidate(id, action, reason, note) {
 
 // Option A — promote a discovered O1 desk target into the funnel at O2.
 export function sendToScreening(deskId) {
-  const d = desk.find((x) => x.id === deskId);
+  const d = findSourcingTarget(deskId);
   if (!d) return { error: 'target-not-found' };
   if (candidates.some((c) => c.company.toLowerCase() === d.name.toLowerCase())) {
     return { error: 'already-in-funnel' };
