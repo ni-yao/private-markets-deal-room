@@ -46,5 +46,9 @@ param apimPublisherName = 'Private Markets Deal Room'
 
 param orchestratorImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
+// Teams interface Container App (ca-dealhub-teams). The image is rolled out
+// separately after infra (like the orchestrator), so this stays portable.
+param deployTeamsApp = true
+
 param enablePrivateEndpoints = false
 param keyVaultPurgeProtection = false
