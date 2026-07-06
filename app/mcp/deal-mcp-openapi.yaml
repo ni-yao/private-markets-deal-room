@@ -1,3 +1,8 @@
+# Deal Room MCP — OpenAPI (Swagger 2.0) TEMPLATE for a Copilot Studio custom connector.
+# Replace the <PLACEHOLDERS> below with your own deployment values before importing:
+#   <MCP_HOST>         the /mcp Container App FQDN (no scheme)
+#   <ENTRA_TENANT_ID>  your Entra tenant GUID
+#   <MCP_CLIENT_ID>    the app registration (client) ID for the MCP server
 swagger: '2.0'
 info:
   title: Deal Room MCP
@@ -7,7 +12,7 @@ info:
     records — thesis, key figures, diligence workstreams, memo and compliance
     status, and top risks. Backed by Azure Cosmos DB; access is gated by Entra ID.
   version: 1.0.0
-host: ca-dealroom-orch-dev-swc.proudsand-8d4a01d0.swedencentral.azurecontainerapps.io
+host: <MCP_HOST>
 basePath: /
 schemes:
   - https
@@ -34,10 +39,10 @@ securityDefinitions:
   oauth2_auth:
     type: oauth2
     flow: accessCode
-    authorizationUrl: https://login.microsoftonline.com/301fb807-bdbc-4bac-802f-39b67f298b6c/oauth2/v2.0/authorize
-    tokenUrl: https://login.microsoftonline.com/301fb807-bdbc-4bac-802f-39b67f298b6c/oauth2/v2.0/token
+    authorizationUrl: https://login.microsoftonline.com/<ENTRA_TENANT_ID>/oauth2/v2.0/authorize
+    tokenUrl: https://login.microsoftonline.com/<ENTRA_TENANT_ID>/oauth2/v2.0/token
     scopes:
-      api://bd01fa3f-550b-4a69-bf50-f9cd74578fd7/deals.read: Read the fund's deals
+      api://<MCP_CLIENT_ID>/deals.read: Read the fund's deals
 security:
   - oauth2_auth:
-      - api://bd01fa3f-550b-4a69-bf50-f9cd74578fd7/deals.read
+      - api://<MCP_CLIENT_ID>/deals.read

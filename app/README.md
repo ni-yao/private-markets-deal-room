@@ -163,7 +163,7 @@ by `infra/main.bicep`. To ship the app image:
    `../.github/workflows/deal-room-app.yml`, or manually:
 
 ```powershell
-$RG = "rg-dealroom-dev-swc"
+$RG = "rg-dealhub-app-dev-swc"
 $ACR = az acr list -g $RG --query "[0].name" -o tsv
 $LOGIN = az acr list -g $RG --query "[0].loginServer" -o tsv
 
@@ -171,7 +171,7 @@ $LOGIN = az acr list -g $RG --query "[0].loginServer" -o tsv
 az acr build -r $ACR -t deal-room:latest ./app
 
 # Roll out
-az containerapp update -n ca-dealroom-orch-dev-swc -g $RG --image "$LOGIN/deal-room:latest"
+az containerapp update -n ca-dealhub-orch-dev-swc -g $RG --image "$LOGIN/deal-room:latest"
 ```
 
 > The Container App starts on the placeholder image until the first app rollout.

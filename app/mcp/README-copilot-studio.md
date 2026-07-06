@@ -23,21 +23,21 @@ never touches Cosmos directly.
 ## Endpoint
 
 ```
-POST https://ca-dealroom-orch-dev-swc.proudsand-8d4a01d0.swedencentral.azurecontainerapps.io/mcp
+POST https://<MCP_HOST>/mcp
 ```
 
 Transport: **Streamable HTTP** (`x-ms-agentic-protocol: mcp-streamable-1.0`) — the only
 transport Copilot Studio supports (SSE was retired Aug 2025). Stateless: no session
 affinity, so it scales across replicas.
 
-## Entra ID app registration (already created)
+## Entra ID app registration (create in your tenant)
 
 | Field | Value |
 |---|---|
-| Application (client) ID | `bd01fa3f-550b-4a69-bf50-f9cd74578fd7` |
-| Directory (tenant) ID | `301fb807-bdbc-4bac-802f-39b67f298b6c` |
-| Application ID URI | `api://bd01fa3f-550b-4a69-bf50-f9cd74578fd7` |
-| Delegated scope | `deals.read` → `api://bd01fa3f-550b-4a69-bf50-f9cd74578fd7/deals.read` |
+| Application (client) ID | `<MCP_CLIENT_ID>` |
+| Directory (tenant) ID | `<ENTRA_TENANT_ID>` |
+| Application ID URI | `api://<MCP_CLIENT_ID>` |
+| Delegated scope | `deals.read` → `api://<MCP_CLIENT_ID>/deals.read` |
 | App role (app-only) | `deals.read.app` |
 
 The server validates every bearer token against this app: signature (tenant JWKS),
@@ -53,12 +53,12 @@ the token must also carry that delegated scope (`scp`) or app role (`roles`).
    - **Server description**: `Read the fund's deals — thesis, key figures, diligence, memo, compliance and risks — to advise on a deal.`
    - **Server URL**: the `/mcp` endpoint above.
 3. **Authentication** → **OAuth 2.0** → **Manual**, then supply:
-   - **Client ID**: `bd01fa3f-550b-4a69-bf50-f9cd74578fd7`
+   - **Client ID**: `<MCP_CLIENT_ID>`
    - **Client secret**: *(create one — see below; do not commit it)*
-   - **Authorization URL**: `https://login.microsoftonline.com/301fb807-bdbc-4bac-802f-39b67f298b6c/oauth2/v2.0/authorize`
-   - **Token URL template**: `https://login.microsoftonline.com/301fb807-bdbc-4bac-802f-39b67f298b6c/oauth2/v2.0/token`
+   - **Authorization URL**: `https://login.microsoftonline.com/<ENTRA_TENANT_ID>/oauth2/v2.0/authorize`
+   - **Token URL template**: `https://login.microsoftonline.com/<ENTRA_TENANT_ID>/oauth2/v2.0/token`
    - **Refresh URL**: same as the Token URL
-   - **Scopes**: `api://bd01fa3f-550b-4a69-bf50-f9cd74578fd7/deals.read`
+   - **Scopes**: `api://<MCP_CLIENT_ID>/deals.read`
 4. Select **Create**. Copilot Studio shows a **callback (redirect) URL** — copy it.
 5. In Entra (this app registration) → **Authentication** → add that callback URL as a
    **Web** redirect URI. (Copilot Studio's global redirect is
@@ -72,7 +72,7 @@ the token must also carry that delegated scope (`scp`) or app role (`roles`).
 ## Create the client secret (for the manual OAuth config)
 
 ```powershell
-az ad app credential reset --id bd01fa3f-550b-4a69-bf50-f9cd74578fd7 `
+az ad app credential reset --id <MCP_CLIENT_ID> `
   --display-name "copilot-studio" --years 1 --query password -o tsv
 ```
 
@@ -85,8 +85,8 @@ Set on the Container App (already wired in `infra/main.bicep`):
 
 | Env | Value | Purpose |
 |---|---|---|
-| `ENTRA_TENANT_ID` | `301fb807-bdbc-4bac-802f-39b67f298b6c` | Issuer + JWKS |
-| `MCP_AUDIENCE` | `bd01fa3f-550b-4a69-bf50-f9cd74578fd7,api://bd01fa3f-550b-4a69-bf50-f9cd74578fd7` | Accepted audiences |
+| `ENTRA_TENANT_ID` | `<ENTRA_TENANT_ID>` | Issuer + JWKS |
+| `MCP_AUDIENCE` | `<MCP_CLIENT_ID>,api://<MCP_CLIENT_ID>` | Accepted audiences |
 | `MCP_REQUIRED_SCOPE` | *(optional)* `deals.read` | Extra gate: require the delegated scope |
 | `MCP_AUTH_DISABLED` | *(local dev only)* `true` | Bypass validation for local testing |
 

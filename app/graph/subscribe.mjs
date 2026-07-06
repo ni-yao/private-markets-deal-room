@@ -9,7 +9,7 @@
 //   $env:GRAPH_TENANT_ID     = "<tenantId>"
 //   $env:GRAPH_CLIENT_ID     = "<appId>"
 //   $env:GRAPH_CLIENT_SECRET = "<secret>"
-//   $env:GRAPH_MAILBOX       = "admin@MngEnvMCAP856239.onmicrosoft.com"
+//   $env:GRAPH_MAILBOX       = "<signal-mailbox@your-tenant.onmicrosoft.com>"
 //   $env:NOTIFICATION_URL    = "https://<public-host>/api/graph/notifications"
 //   $env:GRAPH_CLIENT_STATE  = "<shared-secret>"   # optional but recommended
 //   node graph/subscribe.mjs

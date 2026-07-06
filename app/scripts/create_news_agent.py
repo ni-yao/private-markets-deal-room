@@ -20,16 +20,18 @@ from azure.ai.projects.models import (
     BingGroundingSearchConfiguration,
 )
 
-ENDPOINT = os.environ.get(
-    "FOUNDRY_PROJECT_ENDPOINT",
-    "https://aif-dealroom-dev-7j3ok.services.ai.azure.com/api/projects/proj-dealroom-dev",
-)
-BING_CONNECTION_ID = os.environ.get(
-    "BING_PROJECT_CONNECTION_ID",
-    "/subscriptions/bf278d8a-49ed-4d34-bae7-3ba55e9c8183/resourceGroups/rg-dealroom-dev-swc/"
-    "providers/Microsoft.CognitiveServices/accounts/aif-dealroom-dev-7j3ok/projects/"
-    "proj-dealroom-dev/connections/bing-dealroom-conn",
-)
+ENDPOINT = os.environ.get("FOUNDRY_PROJECT_ENDPOINT")
+if not ENDPOINT:
+    raise SystemExit(
+        "FOUNDRY_PROJECT_ENDPOINT is required, e.g. "
+        "https://<your-foundry>.services.ai.azure.com/api/projects/<your-project>"
+    )
+BING_CONNECTION_ID = os.environ.get("BING_PROJECT_CONNECTION_ID")
+if not BING_CONNECTION_ID:
+    raise SystemExit(
+        "BING_PROJECT_CONNECTION_ID is required (full ARM connection id for your "
+        "Grounding-with-Bing connection)."
+    )
 MODEL = os.environ.get("NEWS_AGENT_MODEL", "gpt-5-mini")
 AGENT_NAME = "deal-room-news-scout"
 

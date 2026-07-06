@@ -6,7 +6,7 @@ resolution), and 5 (persisted workflow state).
 
 ## Datastore
 
-**Azure Cosmos DB for NoSQL, serverless** — account `cosmos-dealroom-dev-7j3ok`,
+**Azure Cosmos DB for NoSQL, serverless** — account `<your Cosmos account>`,
 database `dealroom`, Sweden Central. Local auth is **disabled**; access is
 data-plane RBAC only (the app's managed identity holds *Cosmos DB Built-in Data
 Contributor*). The app reaches it via `lib/repo/` which falls back to an

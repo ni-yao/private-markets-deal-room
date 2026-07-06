@@ -8,9 +8,9 @@ calls the Deal Room webhook and the message becomes a sourcing signal.
 
 | Item | State |
 |------|-------|
-| App registration `Deal Room - Mailbox Signals` | ✅ created — appId `c6207822-40e8-48fc-b990-976725b11aee` |
+| App registration `Deal Room - Mailbox Signals` | Create in your tenant — appId `<GRAPH_APP_ID>` |
 | Graph `Mail.Read` (application) permission | ✅ requested on the app |
-| **Admin consent** | ⛔ **blocked** — the signed-in account `admin@MngEnvMCAP856239.onmicrosoft.com` holds only **Global Reader** (read-only) and cannot consent |
+| **Admin consent** | Requires an admin (Global Administrator / Application Administrator) to grant `Mail.Read` |
 | Client secret | ⚪ not created (create after consent) |
 | Public HTTPS notification endpoint | ⚪ not yet (needs the deployed Container App URL or a dev tunnel) |
 | Webhook receiver in the app (`/api/graph/notifications`) | ✅ built + validated locally |
@@ -28,7 +28,7 @@ subscription can be created:
 ### 1. Grant admin consent (a real admin)
 ```powershell
 # As a Global Admin / Application Admin:
-az ad app permission admin-consent --id c6207822-40e8-48fc-b990-976725b11aee
+az ad app permission admin-consent --id <GRAPH_APP_ID>
 ```
 Or in the portal: **Entra ID → App registrations → Deal Room - Mailbox Signals
 → API permissions → Grant admin consent**.
@@ -38,15 +38,15 @@ Application `Mail.Read` grants read to *all* mailboxes. Restrict it to the one
 mailbox with an Exchange Online **Application Access Policy**:
 ```powershell
 Connect-ExchangeOnline
-New-ApplicationAccessPolicy -AppId c6207822-40e8-48fc-b990-976725b11aee `
-  -PolicyScopeGroupId admin@MngEnvMCAP856239.onmicrosoft.com `
+New-ApplicationAccessPolicy -AppId <GRAPH_APP_ID> `
+  -PolicyScopeGroupId <SIGNAL_MAILBOX> `
   -AccessRight RestrictAccess `
   -Description "Deal Room O1 mailbox signals - single mailbox"
 ```
 
 ### 3. Create a client secret
 ```powershell
-az ad app credential reset --id c6207822-40e8-48fc-b990-976725b11aee `
+az ad app credential reset --id <GRAPH_APP_ID> `
   --display-name "deal-room-o1" --years 1 --query "{appId:appId,secret:password,tenant:tenant}" -o json
 ```
 Store the values in `app/.env.local` (gitignored) — never commit them.
@@ -59,10 +59,10 @@ Store the values in `app/.env.local` (gitignored) — never commit them.
 
 ### 5. Create the subscription
 ```powershell
-$env:GRAPH_TENANT_ID     = "1f629fc5-9a9e-4353-a1a1-e2bbf3b2cd02"
-$env:GRAPH_CLIENT_ID     = "c6207822-40e8-48fc-b990-976725b11aee"
+$env:GRAPH_TENANT_ID     = "<GRAPH_TENANT_ID>"
+$env:GRAPH_CLIENT_ID     = "<GRAPH_APP_ID>"
 $env:GRAPH_CLIENT_SECRET = "<secret from step 3>"
-$env:GRAPH_MAILBOX       = "admin@MngEnvMCAP856239.onmicrosoft.com"
+$env:GRAPH_MAILBOX       = "<SIGNAL_MAILBOX>"
 $env:NOTIFICATION_URL    = "https://<public-host>/api/graph/notifications"
 $env:GRAPH_CLIENT_STATE  = "<shared-secret>"
 node graph/subscribe.mjs
@@ -79,5 +79,5 @@ Keep it alive by running `graph/renew.mjs` on a timer (every ~30–45 min).
 ## Remove everything
 ```powershell
 # Delete the subscription (if created), then the app registration:
-az ad app delete --id c6207822-40e8-48fc-b990-976725b11aee
+az ad app delete --id <GRAPH_APP_ID>
 ```

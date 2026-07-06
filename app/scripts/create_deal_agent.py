@@ -23,10 +23,12 @@ from azure.identity import AzureCliCredential
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import PromptAgentDefinition, FunctionTool
 
-ENDPOINT = os.environ.get(
-    "FOUNDRY_PROJECT_ENDPOINT",
-    "https://aif-dealroom-dev-7j3ok.services.ai.azure.com/api/projects/proj-dealroom-dev",
-)
+ENDPOINT = os.environ.get("FOUNDRY_PROJECT_ENDPOINT")
+if not ENDPOINT:
+    raise SystemExit(
+        "FOUNDRY_PROJECT_ENDPOINT is required, e.g. "
+        "https://<your-foundry>.services.ai.azure.com/api/projects/<your-project>"
+    )
 MODEL = os.environ.get("DEAL_AGENT_MODEL", "gpt-5-mini")
 AGENT_NAME = os.environ.get("DEAL_AGENT_NAME", "deal-room-analyst")
 
