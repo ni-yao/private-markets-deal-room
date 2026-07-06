@@ -1,6 +1,6 @@
 """Provision the Deal Room Analyst agent in Foundry Agent Service.
 
-Creates (or updates) a prompt agent on proj-dealroom-dev that can answer questions
+Creates (or updates) a prompt agent on your Foundry project that can answer questions
 about the fund's DEALS. The deals live in Azure Cosmos DB (container `deals`); the
 agent reaches them through three FUNCTION TOOLS that the Deal Room's Node backend
 executes against its Cosmos-backed store and returns as JSON:

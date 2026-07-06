@@ -16,7 +16,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.21.0',
     date: '2026-07-06',
     image: 'dealroom-app:v27',
-    revision: 'ca-dealroom-orch-dev-swc--0000023',
+    revision: 'ca-dealhub-orch-dev-swc--0000023',
     title: 'M365 login connector · real Teams channel per deal',
     tag: 'feature',
     highlights: [
@@ -30,7 +30,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.20.0',
     date: '2026-07-06',
     image: 'dealroom-app:v26',
-    revision: 'ca-dealroom-orch-dev-swc--0000022',
+    revision: 'ca-dealhub-orch-dev-swc--0000022',
     title: 'Deal MCP server — Entra-secured, for Copilot Studio',
     tag: 'feature',
     highlights: [
@@ -44,7 +44,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.19.0',
     date: '2026-07-06',
     image: 'dealroom-app:v25',
-    revision: 'ca-dealroom-orch-dev-swc--0000021',
+    revision: 'ca-dealhub-orch-dev-swc--0000021',
     title: 'Deal Room Analyst — a Foundry agent with all-deals access',
     tag: 'feature',
     highlights: [
@@ -59,7 +59,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.18.0',
     date: '2026-07-05',
     image: 'dealroom-app:v24',
-    revision: 'ca-dealroom-orch-dev-swc--0000020',
+    revision: 'ca-dealhub-orch-dev-swc--0000020',
     title: 'CxO targets in Ranked Targets · public take-private news',
     tag: 'feature',
     highlights: [
@@ -73,7 +73,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.17.0',
     date: '2026-07-04',
     image: 'dealroom-app:v22',
-    revision: 'ca-dealroom-orch-dev-swc--0000018',
+    revision: 'ca-dealhub-orch-dev-swc--0000018',
     title: 'SEC Form D — free private-company deal signals',
     tag: 'feature',
     highlights: [
@@ -87,7 +87,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.16.0',
     date: '2026-07-04',
     image: 'dealroom-app:v21',
-    revision: 'ca-dealroom-orch-dev-swc--0000017',
+    revision: 'ca-dealhub-orch-dev-swc--0000017',
     title: 'US fund mandate · CxO targets on desk · live SEC filings',
     tag: 'feature',
     highlights: [
@@ -101,7 +101,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.15.0',
     date: '2026-07-04',
     image: 'dealroom-app:v20',
-    revision: 'ca-dealroom-orch-dev-swc--0000016',
+    revision: 'ca-dealhub-orch-dev-swc--0000016',
     title: 'Connect MCP data sources from the website',
     tag: 'feature',
     highlights: [
@@ -115,7 +115,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.14.0',
     date: '2026-07-04',
     image: 'dealroom-app:v19',
-    revision: 'ca-dealroom-orch-dev-swc--0000015',
+    revision: 'ca-dealhub-orch-dev-swc--0000015',
     title: 'Data-source connectivity panel on Home · real tests',
     tag: 'feature',
     highlights: [
@@ -129,7 +129,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.13.0',
     date: '2026-07-04',
     image: 'dealroom-app:v18',
-    revision: 'ca-dealroom-orch-dev-swc--0000014',
+    revision: 'ca-dealhub-orch-dev-swc--0000014',
     title: 'Live Morningstar quality check via MCP',
     tag: 'feature',
     highlights: [
@@ -143,7 +143,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.12.0',
     date: '2026-07-04',
     image: 'dealroom-app:v17',
-    revision: 'ca-dealroom-orch-dev-swc--0000013',
+    revision: 'ca-dealhub-orch-dev-swc--0000013',
     title: 'US refocus · live CxO signal ingestion from M365',
     tag: 'feature',
     highlights: [
@@ -157,7 +157,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.11.0',
     date: '2026-07-04',
     image: 'dealroom-app:v16',
-    revision: 'ca-dealroom-orch-dev-swc--0000012',
+    revision: 'ca-dealhub-orch-dev-swc--0000012',
     title: 'Real datastore · empty-start · durable pipeline',
     tag: 'feature',
     highlights: [
@@ -172,7 +172,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.10.0',
     date: '2026-07-03',
     image: 'dealroom-app:v14',
-    revision: 'ca-dealroom-orch-dev-swc--0000010',
+    revision: 'ca-dealhub-orch-dev-swc--0000010',
     title: 'Live news search · Bing-grounded Foundry agent',
     tag: 'feature',
     highlights: [
@@ -186,7 +186,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.9.0',
     date: '2026-07-03',
     image: 'dealroom-app:v12',
-    revision: 'ca-dealroom-orch-dev-swc--0000008',
+    revision: 'ca-dealhub-orch-dev-swc--0000008',
     title: 'Deal Sourcing page rebuilt · signals-forward',
     tag: 'feature',
     highlights: [
@@ -200,7 +200,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.8.0',
     date: '2026-07-03',
     image: 'dealroom-app:v11',
-    revision: 'ca-dealroom-orch-dev-swc--0000007',
+    revision: 'ca-dealhub-orch-dev-swc--0000007',
     title: 'Converse-with-agent chat + cleaner cohort desk',
     tag: 'feature',
     highlights: [
@@ -213,7 +213,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.7.0',
     date: '2026-07-03',
     image: 'dealroom-app:v10',
-    revision: 'ca-dealroom-orch-dev-swc--0000006',
+    revision: 'ca-dealhub-orch-dev-swc--0000006',
     title: 'O2/O3 agents actually reason on every candidate',
     tag: 'feature',
     highlights: [
@@ -226,7 +226,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.6.1',
     date: '2026-07-02',
     image: 'dealroom-app:v9',
-    revision: 'ca-dealroom-orch-dev-swc--0000005',
+    revision: 'ca-dealhub-orch-dev-swc--0000005',
     title: 'Cleaner left-nav: clickable stage headers',
     tag: 'improvement',
     highlights: [
@@ -239,7 +239,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.6.0',
     date: '2026-07-02',
     image: 'dealroom-app:v8',
-    revision: 'ca-dealroom-orch-dev-swc--0000004',
+    revision: 'ca-dealhub-orch-dev-swc--0000004',
     title: 'Stage 1 rebuilt as a cohort funnel',
     tag: 'feature',
     highlights: [
@@ -253,7 +253,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.5.0',
     date: '2026-07-01',
     image: 'dealroom-app:v6',
-    revision: 'ca-dealroom-orch-dev-swc--0000006',
+    revision: 'ca-dealhub-orch-dev-swc--0000006',
     title: 'Release history on the homepage',
     tag: 'improvement',
     highlights: [
@@ -265,7 +265,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.4.0',
     date: '2026-07-01',
     image: 'dealroom-app:v4',
-    revision: 'ca-dealroom-orch-dev-swc--0000004',
+    revision: 'ca-dealhub-orch-dev-swc--0000004',
     title: 'Launch Orchestration — the deal workspace made real',
     tag: 'feature',
     highlights: [
@@ -279,7 +279,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.3.0',
     date: '2026-07-01',
     image: 'dealroom-app:v3',
-    revision: 'ca-dealroom-orch-dev-swc--0000003',
+    revision: 'ca-dealhub-orch-dev-swc--0000003',
     title: 'Home command centre & navigation',
     tag: 'feature',
     highlights: [
@@ -292,7 +292,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.2.0',
     date: '2026-07-01',
     image: 'dealroom-app:v2',
-    revision: 'ca-dealroom-orch-dev-swc--0000002',
+    revision: 'ca-dealhub-orch-dev-swc--0000002',
     title: 'Honest, stage-aware metrics',
     tag: 'improvement',
     highlights: [
@@ -305,7 +305,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: 'v0.1.0',
     date: '2026-07-01',
     image: 'dealroom-app:v1',
-    revision: 'ca-dealroom-orch-dev-swc--0000001',
+    revision: 'ca-dealhub-orch-dev-swc--0000001',
     title: 'Initial release — the running application',
     tag: 'release',
     highlights: [

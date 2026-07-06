@@ -1,6 +1,6 @@
 """Provision the standalone Bing-grounded news-scout agent in Foundry Agent Service.
 
-Creates (or updates) a prompt agent on proj-dealroom-dev that uses Grounding with
+Creates (or updates) a prompt agent on your Foundry project that uses Grounding with
 Bing Search to find real, recent M&A catalysts about mid-market US companies
 matching the fund mandate, and returns STRICT JSON the Deal Room can ingest.
 
