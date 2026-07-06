@@ -1,0 +1,314 @@
+//==============================================================================
+//  dealhub · APP domain — Container Apps env + ACR, the SHARED BACKEND
+//  orchestrator (single data source: /api + /mcp), an optional Teams-interface
+//  Container App (forwards to the shared backend), and the events Function App.
+//  RG: rg-dealhub-app-{env}-{loc}
+//==============================================================================
+targetScope = 'resourceGroup'
+
+param location string
+param locationShort string
+param namePrefix string
+param workload string
+param environmentName string
+@minLength(5)
+param suffix string
+param tags object
+param enablePrivateEndpoints bool
+param acrSku string
+param containerTargetPort int
+param orchestratorImage string
+param appModelDeployment string
+param dealAgentName string
+param entraTenantId string
+param mcpAudience string
+param mcpRequiredScope string
+param m365ClientId string
+param m365TenantId string
+@secure()
+param m365ClientSecret string
+param m365TeamId string
+param workspaceTenant string
+
+@description('Deploy the Teams-interface Container App (forwards to the shared backend). Enabled in the Teams phase once the teams-app image exists.')
+param deployTeamsApp bool = false
+@description('Container image for the Teams-interface Container App.')
+param teamsImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+@description('Port the Teams-interface container listens on.')
+param teamsTargetPort int = 8090
+
+// Cross-domain wiring (from core + ai modules)
+param uamiResourceId string
+param uamiClientId string
+param uamiPrincipalId string
+param coreResourceGroupName string
+param logAnalyticsName string
+param appInsightsConnectionString string
+param foundryEndpoint string
+
+var pna = enablePrivateEndpoints ? 'Disabled' : 'Enabled'
+var roleIds = {
+  acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+  storageBlobDataOwner: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+}
+
+// Log Analytics lives in the core RG — reference it to wire Container Apps logs.
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsName
+  scope: resourceGroup(coreResourceGroupName)
+}
+
+resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+  name: 'acr${workload}${environmentName}${suffix}'
+  location: location
+  tags: tags
+  sku: { name: acrSku }
+  properties: {
+    adminUserEnabled: false
+    publicNetworkAccess: pna
+  }
+}
+
+resource caEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
+  name: 'cae-${namePrefix}'
+  location: location
+  tags: tags
+  properties: {
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: logAnalytics.properties.customerId
+        sharedKey: logAnalytics.listKeys().primarySharedKey
+      }
+    }
+  }
+}
+
+// SHARED BACKEND — the single data source for web, Teams and Copilot.
+resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: 'ca-${workload}-orch-${environmentName}-${locationShort}'
+  location: location
+  tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${uamiResourceId}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: caEnv.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      secrets: [
+        // Non-empty placeholder keeps the template valid when M365 isn't configured;
+        // the app gates the M365 connector on M365_CLIENT_ID, so the placeholder is inert.
+        { name: 'm365-client-secret', value: empty(m365ClientSecret) ? 'unset' : m365ClientSecret }
+      ]
+      ingress: {
+        external: true
+        targetPort: containerTargetPort
+        transport: 'auto'
+      }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: uamiResourceId
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'orchestrator'
+          image: orchestratorImage
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            { name: 'PORT', value: string(containerTargetPort) }
+            { name: 'AZURE_OPENAI_ENDPOINT', value: foundryEndpoint }
+            { name: 'AZURE_OPENAI_DEPLOYMENT', value: appModelDeployment }
+            { name: 'AZURE_OPENAI_API_VERSION', value: '2024-12-01-preview' }
+            { name: 'AZURE_CLIENT_ID', value: uamiClientId }
+            { name: 'DEAL_ROOM_REGION', value: location }
+            { name: 'WORKSPACE_TENANT', value: workspaceTenant }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+            { name: 'DEAL_AGENT_NAME', value: dealAgentName }
+            { name: 'DEAL_AGENT_MODEL', value: appModelDeployment }
+            { name: 'ENTRA_TENANT_ID', value: entraTenantId }
+            { name: 'MCP_AUDIENCE', value: mcpAudience }
+            { name: 'MCP_REQUIRED_SCOPE', value: mcpRequiredScope }
+            { name: 'M365_CLIENT_ID', value: m365ClientId }
+            { name: 'M365_TENANT_ID', value: empty(m365TenantId) ? entraTenantId : m365TenantId }
+            { name: 'M365_TEAM_ID', value: m365TeamId }
+            { name: 'M365_CLIENT_SECRET', secretRef: 'm365-client-secret' }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 3
+      }
+    }
+  }
+}
+
+// TEAMS INTERFACE — thin front-end + SSO/bot; forwards data to the shared backend.
+resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp) {
+  name: 'ca-${workload}-teams-${environmentName}-${locationShort}'
+  location: location
+  tags: tags
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${uamiResourceId}': {}
+    }
+  }
+  properties: {
+    managedEnvironmentId: caEnv.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: true
+        targetPort: teamsTargetPort
+        transport: 'auto'
+      }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: uamiResourceId
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'teams'
+          image: teamsImage
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            { name: 'PORT', value: string(teamsTargetPort) }
+            { name: 'AZURE_CLIENT_ID', value: uamiClientId }
+            // Single source of truth — the Teams app forwards to the shared backend.
+            { name: 'SHARED_BACKEND_URL', value: 'https://${orchestratorApp.properties.configuration.ingress.fqdn}' }
+            { name: 'ENTRA_TENANT_ID', value: entraTenantId }
+            { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 3
+      }
+    }
+  }
+}
+
+// Azure Functions — Flex Consumption (event-driven glue)
+resource funcStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: 'st${workload}fn${environmentName}${suffix}'
+  location: location
+  tags: tags
+  sku: { name: 'Standard_LRS' }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+  }
+}
+
+resource funcStorageBlob 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: funcStorage
+  name: 'default'
+}
+
+resource funcDeployContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: funcStorageBlob
+  name: 'deployments'
+}
+
+resource funcPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+  name: 'asp-${namePrefix}'
+  location: location
+  tags: tags
+  sku: {
+    name: 'FC1'
+    tier: 'FlexConsumption'
+  }
+  kind: 'functionapp'
+  properties: {
+    reserved: true
+  }
+}
+
+resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+  name: 'func-${workload}-events-${environmentName}-${suffix}'
+  location: location
+  tags: tags
+  kind: 'functionapp,linux'
+  identity: { type: 'SystemAssigned' }
+  properties: {
+    serverFarmId: funcPlan.id
+    httpsOnly: true
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${funcStorage.properties.primaryEndpoints.blob}deployments'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 100
+        instanceMemoryMB: 2048
+      }
+      runtime: {
+        name: 'python'
+        version: '3.11'
+      }
+    }
+    siteConfig: {
+      appSettings: [
+        { name: 'AzureWebJobsStorage__accountName', value: funcStorage.name }
+        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
+      ]
+    }
+  }
+}
+
+// RBAC — UAMI pulls the app image from ACR; the Function App owns its deploy storage.
+resource raAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, uamiPrincipalId, roleIds.acrPull)
+  scope: acr
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.acrPull)
+    principalId: uamiPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource raFuncStorageOwner 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(funcStorage.id, functionApp.id, roleIds.storageBlobDataOwner)
+  scope: funcStorage
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.storageBlobDataOwner)
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+output acrName string = acr.name
+output acrLoginServer string = acr.properties.loginServer
+output containerAppName string = orchestratorApp.name
+output containerAppFqdn string = orchestratorApp.properties.configuration.ingress.fqdn
+output containerAppUrl string = 'https://${orchestratorApp.properties.configuration.ingress.fqdn}'
+output teamsAppName string = deployTeamsApp ? teamsApp!.name : 'not-deployed'
+output teamsAppUrl string = deployTeamsApp ? 'https://${teamsApp!.properties.configuration.ingress.fqdn}' : 'not-deployed'
+output functionAppName string = functionApp.name

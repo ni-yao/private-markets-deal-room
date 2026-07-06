@@ -62,12 +62,10 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Ensure resource group
-        run: az group create -n rg-dealroom-dev-swc -l "$LOCATION" --only-show-errors
       - name: What-if
         run: |
-          az deployment group what-if \
-            -g rg-dealroom-dev-swc \
+          az deployment sub what-if \
+            --location "$LOCATION" \
             -f infra/main.bicep \
             -p infra/main.dev.bicepparam \
             --no-pretty-print > whatif.txt || true
@@ -96,20 +94,17 @@ jobs:
       - name: Compute names
         id: names
         run: |
-          echo "rg=rg-dealroom-${ENVIRONMENT}-swc" >> "$GITHUB_OUTPUT"
-          echo "stack=stack-dealroom-${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
+          echo "stack=stack-dealhub-${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
           if [ "$ENVIRONMENT" = "prod" ]; then
             echo "deny=denyDelete" >> "$GITHUB_OUTPUT"
           else
             echo "deny=none" >> "$GITHUB_OUTPUT"
           fi
-      - name: Ensure resource group
-        run: az group create -n "${{ steps.names.outputs.rg }}" -l "$LOCATION" --only-show-errors
-      - name: Deploy as deployment stack
+      - name: Deploy as subscription deployment stack
         run: |
-          az stack group create \
+          az stack sub create \
             --name "${{ steps.names.outputs.stack }}" \
-            -g "${{ steps.names.outputs.rg }}" \
+            --location "$LOCATION" \
             -f infra/main.bicep \
             -p "infra/main.${ENVIRONMENT}.bicepparam" \
             --deny-settings-mode "${{ steps.names.outputs.deny }}" \

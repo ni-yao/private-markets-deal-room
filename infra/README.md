@@ -1,13 +1,19 @@
-# The Deal Room — Azure Infrastructure (Bicep)
+# dealhub — Azure Infrastructure (Bicep)
 
-Single-file, single-resource-group infrastructure-as-code for the target-state
-**Deal Room** (AI-native private-equity deal flow). The subscription is **not**
-hard-coded — you choose it at deploy time, so you can retarget subscriptions
-without editing any file.
+Subscription-scoped, **domain-split** infrastructure-as-code for the target-state
+**Deal Room** (AI-native private-equity deal flow). One command stands up the
+whole platform across purpose-built resource groups. Fully parameterized and
+customer-deployable — no author-specific tenant/subscription/resource IDs.
 
 | File | Purpose |
 |------|---------|
-| `main.bicep` | Full Azure bill-of-materials (`targetScope = 'resourceGroup'`). |
+| `main.bicep` | Subscription-scoped orchestrator (`targetScope = 'subscription'`): creates the domain resource groups and calls the domain modules. |
+| `modules/core.bicep` | Identity (UAMI), Log Analytics, App Insights, Key Vault. |
+| `modules/ai.bicep` | Foundry account + project, model deployments, Document Intelligence, Content Safety, Speech, AI Search. |
+| `modules/data.bicep` | ADLS Gen2, Microsoft Fabric *(conditional)*, Cosmos DB. |
+| `modules/app.bicep` | ACR, Container Apps env, shared-backend orchestrator, optional Teams-interface app, Functions. |
+| `modules/integration.bicep` | API Management (AI Gateway), Service Bus, Event Grid. |
+| `modules/network.bicep` | VNet + optional Private Endpoints / Private DNS. |
 | `main.dev.bicepparam` | Dev values (public, fast iteration). |
 | `main.test.bicepparam` | Test/UAT values (mirrors dev, separate subscription). |
 | `main.prod.bicepparam` | Prod values (private endpoints, purge protection, ZRS, APIM SLA). |
@@ -19,48 +25,49 @@ without editing any file.
 > Container App, and the Foundry environment variables it needs; the app
 > workflow builds and deploys the image.
 
-## What gets deployed (45 resources)
+## What gets deployed — domain-split resource groups
 
-| Layer | Resources |
-|-------|-----------|
-| Identity & ops | User-assigned managed identity, Log Analytics, Application Insights, Key Vault (RBAC) |
-| Data | ADLS Gen2 storage (`landing`/`bronze`/`silver`/`gold`), Microsoft Fabric capacity *(conditional)* |
-| AI & intelligence | Azure AI Foundry account + project, model deployments (gpt-4o, gpt-4o-mini, text-embedding-3-large), Document Intelligence, Content Safety, Speech, Azure AI Search |
-| App platform | Azure Container Registry, Container Apps env + **Deal Room** orchestrator app (wired to Foundry via managed identity) |
-| Integration & compute | API Management (AI Gateway), Azure Functions (Flex Consumption), Service Bus, Event Grid, Cosmos DB (serverless) |
-| Networking | VNet + 4 subnets; optional Private Endpoints + Private DNS *(off by default)* |
-| Security | Least-privilege RBAC for the managed identity + function app (incl. AcrPull, Cognitive Services OpenAI User) |
+`main.bicep` (subscription scope) creates six resource groups
+`rg-dealhub-{domain}-{env}-{loc}` and deploys each domain's resources + its
+co-located RBAC into it. The core UAMI is granted least-privilege data-plane
+access to the AI, data, app and integration resources.
+
+| Resource group | Domain | Resources |
+|----------------|--------|-----------|
+| `rg-dealhub-core-{env}-{loc}` | Identity & ops | User-assigned managed identity, Log Analytics, Application Insights, Key Vault (RBAC) |
+| `rg-dealhub-ai-{env}-{loc}` | AI & intelligence | Foundry account + project, model deployments (gpt-5-mini, gpt-5-nano, text-embedding-3-large), Document Intelligence, Content Safety, Speech, AI Search |
+| `rg-dealhub-data-{env}-{loc}` | Data | ADLS Gen2 (`landing`/`bronze`/`silver`/`gold`), Microsoft Fabric *(conditional)*, Cosmos DB (serverless) |
+| `rg-dealhub-app-{env}-{loc}` | App platform | ACR, Container Apps env, **shared-backend** orchestrator (`ca-dealhub-orch`), optional **Teams** interface app (`ca-dealhub-teams`), Azure Functions (Flex Consumption) |
+| `rg-dealhub-integration-{env}-{loc}` | Integration | API Management (AI Gateway), Service Bus, Event Grid |
+| `rg-dealhub-network-{env}-{loc}` | Networking | VNet + 4 subnets; optional Private Endpoints + Private DNS *(off by default)* |
 
 ## Prerequisites
 
 - Azure CLI `>= 2.61` with the Bicep extension (`az bicep version`); the
-  `az stack group` commands ship in-box with current CLI.
-- Permission to create a resource group and assign roles (Owner or
-  User Access Administrator) in the target subscription.
+  `az stack sub` commands ship in-box with current CLI.
+- **Owner** (or Contributor + User Access Administrator) at the **subscription**
+  scope — the template creates resource groups and assigns roles.
 
-## Deploy — the recommended way (Azure Deployment Stack)
+## Deploy — one command (subscription-scoped stack)
 
-Deploy the solution as a **deployment stack**, not a one-off deployment. A stack
-manages every resource as one lifecycle unit: resources you later remove from
-`main.bicep` are cleaned up automatically, and `--deny-settings-mode` protects
-the live resources from accidental deletion.
+Deploy as a **subscription-scoped deployment stack** so every resource group and
+resource is managed as one lifecycle unit: resources you later remove from the
+template are cleaned up automatically, and `--deny-settings-mode` protects the
+live resources from accidental deletion.
 
 ```powershell
 # 1. Pick the subscription (this is the only place it is set)
 az account set --subscription "<SUBSCRIPTION_ID_OR_NAME>"
 
-# 2. Create the resource group
-az group create -n rg-dealroom-dev-swc -l swedencentral
-
-# 3. Preview changes
-az deployment group what-if `
-  -g rg-dealroom-dev-swc `
+# 2. Preview changes (creates net-new rg-dealhub-* groups only)
+az deployment sub what-if `
+  --location swedencentral `
   -f main.bicep -p main.dev.bicepparam
 
-# 4. Deploy as a stack
-az stack group create `
-  --name stack-dealroom-dev `
-  -g rg-dealroom-dev-swc `
+# 3. Deploy as a subscription stack
+az stack sub create `
+  --name stack-dealhub-dev `
+  --location swedencentral `
   -f main.bicep -p main.dev.bicepparam `
   --deny-settings-mode none `
   --action-on-unmanage deleteResources `
@@ -71,19 +78,18 @@ For **prod**, use the hardened params and protect the resources from deletion:
 
 ```powershell
 az account set --subscription "<PROD_SUBSCRIPTION>"
-az group create -n rg-dealroom-prod-swc -l swedencentral
-az stack group create `
-  --name stack-dealroom-prod `
-  -g rg-dealroom-prod-swc `
+az stack sub create `
+  --name stack-dealhub-prod `
+  --location swedencentral `
   -f main.bicep -p main.prod.bicepparam `
   --deny-settings-mode denyDelete `
   --action-on-unmanage deleteResources `
   --yes
 ```
 
-> A plain `az deployment group create -f main.bicep -p main.dev.bicepparam`
-> still works for a quick smoke test, but it leaves orphans behind and offers no
-> delete protection — prefer the stack.
+> A plain `az deployment sub create --location swedencentral -f main.bicep -p main.dev.bicepparam`
+> also works for a quick smoke test, but a stack gives drift cleanup and delete
+> protection — prefer the stack.
 
 ## Deploy — the automated way (CI/CD with OIDC)
 
@@ -125,7 +131,7 @@ az stack group create `
 |-----------|---------|-------|
 | `location` | `swedencentral` | EU data residency. |
 | `environmentName` | `dev` | `dev` / `test` / `prod`. |
-| `openAiDeployments` | gpt-4o, gpt-4o-mini, text-embedding-3-large | Edit list / capacities to taste. |
+| `openAiDeployments` | gpt-5-mini, gpt-5-nano, text-embedding-3-large | Edit list / capacities to taste. |
 | `deployFabric` | `true` | Fabric also needs **`fabricAdminMembers`**; if that list is empty Fabric is skipped. |
 | `fabricAdminMembers` | `[]` | Add a UPN/objectId to actually provision Fabric. |
 | `deployApim` | `true` | Developer SKU takes ~30–45 min. Set `false` for faster dev loops. |
@@ -146,11 +152,13 @@ via licensing and admin portals, not Bicep:
 
 ## Notes
 
-- **Deploy as a stack** (`az stack group create`) rather than a one-off
-  deployment so the whole Deal Room is managed as one lifecycle unit with
+- **Deploy as a stack** (`az stack sub create`) rather than a one-off
+  deployment so the whole platform is managed as one lifecycle unit with
   drift cleanup and delete-protection.
 - Globally-unique names (storage, Key Vault, Cosmos, Search, APIM, Foundry
-  sub-domain, Fabric) append a deterministic hash of the resource group id.
+  sub-domain, Fabric) append a deterministic hash derived from the
+  **subscription** id + workload + env — stable across the domain RGs and per
+  customer.
 - Model deployments are serialized (`@batchSize(1)`) because a Cognitive
   Services account cannot create multiple deployments in parallel.
 - Azure Functions uses managed-identity access to its storage account

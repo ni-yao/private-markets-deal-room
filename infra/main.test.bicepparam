@@ -5,7 +5,7 @@ using './main.bicep'
 
 param location = 'swedencentral'
 param locationShort = 'swc'
-param workload = 'dealroom'
+param workload = 'dealhub'
 param environmentName = 'test'
 param costCenter = 'private-markets'
 

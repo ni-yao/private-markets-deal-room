@@ -45,8 +45,8 @@ jobs:
       - name: Resolve resource names
         id: rid
         run: |
-          RG="rg-dealroom-${ENVIRONMENT}-swc"
-          CA="ca-dealroom-orch-${ENVIRONMENT}-swc"
+          RG="rg-dealhub-app-${ENVIRONMENT}-swc"
+          CA="ca-dealhub-orch-${ENVIRONMENT}-swc"
           ACR=$(az acr list -g "$RG" --query "[0].name" -o tsv)
           LOGIN=$(az acr list -g "$RG" --query "[0].loginServer" -o tsv)
           if [ -z "$ACR" ]; then echo "No ACR found in $RG — run deal-room-infra first." && exit 1; fi
