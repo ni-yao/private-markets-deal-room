@@ -16,6 +16,7 @@ import type {
   Framework,
   Screen,
   ScoredTargets,
+  TargetDetail,
   ScreenMutationError,
   PipelineFunnel,
   Cohort,
@@ -123,6 +124,7 @@ export const api = {
   research: () => get<AnalystResearch>('/api/research'),
   framework: () => get<Framework>('/api/framework'),
   scoredTargets: () => get<ScoredTargets>('/api/targets/scored'),
+  targetDetail: (id: string) => post<TargetDetail>(`/api/targets/${id}/detail`, {}),
   selectScreen: (id: string, selected: boolean) => post<Screen>(`/api/screens/${id}/select`, { selected }),
   selectTheme: (id: string, selected: boolean) =>
     post<{ themeId: string; selected: boolean; screenIds: string[] }>(`/api/themes/${id}/select`, { selected }),

@@ -33,6 +33,7 @@ import {
   updateScreen,
   createScreen,
   getScoredTargets,
+  getTargetDetail,
   getPipelineFunnel,
   getStage1Funnel,
   getCohort,
@@ -276,6 +277,18 @@ api.get('/research', (_req, res) => res.json(getAnalystResearch()));
 // O1 · Deal Sourcing — Sourcing framework (fund GATE · themes GUIDE · screens RANK)
 api.get('/framework', (_req, res) => res.json(getFramework()));
 api.get('/targets/scored', (_req, res) => res.json(getScoredTargets()));
+
+// Expandable ranked-target detail: real SEC filings + Morningstar quality (if
+// public) + a generated analyst report. Works for desk and CxO-signal targets.
+api.post('/targets/:id/detail', async (req, res) => {
+  try {
+    const detail = await getTargetDetail(req.params.id, { force: !!req.body?.force });
+    if (!detail) return res.status(404).json({ error: 'target not found' });
+    res.json(detail);
+  } catch (err) {
+    res.status(500).json({ error: 'target detail failed', detail: String(err?.message || err) });
+  }
+});
 
 api.post('/screens/:id/select', (req, res) => {
   const s = setScreenSelected(req.params.id, req.body?.selected);

@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.23.0',
+    date: '2026-07-06',
+    image: 'dealroom-app:v35',
+    revision: 'ca-dealroom-orch-dev-swc--0000031',
+    title: 'News Signals · filings + Morningstar + analyst report on ranked targets',
+    tag: 'feature',
+    highlights: [
+      'The News & Filings desk is now News Signals — restructured to mirror CxO Signals: a live news feed on the left (with tabs per source/publisher) and the companies extracted from that news on the right, each expandable to its grouped catalysts. Cleaner, signal-first, and consistent with the CxO explorer.',
+      'Filings and the Morningstar quality read have moved onto the Deal Sourcing page: every ranked target row is now expandable to a detail panel with three sections — SEC filings (10-K/10-Q/8-K for public names, Reg D Form D for private), the Morningstar rating (shown only for public tickers; private names say “no public coverage”), and a generated analyst report.',
+      'The analyst report is AI-generated and grounded in what the desk actually knows about the target — sector, EV, ownership, the live news catalysts, its filings and (for public names) the Morningstar read — producing a why-now thesis, sector outlook, competitive read, key risks and a recommendation. Falls back to a grounded deterministic note if the model is momentarily unavailable.',
+      'It works for both news-sourced and CxO-signal targets, loads lazily on expand (cached), and keeps the catalyst re-classification control on each news item.'
+    ]
+  },
+  {
     version: 'v0.22.0',
     date: '2026-07-06',
     image: 'dealroom-app:v28',

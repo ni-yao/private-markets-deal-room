@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   Framework,
   FundMandate,
@@ -7,11 +7,9 @@ import type {
   ScoredTargets,
   ScoredTarget,
   ScreenMutationError,
-  AnalystResearch,
-  CompanyResearch
+  TargetDetail
 } from '../types';
 import { api } from '../api';
-import { ResearchDetail } from './AnalystReports';
 
 const TIER_BADGE: Record<number, { label: string; cls: string; role: string }> = {
   1: { label: 'GATE', cls: 'gate', role: 'binding LPA constraints' },
@@ -22,7 +20,6 @@ const TIER_BADGE: Record<number, { label: string; cls: string; role: string }> =
 export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: () => void } = {}) {
   const [fw, setFw] = useState<Framework | null>(null);
   const [scored, setScored] = useState<ScoredTargets | null>(null);
-  const [research, setResearch] = useState<AnalystResearch | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [creatingUnder, setCreatingUnder] = useState<string | null>(null);
@@ -36,16 +33,7 @@ export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: (
   }
   useEffect(() => {
     refresh();
-    api.research().then(setResearch).catch(() => {});
   }, []);
-
-  // Analyst research keyed by target id (scored targets and research share the
-  // same desk-company id), for the inline expandable detail on each ranked target.
-  const researchById = useMemo(() => {
-    const m: Record<string, CompanyResearch> = {};
-    for (const c of research?.companies ?? []) m[c.id] = c.research;
-    return m;
-  }, [research]);
 
   if (!fw) return <div className="framework"><div className="finding empty">Loading framework…</div></div>;
 
@@ -130,8 +118,8 @@ export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: (
           </span>
         </div>
         <div className="scored-sub">
-          {scored?.totalCount ?? 0} companies discovered on the News &amp; filings desk —
-          gated by the <b>Fund Mandate</b>, then ranked by your selected <b>screens</b>.
+          {scored?.totalCount ?? 0} companies surfaced from <b>News Signals</b> &amp; <b>CxO Signals</b> —
+          gated by the <b>Fund Mandate</b>, then ranked by your selected <b>screens</b>. Expand a row for filings, Morningstar &amp; a generated analyst report.
           {(scored?.gatedCount ?? 0) > 0 && (
             <span className="disc-note gated"> · {scored!.gatedCount} excluded by the gate</span>
           )}
@@ -145,7 +133,7 @@ export function SourcingFramework({ onSentToScreening }: { onSentToScreening?: (
           </div>
         )}
         {scored?.targets.map((t) => (
-          <ScoredRow key={t.id} t={t} onSend={sendToScreening} sending={sending === t.id} research={researchById[t.id]} />
+          <ScoredRow key={t.id} t={t} onSend={sendToScreening} sending={sending === t.id} />
         ))}
       </div>
     </div>
@@ -446,8 +434,23 @@ const PART_KEYS: { k: keyof NonNullable<ScoredTarget['parts']>; label: string }[
   { k: 'growth', label: 'Grw' }
 ];
 
-function ScoredRow({ t, onSend, sending, research }: { t: ScoredTarget; onSend: (deskId: string) => void; sending: boolean; research?: CompanyResearch }) {
+function ScoredRow({ t, onSend, sending }: { t: ScoredTarget; onSend: (deskId: string) => void; sending: boolean }) {
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<TargetDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Lazily load the target's filings + Morningstar + generated analyst report the
+  // first time the row is expanded (cached server-side per target).
+  useEffect(() => {
+    if (!open || detail || loading) return;
+    setLoading(true);
+    api.targetDetail(t.id)
+      .then(setDetail)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   if (t.gated) {
     return (
       <div className="scored-row gated">
@@ -493,11 +496,9 @@ function ScoredRow({ t, onSend, sending, research }: { t: ScoredTarget; onSend: 
           ) : (
             <div className="scored-match none">no screen selected</div>
           )}
-          {research && (
-            <button className="scored-research-toggle" onClick={() => setOpen((v) => !v)}>
-              {open ? '▾' : '▸'} Analyst research · sector outlook · competitive rank · sell-side view
-            </button>
-          )}
+          <button className="scored-research-toggle" onClick={() => setOpen((v) => !v)}>
+            {open ? '▾' : '▸'} Filings · Morningstar rating · generated analyst report
+          </button>
         </div>
         <div className="scored-send">
           {t.inFunnel ? (
@@ -509,11 +510,114 @@ function ScoredRow({ t, onSend, sending, research }: { t: ScoredTarget; onSend: 
           )}
         </div>
       </div>
-      {research && open && (
-        <div className="scored-research">
-          <ResearchDetail r={research} />
+      {open && (
+        <div className="scored-detail">
+          {loading && !detail && <div className="finding empty">Pulling filings, Morningstar & generating the analyst report…</div>}
+          {detail && <TargetDetailBody d={detail} />}
         </div>
       )}
+    </div>
+  );
+}
+
+const STANCE_META: Record<string, { label: string; color: string; tint: string }> = {
+  positive: { label: 'Positive', color: '#0d9488', tint: 'var(--positive-tint)' },
+  neutral: { label: 'Neutral', color: '#64748b', tint: 'var(--canvas-2)' },
+  caution: { label: 'Caution', color: '#b45309', tint: 'var(--amber-tint)' }
+};
+
+function TargetDetailBody({ d }: { d: TargetDetail }) {
+  const q = d.quality;
+  const qBand = (q.score ?? 0) >= 7 ? 'strong' : (q.score ?? 0) >= 5 ? 'moderate' : 'weak';
+  const r = d.report;
+  const stance = STANCE_META[r.sectorOutlook.stance] || STANCE_META.neutral;
+  return (
+    <div className="td-grid">
+      {/* Filings */}
+      <div className="td-panel">
+        <div className="td-panel-hd"><span className="td-ic">📄</span>Filings
+          <span className="td-hd-tag">{d.filingsKind === 'formd' ? 'SEC Form D' : d.filingsKind === 'public' ? 'SEC EDGAR' : 'none'}</span>
+        </div>
+        {d.filings.length === 0 ? (
+          <div className="td-empty">No SEC filings — no public 10-K/10-Q/8-K and no recent Reg D private placement (Form D) on EDGAR for this company.</div>
+        ) : (
+          <div className="td-filings">
+            {d.filings.slice(0, 6).map((f) => (
+              <div className="td-filing" key={f.id}>
+                <div className="td-filing-top">
+                  <span className="filing-type">{f.filingType}</span>
+                  <span className="src-badge sm morningstar">{d.filingsKind === 'formd' ? 'Form D' : 'SEC EDGAR'}</span>
+                </div>
+                <div className="td-filing-head">{f.headline}</div>
+                {f.detail && <div className="td-filing-detail">{f.detail}</div>}
+                {f.url && <a className="nf-source" href={f.url} target="_blank" rel="noreferrer">🔗 View on SEC.gov</a>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Morningstar (public only) */}
+      <div className="td-panel">
+        <div className="td-panel-hd"><span className="td-ic">★</span>Morningstar rating
+          {d.isPublic ? <span className="td-hd-tag">{d.ticker}</span> : <span className="td-hd-tag priv">private</span>}
+        </div>
+        {!d.isPublic ? (
+          <div className="td-empty">Private company — no public Morningstar coverage. The quality read applies to listed names only.</div>
+        ) : q.configured === false ? (
+          <div className="td-empty">{q.note || 'Morningstar not connected.'}</div>
+        ) : !q.rating || q.rating === 'Pending' ? (
+          <div className="td-empty">{q.error ? `Morningstar read failed: ${q.error}` : 'Morningstar quality read pending.'}</div>
+        ) : (
+          <div className="quality-card">
+            <div className="q-top">
+              <div className={`q-score ${qBand}`}>{(q.score ?? 0).toFixed(1)}</div>
+              <div>
+                <div className="q-rating">{q.rating}</div>
+                <div className={`q-trend ${q.trend}`}>{q.trend === 'improving' ? '↑' : q.trend === 'weakening' ? '↓' : '→'} {q.trend}</div>
+              </div>
+              <span className="src-badge sm morningstar" style={{ marginLeft: 'auto' }}>Morningstar</span>
+            </div>
+            <div className="q-bar"><i className={qBand} style={{ width: `${Math.round(((q.score ?? 0) / 10) * 100)}%` }} /></div>
+            {(q.flags?.length ?? 0) > 0 && (
+              <div className="q-flags">{q.flags!.map((f) => <span className="q-flag" key={f}>⚑ {f}</span>)}</div>
+            )}
+            {q.note && <div className="q-note">{q.note}</div>}
+          </div>
+        )}
+      </div>
+
+      {/* Generated analyst report */}
+      <div className="td-panel wide">
+        <div className="td-panel-hd"><span className="td-ic">📝</span>Analyst report
+          <span className={`td-hd-tag ${r.generated ? 'ai' : ''}`}>{r.generated ? '✦ AI-generated' : 'grounded'}</span>
+          <span className="td-report-src">{r.sources.join(' · ')}</span>
+        </div>
+        <div className="td-report">
+          <div className="td-report-summary">💡 {r.summary}</div>
+          <div className="td-report-row">
+            <span className="td-report-k">Sector outlook</span>
+            <span className="td-report-v">
+              <span className="td-stance" style={{ background: stance.tint, color: stance.color }}>{stance.label}</span>
+              {r.sectorOutlook.text}
+            </span>
+          </div>
+          <div className="td-report-row">
+            <span className="td-report-k">Competitive position</span>
+            <span className="td-report-v">{r.competitivePosition}</span>
+          </div>
+          <div className="td-report-row">
+            <span className="td-report-k">Key risks</span>
+            <span className="td-report-v">
+              <ul className="td-risks">{r.keyRisks.map((k, i) => <li key={i}>{k}</li>)}</ul>
+            </span>
+          </div>
+          <div className="td-report-row rec">
+            <span className="td-report-k">Recommendation</span>
+            <span className="td-report-v">{r.recommendation}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

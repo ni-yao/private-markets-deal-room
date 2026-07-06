@@ -8,7 +8,7 @@ import { Home } from './components/Home';
 import { DealsReady } from './components/DealsReady';
 import { Pipeline } from './components/Pipeline';
 import { CxoSignals } from './components/CxoSignals';
-import { NewsFilings } from './components/NewsFilings';
+import { NewsSignals } from './components/NewsSignals';
 import { AnalystReports } from './components/AnalystReports';
 
 const HOME = 'HOME';
@@ -208,7 +208,7 @@ export default function App() {
             ) : signalsOpen ? (
               <CxoSignals onBack={() => setSignalsOpen(false)} />
             ) : newsOpen ? (
-              <NewsFilings onBack={() => setNewsOpen(false)} />
+              <NewsSignals onBack={() => setNewsOpen(false)} />
             ) : researchOpen ? (
               <AnalystReports onBack={() => setResearchOpen(false)} />
             ) : (

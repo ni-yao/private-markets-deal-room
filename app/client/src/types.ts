@@ -671,6 +671,40 @@ export interface ScoredTargets {
   targets: ScoredTarget[];
 }
 
+// Generated analyst report + resolved filings/Morningstar for a ranked target's
+// expandable detail on the Deal Sourcing page.
+export interface GeneratedReport {
+  generated: boolean;
+  summary: string;
+  sectorOutlook: { stance: 'positive' | 'neutral' | 'caution'; text: string };
+  competitivePosition: string;
+  keyRisks: string[];
+  recommendation: string;
+  sources: string[];
+}
+
+export interface TargetQuality {
+  public: boolean;
+  configured?: boolean;
+  rating?: string;
+  score?: number;
+  trend?: 'improving' | 'stable' | 'weakening';
+  flags?: string[];
+  note?: string;
+  error?: string;
+}
+
+export interface TargetDetail {
+  id: string;
+  name: string;
+  ticker: string | null;
+  isPublic: boolean;
+  filings: DeskFiling[];
+  filingsKind: 'public' | 'formd' | 'none';
+  quality: TargetQuality;
+  report: GeneratedReport;
+}
+
 export interface ScreenMutationError {
   error: string;
   errors?: string[];

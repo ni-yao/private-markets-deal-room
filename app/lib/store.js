@@ -20,6 +20,7 @@ import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
 import { ensureDealChannel, m365Connected } from './m365/graph.js';
+import { generateAnalystReport } from './analystReport.js';
 import {
   PASS_REASONS,
   PARK_REASONS,
@@ -789,6 +790,94 @@ export function getScoredTargets() {
     gatedCount: targets.filter((t) => t.gated).length,
     targets: targets.map((t) => ({ ...t, inFunnel: inFunnel.has(t.name.toLowerCase()) }))
   };
+}
+
+// ---- Ranked-target expandable detail: filings + Morningstar + analyst report --
+// One consolidated read for a ranked target's expandable panel on Deal Sourcing.
+// Works for BOTH news-desk companies and CxO-signal targets (via findSourcingTarget),
+// so filings/quality resolve from the company's name + ticker regardless of origin.
+// Session-cached per target id so re-opening a row is instant; pass force to refresh.
+const targetDetailCache = new Map();
+
+// Real SEC EDGAR filings for a target (public → 10-K/10-Q/8-K; private → Reg D Form D
+// or none). Persists onto the desk company when the target lives on the desk.
+async function targetFilings(t, deskCompany) {
+  try {
+    const res = await fetchFilings(t.name, t.ticker || null);
+    let filings = res.filings;
+    let kind = res.matched ? 'public' : 'none';
+    if (!res.matched || filings.length === 0) {
+      const fd = await fetchFormD(t.name).catch(() => ({ matched: false, filings: [] }));
+      if (fd.matched && fd.filings.length) {
+        filings = fd.filings;
+        kind = 'formd';
+      }
+    }
+    if (deskCompany) {
+      deskCompany.filings = filings;
+      deskCompany.filingsChecked = true;
+      persistDesk(deskCompany);
+    }
+    markSync('edgar');
+    return { filings, kind };
+  } catch (err) {
+    return { filings: deskCompany?.filings || [], kind: 'none', error: String(err?.message || err) };
+  }
+}
+
+// Morningstar quality for a target — only meaningful for PUBLIC names (a ticker).
+// Private targets return { public:false } so the UI shows "no public coverage".
+async function targetQuality(t, deskCompany) {
+  if (!t.ticker) return { public: false, note: 'Private company — no public Morningstar coverage.' };
+  if (!morningstarConfigured()) {
+    return { public: true, configured: false, rating: 'Pending', score: 0, trend: 'stable', flags: [], note: 'Morningstar MCP not connected — sign in on Home to enable the quality read.' };
+  }
+  try {
+    const q = await morningstarQuality(t.name, t.ticker);
+    if (deskCompany) {
+      deskCompany.quality = q;
+      persistDesk(deskCompany);
+    }
+    markSync('morningstar');
+    return { public: true, configured: true, ...q };
+  } catch (err) {
+    return { public: true, configured: true, rating: 'Pending', score: 0, trend: 'stable', flags: [], note: 'Morningstar read failed.', error: String(err?.message || err) };
+  }
+}
+
+export async function getTargetDetail(id, { force = false } = {}) {
+  const cached = targetDetailCache.get(id);
+  // Serve cache only when it holds a real AI-generated report; a prior fallback
+  // (e.g. a transient model 429) is re-attempted so it can self-heal.
+  if (!force && cached && cached.report?.generated) return cached;
+
+  const t = findSourcingTarget(id);
+  if (!t) return null;
+  const deskCompany = desk.find((x) => x.id === id) || null;
+
+  // Reuse already-fetched filings/quality when we're only re-attempting the report.
+  let filings, quality;
+  if (!force && cached) {
+    filings = { filings: cached.filings, kind: cached.filingsKind };
+    quality = cached.quality;
+  } else {
+    [filings, quality] = await Promise.all([targetFilings(t, deskCompany), targetQuality(t, deskCompany)]);
+  }
+  const report = await generateAnalystReport(t, { filings: filings.filings, kind: filings.kind, quality });
+
+  const detail = {
+    id: t.id,
+    name: t.name,
+    ticker: t.ticker || null,
+    isPublic: !!t.ticker,
+    filings: filings.filings,
+    filingsKind: filings.kind,
+    quality,
+    report
+  };
+  targetDetailCache.set(id, detail);
+  logEvent(id, 'target-detail', { filings: filings.filings.length, public: detail.isPublic, report: report.generated ? 'ai' : 'fallback' });
+  return detail;
 }
 
 // ===========================================================================

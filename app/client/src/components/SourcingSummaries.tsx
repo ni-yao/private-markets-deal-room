@@ -53,9 +53,10 @@ export function CxoSummary({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-// News & Filings summary — a compact card on the Deal Sourcing page. Lists the
-// companies surfaced in the news with their Morningstar rating, plus the total
-// number of filings pulled, and opens the full News & Filings desk on click.
+// News Signals summary — a compact card on the Deal Sourcing page. Lists the
+// companies surfaced in the news with how many catalyst items each carries, and
+// opens the full News Signals desk on click. (Filings & Morningstar now live on
+// the ranked-target rows below.)
 export function NewsSummary({ onOpen }: { onOpen: () => void }) {
   const [desk, setDesk] = useState<SourcingDesk | null>(null);
 
@@ -64,38 +65,32 @@ export function NewsSummary({ onOpen }: { onOpen: () => void }) {
   }, []);
 
   const companies = desk?.companies ?? [];
-  const filings = companies.reduce((n, c) => n + c.filings.length, 0);
-
-  function band(score: number) {
-    return score >= 7 ? 'strong' : score >= 5 ? 'moderate' : 'weak';
-  }
+  const newsItems = companies.reduce((n, c) => n + c.news.length, 0);
 
   return (
     <button className="src-summary news" onClick={onOpen}>
       <div className="ss-head">
         <span className="ss-ic">📰</span>
         <div className="ss-titles">
-          <div className="ss-title">News &amp; Filings</div>
-          <div className="ss-sub">Public catalysts, filings & Morningstar quality</div>
+          <div className="ss-title">News Signals</div>
+          <div className="ss-sub">Public catalysts — companies in the news &amp; the “why now”</div>
         </div>
         <span className="ss-go">explore →</span>
       </div>
 
       <div className="ss-metrics">
         <div className="ss-metric"><span className="ss-n">{companies.length}</span><span className="ss-l">📈 In the news</span></div>
-        <div className="ss-metric"><span className="ss-n">{filings}</span><span className="ss-l">📄 Filings pulled</span></div>
+        <div className="ss-metric"><span className="ss-n">{newsItems}</span><span className="ss-l">📰 Catalyst items</span></div>
       </div>
 
       <div className="ss-colist">
-        {desk == null && <div className="ss-empty">Loading the news desk…</div>}
+        {desk == null && <div className="ss-empty">Loading news signals…</div>}
         {desk != null && companies.length === 0 && <div className="ss-empty">No companies in the news yet — run “Find more news”.</div>}
         {companies.map((c) => (
           <div className="ss-corow" key={c.id}>
-            <span className="ss-coname">{c.name}</span>
-            <span className="ss-cofilings">📄 {c.filings.length}</span>
-            <span className={`ss-rating ${band(c.quality.score)}`} title={`Morningstar ${c.quality.rating}`}>
-              ★ {c.quality.rating}
-            </span>
+            <span className="ss-coname">{c.name}{c.ticker ? <span className="ticker-badge">{c.ticker}</span> : null}</span>
+            <span className="ss-cometa">{c.sector}</span>
+            <span className="ss-cofilings">📰 {c.news.length}</span>
           </div>
         ))}
       </div>
