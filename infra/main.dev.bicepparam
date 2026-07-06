@@ -37,8 +37,9 @@ param deployFabric = true
 param fabricSkuName = 'F2'
 param fabricAdminMembers = []
 
-// APIM Developer SKU (~30-45 min). Set deployApim = false for faster inner-loop deploys.
-param deployApim = true
+// APIM Developer SKU (~30-45 min). Off in dev for fast/cheap inner-loop deploys
+// (the AI Gateway isn't required by the app or Teams). Prod keeps it on.
+param deployApim = false
 param apimSkuName = 'Developer'
 param apimPublisherEmail = 'deal-room-platform@contoso.com'
 param apimPublisherName = 'Private Markets Deal Room'
