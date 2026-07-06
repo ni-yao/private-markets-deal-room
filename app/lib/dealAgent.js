@@ -23,10 +23,11 @@ import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity'
 import { listDeals, getDeal, getDealRaw, getPersonas } from './store.js';
 import { dispatchTool, dealAnalystView, dealSummary } from './dealTools.js';
 import { chat as directDealChat } from './agents.js';
+import { config } from './config.js';
 
-const PROJECT_ENDPOINT = (process.env.FOUNDRY_PROJECT_ENDPOINT || '').replace(/\/$/, '');
-const AGENT_NAME = process.env.DEAL_AGENT_NAME || 'deal-room-analyst';
-const AGENT_MODEL = process.env.DEAL_AGENT_MODEL || 'gpt-5-mini';
+const PROJECT_ENDPOINT = config.foundry.projectEndpoint;
+const AGENT_NAME = config.foundry.dealAgentName;
+const AGENT_MODEL = config.foundry.dealAgentModel;
 const RESPONSES_URL = PROJECT_ENDPOINT ? `${PROJECT_ENDPOINT}/openai/v1/responses` : '';
 
 const MAX_TOOL_TURNS = 5; // hard cap on agent<->tool round-trips per message

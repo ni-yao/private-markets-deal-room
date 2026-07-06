@@ -4,11 +4,12 @@
 
 import { AzureOpenAI } from 'openai';
 import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
+import { config } from './config.js';
 
-const endpoint = process.env.AZURE_OPENAI_ENDPOINT || '';
-const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-5-mini';
-const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-12-01-preview';
-const apiKey = process.env.AZURE_OPENAI_API_KEY || '';
+const endpoint = config.ai.endpoint;
+const deployment = config.ai.deployment;
+const apiVersion = config.ai.apiVersion;
+const apiKey = config.ai.apiKey;
 
 // gpt-5 and the o-series are reasoning models: they use max_completion_tokens
 // (not max_tokens), only support the default temperature, and spend tokens on

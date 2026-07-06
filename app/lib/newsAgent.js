@@ -9,10 +9,11 @@
 // app never breaks.
 
 import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity';
+import { config } from './config.js';
 
-const PROJECT_ENDPOINT = (process.env.FOUNDRY_PROJECT_ENDPOINT || '').replace(/\/$/, '');
-const AGENT_NAME = process.env.NEWS_AGENT_NAME || 'deal-room-news-scout';
-const AGENT_MODEL = process.env.NEWS_AGENT_MODEL || 'gpt-5-mini';
+const PROJECT_ENDPOINT = config.foundry.projectEndpoint;
+const AGENT_NAME = config.foundry.newsAgentName;
+const AGENT_MODEL = config.foundry.newsAgentModel;
 const RESPONSES_URL = PROJECT_ENDPOINT ? `${PROJECT_ENDPOINT}/openai/v1/responses` : '';
 
 export function newsAgentConfigured() {

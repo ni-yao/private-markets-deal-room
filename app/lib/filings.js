@@ -6,7 +6,9 @@
 // Since our fund is US mid-market, this turns the O1 "Quantify with Filings"
 // column from seeded text into live regulatory filings with clickable sources.
 
-const UA = process.env.SEC_EDGAR_USER_AGENT || 'The Deal Room deal-room@example.com';
+import { config } from './config.js';
+
+const UA = config.filings.secEdgarUserAgent;
 const HEADERS = { 'User-Agent': UA, Accept: 'application/json' };
 
 export function filingsConfigured() {

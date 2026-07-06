@@ -16,8 +16,9 @@
 
 import fs from 'node:fs';
 import { messagesToSignals } from '../lib/ingest/signals.js';
+import { config } from '../lib/config.js';
 
-const SIGNAL_INBOX = (process.env.SIGNAL_INBOX || 'admin@MngEnvMCAP856239.onmicrosoft.com').toLowerCase();
+const SIGNAL_INBOX = config.ingest.signalInbox;
 
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));

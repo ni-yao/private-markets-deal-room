@@ -5,14 +5,15 @@
 // still run with no datastore. Every store mutation goes through here, so the
 // app's persistence (P1) and workflow-state durability (P5) live in one place.
 //
-// Cosmos account cosmos-dealroom-dev-7j3ok has local auth disabled — data-plane
-// access is RBAC only (the Container App's managed identity holds Cosmos DB
-// Built-in Data Contributor).
+// The Cosmos account should have local auth disabled — data-plane access is
+// RBAC only (the Container App's managed identity holds Cosmos DB Built-in Data
+// Contributor).
 
 import { DefaultAzureCredential } from '@azure/identity';
+import { config } from '../config.js';
 
-const ENDPOINT = process.env.COSMOS_ENDPOINT || '';
-const DATABASE = process.env.COSMOS_DATABASE || 'dealroom';
+const ENDPOINT = config.cosmos.endpoint;
+const DATABASE = config.cosmos.database;
 const COLLECTIONS = ['companies', 'deals', 'events', 'signals', 'connectors'];
 
 let mode = 'memory';

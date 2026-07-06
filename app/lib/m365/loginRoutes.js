@@ -17,12 +17,13 @@
 import express from 'express';
 import crypto from 'node:crypto';
 import { pkcePair, saveTokens } from '../mcp/oauth.js';
+import { config } from '../config.js';
 
 const router = express.Router();
 
-const TENANT = process.env.M365_TENANT_ID || 'organizations';
-const CLIENT_ID = process.env.M365_CLIENT_ID || '';
-const CLIENT_SECRET = process.env.M365_CLIENT_SECRET || '';
+const TENANT = config.m365.tenantId;
+const CLIENT_ID = config.m365.clientId;
+const CLIENT_SECRET = config.m365.clientSecret;
 const AUTHORIZE = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/authorize`;
 const TOKEN = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`;
 // Delegated Graph scopes: identity + Teams channel provisioning. offline_access
@@ -41,7 +42,7 @@ function reap() {
 }
 
 function baseUrl(req) {
-  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '');
+  if (config.server.appBaseUrl) return config.server.appBaseUrl;
   const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   return `${proto}://${host}`;

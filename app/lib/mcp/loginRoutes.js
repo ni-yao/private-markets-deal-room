@@ -17,6 +17,7 @@ import {
   discover, registerClient, pkcePair, buildAuthorizationUrl, exchangeCode, saveTokens, OAuthError
 } from './oauth.js';
 import { mcpProviderConfig } from '../connectors.js';
+import { config } from '../config.js';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ function reap() {
 const clients = new Map();
 
 function baseUrl(req) {
-  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '');
+  if (config.server.appBaseUrl) return config.server.appBaseUrl;
   const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   return `${proto}://${host}`;

@@ -7,8 +7,9 @@
 // currently marks as pending (see lib/newsAgent.js toDeskCompany.quality).
 
 import { getAccessToken, hasLogin } from './oauth.js';
+import { config } from '../config.js';
 
-const MCP_URL = process.env.MORNINGSTAR_MCP_URL || 'https://mcp.morningstar.com/mcp';
+const MCP_URL = config.connectors.morningstarMcpUrl;
 const PROTOCOL_VERSION = '2025-06-18';
 
 export function morningstarConfigured() {

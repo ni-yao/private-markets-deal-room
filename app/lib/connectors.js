@@ -14,6 +14,7 @@
 
 import { newsAgentConfigured } from './newsAgent.js';
 import { McpSession } from './mcp/morningstar.js';
+import { config } from './config.js';
 import { hasLogin } from './mcp/oauth.js';
 import { testFilings, filingsConfigured } from './filings.js';
 import { m365Configured, m365Connected, me as m365Me } from './m365/graph.js';
@@ -34,19 +35,19 @@ export const CONNECTORS = [
     id: 'morningstar', name: 'Morningstar', kind: 'mcp', provider: 'morningstar', role: 'quality',
     primaryJob: 'Fundamentals, ratings, equity & credit research',
     sweetSpot: 'Quality / creditworthiness cross-check',
-    mcpUrl: process.env.MORNINGSTAR_MCP_URL || 'https://mcp.morningstar.com/mcp'
+    mcpUrl: config.connectors.morningstarMcpUrl
   },
   {
     id: 'lseg', name: 'LSEG', kind: 'mcp', provider: 'lseg', role: 'confirm',
     primaryJob: 'Market data, estimates, filings, ownership',
     sweetSpot: 'Public-market data & reference cross-check',
-    mcpUrl: process.env.LSEG_MCP_URL || 'https://api.analytics.lseg.com/lfa/mcp'
+    mcpUrl: config.connectors.lsegMcpUrl
   },
   {
     id: 'moodys', name: "Moody's", kind: 'mcp', provider: 'moodys', role: 'quality',
     primaryJob: 'Credit ratings, research & risk assessment',
     sweetSpot: 'Credit & default-risk cross-check',
-    mcpUrl: process.env.MOODYS_MCP_URL || 'https://mcp.moodys.com/genai-ready-data/mcp'
+    mcpUrl: config.connectors.moodysMcpUrl
   },
   {
     id: 'edgar', name: 'SEC EDGAR', kind: 'edgar', role: 'confirm',
@@ -108,7 +109,7 @@ async function testWeb(c) {
   if (!newsAgentConfigured()) {
     return result(c, { ok: false, status: 'disconnected', latencyMs: null, message: 'News agent not configured.' });
   }
-  const url = (process.env.FOUNDRY_PROJECT_ENDPOINT || '').replace(/\/$/, '');
+  const url = config.foundry.projectEndpoint;
   const t0 = Date.now();
   try {
     // Any HTTP response means the Bing-grounded agent backend is reachable; only

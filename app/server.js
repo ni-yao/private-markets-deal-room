@@ -70,6 +70,9 @@ import m365LoginRouter from './lib/m365/loginRoutes.js';
 import { m365Configured, m365Connected } from './lib/m365/graph.js';
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
+import { config, validateConfig } from './lib/config.js';
+
+validateConfig({ strict: false });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -87,7 +90,7 @@ api.get('/config', (_req, res) => {
   const info = getModelInfo();
   res.json({
     ...info,
-    region: process.env.DEAL_ROOM_REGION || 'swedencentral',
+    region: config.server.region,
     appName: 'The Deal Room',
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
     dealAgent: dealAgentInfo().configured ? 'live' : 'demo',
@@ -410,7 +413,7 @@ if (existsSync(clientDist)) {
   );
 }
 
-const port = process.env.PORT || 8080;
+const port = config.server.port;
 
 // Rehydrate persisted state from Cosmos before accepting traffic (P1/P5).
 hydrate()

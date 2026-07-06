@@ -9,11 +9,12 @@
 // permission itself — it only receives callbacks.
 
 import { Router } from 'express';
+import { config } from './config.js';
 
 const router = Router();
 const MAX_SIGNALS = 200;
 const signals = [];
-const clientState = process.env.GRAPH_CLIENT_STATE || '';
+const clientState = config.graph.clientState;
 
 function record(note) {
   signals.unshift({

@@ -18,14 +18,12 @@
 // configured, the endpoint returns 503 rather than serving deals unauthenticated.
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { config } from '../config.js';
 
-const TENANT_ID = (process.env.ENTRA_TENANT_ID || '').trim();
-const AUDIENCES = (process.env.MCP_AUDIENCE || '')
-  .split(',')
-  .map((a) => a.trim())
-  .filter(Boolean);
-const REQUIRED_SCOPE = (process.env.MCP_REQUIRED_SCOPE || '').trim();
-const DISABLED = String(process.env.MCP_AUTH_DISABLED || '').toLowerCase() === 'true';
+const TENANT_ID = config.mcpAuth.tenantId;
+const AUDIENCES = config.mcpAuth.audiences;
+const REQUIRED_SCOPE = config.mcpAuth.requiredScope;
+const DISABLED = config.mcpAuth.disabled;
 
 const ISSUERS = TENANT_ID
   ? [

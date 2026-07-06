@@ -14,16 +14,17 @@
 // connection is reused everywhere.
 
 import { getAccessToken, hasLogin, NotLoggedInError } from '../mcp/oauth.js';
+import { config } from '../config.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
-const TEAM_NAME = process.env.M365_TEAM_NAME || 'The Deal Room';
+const TEAM_NAME = config.m365.teamName;
 
 export class GraphError extends Error {}
 export class M365NotConnectedError extends Error {}
 
 // The M365 login can be OFFERED once the app registration is configured…
 export function m365Configured() {
-  return !!(process.env.M365_CLIENT_ID && process.env.M365_CLIENT_SECRET);
+  return !!(config.m365.clientId && config.m365.clientSecret);
 }
 // …and is CONNECTED once a user has signed in (delegated token stored).
 export function m365Connected() {
@@ -81,7 +82,7 @@ let cachedTeamId = null;
 // deal. Prefers an explicit M365_TEAM_ID; then an existing joined team by name;
 // then creates one (async provisioning — polled until it resolves).
 export async function ensureDealRoomTeam() {
-  if (process.env.M365_TEAM_ID) return process.env.M365_TEAM_ID;
+  if (config.m365.teamId) return config.m365.teamId;
   if (cachedTeamId) return cachedTeamId;
 
   const joined = await graph('/me/joinedTeams?$select=id,displayName');

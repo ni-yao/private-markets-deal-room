@@ -21,7 +21,9 @@
 // deep links out to the tenant. buildWorkspace() is the single seam where live
 // Graph calls would slot in.
 
-const TENANT = 'mngenvmcap336646';
+import { config } from '../lib/config.js';
+
+const TENANT = config.workspace.tenant;
 
 // The MDs a lane can be assigned to (the dropdown options).
 export const MD_OPTIONS = [
