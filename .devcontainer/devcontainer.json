@@ -1,0 +1,29 @@
+{
+  "name": "private-markets-deal-room",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest",
+      "installBicep": true
+    },
+    "ghcr.io/azure/azure-dev/azd:0": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [8080, 8090],
+  "portsAttributes": {
+    "8080": { "label": "deal-room app", "onAutoForward": "notify" },
+    "8090": { "label": "teams-app server", "onAutoForward": "notify" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-bicep",
+        "ms-azuretools.vscode-azure-github-copilot",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ]
+    }
+  },
+  "postCreateCommand": "cd app && npm install && cd client && npm install",
+  "remoteUser": "node"
+}
