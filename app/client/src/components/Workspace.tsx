@@ -63,22 +63,19 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
   const [note, setNote] = useState<string | null>(null);
   const teamsProvisioned = !!ws.teamsProvisioned && !!ws.teamsUrl;
   const spProvisioned = !!ws.sharePointProvisioned;
-  // The site root is "real" when either the VDR folders were provisioned, or the
-  // deal's SharePoint document-library URL has been resolved out-of-band.
-  const spSiteReal = spProvisioned || !!ws.sharePointUrlResolved;
 
   // Provision (idempotent) and merge the refreshed workspace into local state.
   async function ensure(): Promise<Deal['workspace'] | undefined> {
     const r = await api.ensureDealTeams(deal.id);
     if (r.workspace) setWs(r.workspace);
     if (!r.connected) {
-      setNote('Connect Microsoft 365 on the Home page, then reopen — this creates the deal’s Teams space.');
+      setNote('Connect Microsoft 365 on the Home page, then reopen — this creates the deal’s Teams space and SharePoint data room.');
     } else if (!r.sharePointProvisioned) {
-      // Connected, but the indexed folders couldn’t be created. In this tenant the
-      // Graph file scope (Files.ReadWrite.All) isn’t user-consentable — it needs a
-      // one-time tenant-admin approval — so a reconnect can’t fix it. Be honest and
-      // send the user to where documents actually live: the deal team’s Files.
-      setNote('The indexed SharePoint data-room folders need a one-time tenant-admin approval (Microsoft Graph file access) — a user reconnect can’t grant it in this tenant. Opening the deal team’s Files, where documents live.');
+      // Connected, but the data-room folders aren’t created — the delegated token
+      // is missing the SharePoint file scope (Files.ReadWrite.All). That scope IS
+      // user-consentable in this tenant (no admin): reconnecting M365 re-prompts
+      // for consent and grants it, after which the folders provision for real.
+      setNote('The SharePoint data room isn’t set up yet. Reconnect Microsoft 365 on the Home page and approve file access when prompted (no admin needed), then reopen — the data-room folders will be created.');
     }
     return r.workspace;
   }
@@ -96,20 +93,19 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
     finally { setBusy(false); }
   }
 
-  // SharePoint: open something REAL — never a fabricated 404.
-  //  • folders provisioned      → open the specific real folder/template URL (pick)
-  //  • site root resolved only  → open the real document-library root
-  //  • neither (admin-gated)    → open the deal team (its Files tab IS the library)
+  // SharePoint: open the REAL data room only. NEVER redirect to a different
+  // target (e.g. the Teams space) when it isn’t provisioned — a silent fallback
+  // hides the failure and surprises the user. If the folders aren’t created yet,
+  // attempt on-demand provisioning; if that can’t complete, show a clear,
+  // actionable note and navigate nowhere.
   async function openSp(pick: (w: NonNullable<Deal['workspace']>) => string | undefined) {
     if (spProvisioned) { openExt(pick(ws)); return; }
-    if (spSiteReal) { openExt(ws.sharePointUrl); return; }
     setBusy(true); setNote(null);
     try {
       const fresh = await ensure();
       if (fresh?.sharePointProvisioned) { openExt(pick(fresh)); return; }
-      if (fresh?.sharePointUrlResolved) { openExt(fresh.sharePointUrl); return; }
-      // Still not resolvable → honest fallback to the real deal team (Files live there).
-      if (fresh?.teamsProvisioned && fresh.teamsUrl) openExt(fresh.teamsUrl);
+      // Not provisioned — do NOT open anything else. ensure() has set an
+      // actionable note explaining how to enable the data room.
     } catch { setNote('Could not reach the server to open the data room.'); }
     finally { setBusy(false); }
   }
@@ -127,7 +123,7 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
             {busy ? 'Working…' : teamsProvisioned ? 'Open in Teams ↗' : 'Create Teams space ↗'}
           </button>
           <button className="wsp-link spo" onClick={() => openSp((w) => w.sharePointUrl)} disabled={busy}>
-            {busy ? 'Working…' : spProvisioned ? 'Open SharePoint ✓ ↗' : 'Open data room ↗'}
+            {busy ? 'Working…' : spProvisioned ? 'Open SharePoint ✓ ↗' : 'Set up data room ↗'}
           </button>
         </div>
       </div>
@@ -235,7 +231,7 @@ function Overview({ ws, openTeams, openSp, teamsProvisioned, spProvisioned, onGo
               <button key={f.name} className="wsp-chip folder" onClick={() => openSp((w) => w.folders.find((x) => x.name === f.name)?.url)}>📁 {f.name}</button>
             ))}
           </div>
-          {!spProvisioned && <div className="wsp-res-note">This is the standard {ws.folders.length}-folder VDR taxonomy. Creating them as real, indexed SharePoint folders needs a one-time tenant-admin approval (Graph file access); until then the links open the deal team’s document library, where files live.</div>}
+          {!spProvisioned && <div className="wsp-res-note">This is the standard {ws.folders.length}-folder VDR taxonomy — not set up yet. Reconnect Microsoft 365 on the Home page and approve file access when prompted (no admin needed); the folders are then created as a real, indexed SharePoint data room.</div>}
         </div>
       </div>
     </div>
