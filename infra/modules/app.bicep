@@ -45,6 +45,7 @@ param coreResourceGroupName string
 param logAnalyticsName string
 param appInsightsConnectionString string
 param foundryEndpoint string
+param contentSafetyEndpoint string = ''
 
 var pna = enablePrivateEndpoints ? 'Disabled' : 'Enabled'
 var roleIds = {
@@ -148,6 +149,7 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'AZURE_CLIENT_ID', value: uamiClientId }
             { name: 'DEAL_ROOM_REGION', value: location }
             { name: 'WORKSPACE_TENANT', value: workspaceTenant }
+            { name: 'CONTENT_SAFETY_ENDPOINT', value: contentSafetyEndpoint }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
             { name: 'DEAL_AGENT_NAME', value: dealAgentName }
             { name: 'DEAL_AGENT_MODEL', value: appModelDeployment }

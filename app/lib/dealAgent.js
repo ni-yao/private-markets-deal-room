@@ -24,6 +24,7 @@ import { listDeals, getDeal, getDealRaw, getPersonas } from './store.js';
 import { dispatchTool, dealAnalystView, dealSummary } from './dealTools.js';
 import { chat as directDealChat } from './agents.js';
 import { config } from './config.js';
+import { screenText } from './contentSafety.js';
 
 const PROJECT_ENDPOINT = config.foundry.projectEndpoint;
 const AGENT_NAME = config.foundry.dealAgentName;
@@ -222,6 +223,17 @@ async function dealFallback(focusId, message) {
 export async function chatDealAgent({ message, dealId, scope, previousResponseId } = {}) {
   const text = String(message || '').trim();
   if (!text) return { error: 'message-required' };
+
+  // Content Safety guard on user input (fail-open; blocks only egregious content).
+  const safety = await screenText(text);
+  if (!safety.allowed) {
+    return {
+      reply: "I can't help with that request. Ask me about the fund's deals, diligence or pipeline and I'll dig in.",
+      citations: [],
+      source: 'guard',
+      blocked: true,
+    };
+  }
 
   // Resolve scope + focus, validating the deal exists.
   let effScope = scope === 'deal' || scope === 'portfolio' ? scope : dealId ? 'deal' : 'portfolio';

@@ -165,6 +165,17 @@ resource raFoundryCogUser 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   }
 }
 
+// UAMI can call the Content Safety data plane (text:analyze) to screen chat input.
+resource raContentSafetyUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(contentSafety.id, uamiPrincipalId, roleIds.cognitiveServicesUser)
+  scope: contentSafety
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleIds.cognitiveServicesUser)
+    principalId: uamiPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource raSearchIndexContrib 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(search.id, uamiPrincipalId, roleIds.searchIndexDataContributor)
   scope: search

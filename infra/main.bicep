@@ -337,6 +337,7 @@ module app 'modules/app.bicep' = {
     logAnalyticsName: core.outputs.logAnalyticsName
     appInsightsConnectionString: core.outputs.appInsightsConnectionString
     foundryEndpoint: ai.outputs.foundryEndpoint
+    contentSafetyEndpoint: ai.outputs.contentSafetyEndpoint
   }
 }
 

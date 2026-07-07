@@ -48,6 +48,13 @@ export const config = Object.freeze({
     endpoint: str(env.COSMOS_ENDPOINT, ''),
     database: str(env.COSMOS_DATABASE, 'dealroom'),
   },
+  contentSafety: {
+    // Azure AI Content Safety endpoint. When empty the guard is a no-op
+    // (fail-open). threshold is the minimum severity (0-7) that blocks;
+    // 6 blocks only egregious content and never trips on business text.
+    endpoint: trimUrl(env.CONTENT_SAFETY_ENDPOINT, ''),
+    threshold: int(env.CONTENT_SAFETY_THRESHOLD, 6),
+  },
   mcpAuth: {
     tenantId: str(env.ENTRA_TENANT_ID, '').trim(),
     audiences: list(env.MCP_AUDIENCE),
@@ -87,6 +94,7 @@ export const config = Object.freeze({
 export const isAiLive = () => !!config.ai.endpoint;
 export const isCosmosLive = () => !!config.cosmos.endpoint;
 export const isDemoMode = () => !isAiLive() && !isCosmosLive();
+export const isContentSafetyLive = () => !!config.contentSafety.endpoint;
 
 // Validate configuration at startup. In demo mode this only logs an info line.
 // In live mode it warns on soft issues and (when strict) throws on hard errors.
