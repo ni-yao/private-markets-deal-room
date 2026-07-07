@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.26.0',
+    date: '2026-07-06',
+    image: 'dealroom-app:v39',
+    revision: 'ca-dealroom-orch-dev-swc--0000035',
+    title: 'Auto Screen, Triage & Screening Gate — real PE artifacts, grounded in research',
+    tag: 'feature',
+    highlights: [
+      'The three pre-gate funnel steps are no longer thin advance/pass shells — each candidate row now expands to the real deliverable a US mid-market PE firm produces at that step, grounded in research across 235 findings from 86 practitioner sources (Wall Street Prep, CFI, M&I/Multiple Expansion, Grata, Sourcescrub, DealCloud/Affinity, Axial, SPS/Bain).',
+      'O2 Auto Screen → an Investment-Criteria Scorecard: a pass/flag/fail knockout matrix over the fund’s binding criteria — sector/mandate fit, geography, EV band, positive-EBITDA (LBO viability), implied entry-multiple sanity, ESG exclusions — plus soft flags (margin/model, growth quality, ownership/actionability). Advances only when nothing fails.',
+      'O3 Triage → a weighted Triage Scorecard: six scored dimensions (investment-thesis fit, asset quality, value-creation angle, deal actionability, valuation attractiveness, competitive dynamics) roll up to a composite score and an A/B/C tier (A pursue, B monitor, C pass), with an AI value-creation angle & why-now brief.',
+      'O4 Screening Gate → an IC Pre-Screen Memo: a back-of-envelope paper LBO (entry multiple, 5x leverage, 5-yr hold) with base/upside/downside MOIC & IRR against the fund’s ≥2.0x / ≥20% hurdle, plus sourcing angle, investment thesis, key risks & mitigants, diligence priorities, proposed deal team and the precise IC ask.',
+      'Each artifact is grounded and deterministic first (real numbers from the record), with an AI narrative layer on top; the whole panel loads lazily on expand and is cached per candidate. Also fixed an id-sequence bug where a freshly booted container could mint a candidate/deal id that collided with an existing record.'
+    ]
+  },
+  {
     version: 'v0.25.0',
     date: '2026-07-06',
     image: 'dealroom-app:v38',

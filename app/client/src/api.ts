@@ -21,6 +21,7 @@ import type {
   ScreenMutationError,
   PipelineFunnel,
   Cohort,
+  CandidateArtifact,
   Pipeline,
   PassReasons,
   Candidate,
@@ -85,6 +86,8 @@ export const api = {
     post<Cohort>(`/api/stage1/cohort/${stage}/assess`, { force }),
   assessCandidate: (id: string) =>
     post<{ assessment: Assessment; candidate: Candidate }>(`/api/candidates/${id}/assess`, {}),
+  candidateArtifact: (id: string, force = false) =>
+    post<CandidateArtifact>(`/api/candidates/${id}/artifact`, { force }),
   candidateChat: (id: string) => get<CandidateChatLog>(`/api/candidates/${id}/chat`),
   sendCandidateChat: (id: string, message: string) =>
     post<{ reply: string; source: 'live' | 'demo'; log: ChatMessage[] }>(`/api/candidates/${id}/chat`, { message }),

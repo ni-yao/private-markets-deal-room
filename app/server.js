@@ -46,6 +46,7 @@ import {
   assessCohort,
   assessCandidateById,
   getCandidateChat,
+  getCandidateArtifact,
   chatCandidateById,
   screenCandidate,
   triageCandidate,
@@ -153,6 +154,18 @@ api.post('/candidates/:id/chat', async (req, res) => {
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: 'chat failed', detail: String(err?.message || err) });
+  }
+});
+
+// Stage artifact — the real PE deliverable for the candidate's funnel step:
+// O2 Investment-Criteria Scorecard · O3 Triage Scorecard · O4 IC Pre-Screen Memo.
+api.post('/candidates/:id/artifact', async (req, res) => {
+  try {
+    const r = await getCandidateArtifact(req.params.id, { force: !!req.body?.force });
+    if (!r) return res.status(404).json({ error: 'candidate not found' });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: 'artifact failed', detail: String(err?.message || err) });
   }
 });
 

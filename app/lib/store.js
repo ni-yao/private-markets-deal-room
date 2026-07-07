@@ -11,7 +11,7 @@ import { runStep as runStepAgent } from './agents.js';
 import { messagesToSignals } from './ingest/signals.js';
 import { SOURCES, catalysts, catalystById } from '../data/news.js';
 import { researchFor } from '../data/research.js';
-import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage } from './agents.js';
+import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage, generateTriageBrief, generateScreeningMemo } from './agents.js';
 import { scoutNews, newsAgentConfigured } from './newsAgent.js';
 import { morningstarConfigured, quality as morningstarQuality } from './mcp/morningstar.js';
 import { fetchFilings, fetchFormD, scanFormD, downloadEntireFiling } from './filings.js';
@@ -19,6 +19,7 @@ import { uploadFiles as uploadFilingFiles, getFile as getBlobFile } from './blob
 import { markSync } from './connectors.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
+import { buildScorecard, buildTriageScore, buildMemoBase } from './screening.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
 import { ensureDealChannel, m365Connected } from './m365/graph.js';
 import { generateAnalystReport } from './analystReport.js';
@@ -100,10 +101,26 @@ export async function hydrate() {
     const ds = await dealRepo.list();
     deals = attachWorkspaces(ds);
     signalCompanies = await sigRepo.list();
+    reseedSequences();
   } catch {
     /* keep empty in-memory state on a read failure */
   }
   return { mode: 'cosmos', companies: desk.length + candidates.length, deals: deals.length, signals: signalCompanies.length };
+}
+
+// Re-initialize the id sequence counters from the hydrated records so a freshly
+// booted container never mints an id that collides with an existing candidate/
+// deal/screen (a collision would push a duplicate in memory and overwrite the
+// existing document in Cosmos on the next persist). Sets each counter to
+// max(existing numeric suffix) + 1.
+function reseedSequences() {
+  const maxSuffix = (arr, re) => arr.reduce((m, x) => {
+    const mm = String(x.id || '').match(re);
+    return mm ? Math.max(m, Number(mm[1])) : m;
+  }, 0);
+  candSeq = maxSuffix(candidates, /^cand-new-(\d+)$/) + 1;
+  dealSeq = maxSuffix(deals, /^screened-(\d+)-/) + 1;
+  screenSeq = maxSuffix(screens, /^screen-custom-(\d+)$/) + 1;
 }
 
 
@@ -1169,6 +1186,55 @@ export async function assessCandidateById(id, force = true) {
   if (!c || c.disposition !== 'active' || !ASSESSABLE.has(c.stage)) return { error: 'not-actionable' };
   const a = await ensureAssessment(c, force);
   return { ok: true, assessment: a, candidate: publicCandidate(c) };
+}
+
+// ---- Stage artifact: the real PE pre-diligence deliverable per funnel step ----
+// O2 -> Investment-Criteria Scorecard (hard knockouts + soft flags)
+// O3 -> Triage Scorecard (weighted 6-dimension score + A/B/C tier) + AI angle brief
+// O4 -> IC Pre-Screen Memo (paper-LBO returns + AI narrative)
+// The deterministic core (lib/screening.js) is authoritative; the AI layer only
+// adds narrative. Cached on the candidate (c.artifacts[stage]) so re-opening a row
+// is instant; `force` re-runs it. Works for any stage a candidate reached.
+const ARTIFACT_STAGES = new Set(['O2', 'O3', 'O4']);
+
+function candidateFitScore(c) {
+  return scoreCandidate(c).score;
+}
+
+export async function getCandidateArtifact(id, { force = false } = {}) {
+  const c = candidates.find((x) => x.id === id);
+  if (!c) return null;
+  const stage = c.stage === 'pursued' ? 'O4' : c.stage;
+  if (!ARTIFACT_STAGES.has(stage)) return { stage, kind: 'none' };
+
+  c.artifacts = c.artifacts || {};
+  // Serve cache unless forced; for O3/O4 only serve when the AI narrative landed
+  // (a prior fallback re-attempts so it can self-heal), mirroring target detail.
+  const cached = c.artifacts[stage];
+  if (!force && cached && (stage === 'O2' || cached.generated)) return cached;
+
+  const knowledge = candidateKnowledge(c);
+  const fit = candidateFitScore(c);
+  let artifact;
+
+  if (stage === 'O2') {
+    artifact = { stage, ...buildScorecard(c, fund), company: c.company };
+  } else if (stage === 'O3') {
+    const triage = buildTriageScore(c, fund, fit);
+    const brief = await generateTriageBrief(c, triage, knowledge);
+    artifact = { stage, ...triage, brief, company: c.company };
+  } else {
+    // O4 — paper-LBO memo. tier comes from a triage recompute for context.
+    const triage = buildTriageScore(c, fund, fit);
+    const memoBase = buildMemoBase(c, fund, { fitScore: fit, tier: triage.tier });
+    const memo = await generateScreeningMemo(c, memoBase, knowledge);
+    artifact = { stage, ...memo, company: c.company };
+  }
+
+  c.artifacts[stage] = artifact;
+  persistCand(c);
+  logEvent(c.deskId || c.id, 'artifact', { stage, kind: artifact.kind, generated: !!artifact.generated });
+  return artifact;
 }
 
 // Persistent per-candidate conversation with the step's agent (O2/O3). History

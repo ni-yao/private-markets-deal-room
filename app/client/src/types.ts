@@ -244,6 +244,95 @@ export interface Cohort {
   candidates: Candidate[];
 }
 
+// ---- Stage artifacts: the real PE deliverable per funnel step --------------
+// O2 Investment-Criteria Scorecard · O3 Triage Scorecard · O4 IC Pre-Screen Memo
+export interface ScorecardRow {
+  key: string;
+  label: string;
+  group: 'hard' | 'soft';
+  status: 'pass' | 'flag' | 'fail';
+  detail: string;
+  value: string;
+}
+export interface Scorecard {
+  stage: string;
+  kind: 'scorecard';
+  company: string;
+  rows: ScorecardRow[];
+  summary: { hardTotal: number; hardCleared: number; softFlags: number; fails: number };
+  recommendation: 'advance' | 'pass';
+  passReasonCode: string | null;
+  headline: string;
+}
+
+export interface TriageDim {
+  key: string;
+  label: string;
+  weight: number;
+  pct: number;
+  points: number;
+  note: string;
+}
+export interface TriageBrief {
+  angle: string;
+  whyNow: string;
+  watchouts: string[];
+  generated: boolean;
+  model?: string;
+}
+export interface TriageScorecard {
+  stage: string;
+  kind: 'triage';
+  company: string;
+  dims: TriageDim[];
+  composite: number;
+  tier: 'A' | 'B' | 'C';
+  tierAction: 'advance' | 'park' | 'pass';
+  tierLabel: string;
+  headline: string;
+  brief: TriageBrief;
+  parkReasonCode: string | null;
+  passReasonCode: string | null;
+}
+
+export interface LboScenario {
+  entryEV: number; equityIn: number; debt: number;
+  exitEbitda: number; exitEV: number; equityOut: number;
+  moic: number; irr: number;
+}
+export interface MemoReturns {
+  entryMultiple: number;
+  impliedMultiple: number | null;
+  entryAboveCeiling: boolean;
+  leverage: string;
+  holdYears: number;
+  scenarios: { downside: LboScenario; base: LboScenario; upside: LboScenario };
+  hurdle: { irr: number; moic: number };
+  meetsHurdle: boolean;
+}
+export interface MemoRisk { risk: string; mitigant: string }
+export interface ScreeningMemo {
+  stage: string;
+  kind: 'memo';
+  company: string;
+  generated: boolean;
+  model?: string;
+  recommendation: 'PURSUE' | 'PASS';
+  execSummary: string;
+  sourcingAngle: string;
+  thesis: string;
+  marketRead?: string;
+  keyRisks: MemoRisk[];
+  diligencePriorities: string[];
+  dealTeam: string;
+  returns: MemoReturns;
+  ask: string;
+  recommendationNote?: string;
+  tier?: string | null;
+}
+
+export type CandidateArtifact = Scorecard | TriageScorecard | ScreeningMemo | { stage: string; kind: 'none' };
+
 export interface ChatMessage {
   role: 'user' | 'agent';
   content: string;

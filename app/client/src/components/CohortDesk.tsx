@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Candidate, Cohort, PassReasons, Assessment } from '../types';
 import { api } from '../api';
 import { CandidateChat } from './CandidateChat';
+import { CandidateArtifactPanel } from './CandidateArtifacts';
 
 type StageKey = 'O2' | 'O3' | 'O4';
 
@@ -19,6 +20,11 @@ interface Props {
 const BAND_LABEL: Record<string, string> = { strong: 'strong fit', moderate: 'moderate fit', weak: 'weak fit', excluded: 'excluded' };
 const ACTION_LABEL: Record<string, string> = { advance: 'ADVANCE', pass: 'PASS', park: 'PARK' };
 const ACTION_ICON: Record<string, string> = { advance: '↑', pass: '✕', park: '❚❚' };
+const ARTIFACT_LABEL: Record<string, string> = {
+  O2: 'Investment-criteria scorecard',
+  O3: 'Triage scorecard',
+  O4: 'IC pre-screen memo'
+};
 
 // A cohort desk — the actionable list of candidates at one funnel stage. For O2
 // and O3 the step's assessment agent runs automatically against every candidate
@@ -32,6 +38,7 @@ export function CohortDesk({ stage, title, subtitle, advanceLabel, advanceClass,
   const [assessing, setAssessing] = useState(false);
   const [reassessing, setReassessing] = useState<string | null>(null);
   const [chatFor, setChatFor] = useState<Candidate | null>(null);
+  const [openArtifact, setOpenArtifact] = useState<string | null>(null);
 
   async function load() {
     if (assess) {
@@ -209,15 +216,26 @@ export function CohortDesk({ stage, title, subtitle, advanceLabel, advanceClass,
                     <button className={`co-act a-pass ${rec === 'pass' ? 'reco' : ''}`} disabled={busy === c.id} onClick={() => setMenu({ id: c.id, kind: 'pass' })}>Pass</button>
                     <button className={`co-act a-park ${rec === 'park' ? 'reco' : ''}`} disabled={busy === c.id} onClick={() => setMenu({ id: c.id, kind: 'park' })}>Park</button>
                   </div>
-                  {assess && (
+                  <div className="co-secondary">
                     <button
-                      className={`co-converse ${chatFor?.id === c.id ? 'open' : ''}`}
-                      onClick={() => setChatFor(chatFor?.id === c.id ? null : c)}
+                      className={`co-artifact-toggle ${openArtifact === c.id ? 'open' : ''}`}
+                      onClick={() => setOpenArtifact(openArtifact === c.id ? null : c.id)}
                     >
-                      💬 Converse with Agent
+                      {openArtifact === c.id ? '▾' : '▸'} {ARTIFACT_LABEL[stage]}
                     </button>
-                  )}
+                    {assess && (
+                      <button
+                        className={`co-converse ${chatFor?.id === c.id ? 'open' : ''}`}
+                        onClick={() => setChatFor(chatFor?.id === c.id ? null : c)}
+                      >
+                        💬 Converse with Agent
+                      </button>
+                    )}
+                  </div>
                 </>
+              )}
+              {openArtifact === c.id && (
+                <CandidateArtifactPanel id={c.id} stage={stage} />
               )}
             </div>
             );

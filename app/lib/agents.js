@@ -555,3 +555,93 @@ Ground every point in the provided candidate record and fund mandate; be specifi
   if (!reply) reply = candidateChatMock(knowledge, assessment, message);
   return { reply, source };
 }
+
+// ---------------------------------------------------------------------------
+// Artifact NARRATIVE generators — enrich the deterministic pre-diligence
+// artifacts (lib/screening.js) with a short, grounded, model-written narrative.
+// Same pattern as lib/analystReport.js: try the model for strict JSON, fall back
+// to a deterministic note so the artifact is always complete. The numbers stay
+// authoritative from screening.js; the model only writes prose around them.
+// ---------------------------------------------------------------------------
+
+function jsonFromRaw(raw) {
+  if (!raw) return null;
+  let t = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  const i = t.indexOf('{');
+  const j = t.lastIndexOf('}');
+  if (i < 0 || j <= i) return null;
+  try { return JSON.parse(t.slice(i, j + 1)); } catch { return null; }
+}
+
+// O3 · Triage — a value-creation angle + why-now brief around the weighted score.
+const TRIAGE_BRIEF_SYSTEM = `You are the Pipeline-Prioritization Agent inside "The Deal Room" for a US mid-market PE fund (Fund IV).
+Given ONE triaged candidate and its weighted triage score, write a tight prioritization brief a deal team would act on.
+Ground every point in the provided record and scores; be specific and quantitative; never invent precise figures not given.
+Respond with STRICT JSON ONLY — no prose, no fences — exactly:
+{"angle":"<=2 sentence value-creation angle / why this deal","whyNow":"<=1 sentence why now / what makes it timely","watchouts":["<=1 short phrase","..."]}`;
+
+function triageBriefFallback(c, triage) {
+  const kw = c.keywords || [];
+  const lever = kw.find((k) => /roll-?up|bolt-?on|buy-and-build|consolidat|platform/i.test(k)) ? 'a buy-and-build in a fragmented market'
+    : kw.find((k) => /margin|pricing|efficien|automat|digital/i.test(k)) ? 'margin expansion via operational levers'
+      : (c.growth ?? 0) >= 8 ? 'organic-growth capture' : 'professionalization under institutional ownership';
+  return {
+    angle: `${c.company} scores Tier ${triage.tier} (${triage.composite}/100); the value-creation angle is ${lever}, backed by ${c.ebitdaMargin}% margins and ${c.growth >= 0 ? '+' : ''}${c.growth}% growth.`,
+    whyNow: (c.sources || []).includes('cxo') ? 'A warm CxO relationship gives a limited-process window now.' : 'Ownership and sector timing make an approach worthwhile now.',
+    watchouts: (triage.dims || []).filter((d) => d.pct < 0.45).slice(0, 3).map((d) => d.label.toLowerCase())
+  };
+}
+
+export async function generateTriageBrief(c, triage, knowledge) {
+  const user = `CANDIDATE: ${knowledge.candidateSummary}
+FUND MANDATE: ${knowledge.mandate}
+TRIAGE SCORE: Tier ${triage.tier}, composite ${triage.composite}/100.
+DIMENSION SCORES: ${(triage.dims || []).map((d) => `${d.label} ${Math.round(d.pct * 100)}% (${d.note})`).join('; ')}.
+Write the prioritization brief now (STRICT JSON only).`;
+  let parsed = null;
+  try { parsed = jsonFromRaw(await complete({ system: TRIAGE_BRIEF_SYSTEM, user, maxTokens: 260, temperature: 0.3 })); } catch { parsed = null; }
+  const fb = triageBriefFallback(c, triage);
+  if (!parsed || typeof parsed.angle !== 'string') return { ...fb, generated: false };
+  return {
+    angle: String(parsed.angle).slice(0, 400),
+    whyNow: String(parsed.whyNow || fb.whyNow).slice(0, 240),
+    watchouts: Array.isArray(parsed.watchouts) ? parsed.watchouts.filter((w) => typeof w === 'string').slice(0, 4) : fb.watchouts,
+    generated: true,
+    model: getModelInfo().model
+  };
+}
+
+// O4 · Screening Gate — narrative around the deterministic paper-LBO memo.
+const MEMO_SYSTEM = `You are a deal sponsor writing the IC PRE-SCREEN MEMO narrative for a US mid-market PE fund (Fund IV) investment committee.
+You are given the deterministic paper-LBO returns and the candidate record. Write the qualitative memo sections that wrap those numbers.
+Ground everything in the provided facts; be decisive and specific; never contradict or restate the provided returns figures — reference them.
+Respond with STRICT JSON ONLY — no prose, no fences — exactly:
+{"thesis":"<=3 sentence investment thesis & value-creation plan","sourcingAngle":"<=2 sentence sourcing angle / angle-to-win","marketRead":"<=2 sentence market/industry read","keyRisks":[{"risk":"<short>","mitigant":"<short>"}],"recommendationNote":"<=1 sentence rationale for the PURSUE/PASS call"}`;
+
+export async function generateScreeningMemo(c, memoBase, knowledge) {
+  const r = memoBase.returns;
+  const user = `CANDIDATE: ${knowledge.candidateSummary}
+FUND MANDATE: ${knowledge.mandate}
+PAPER-LBO RETURNS: entry ${r.entryMultiple}x EV/EBITDA, ~${r.leverage} leverage, ${r.holdYears}-yr hold. Base ${r.scenarios.base.moic}x / ${r.scenarios.base.irr}% IRR; downside ${r.scenarios.downside.irr}% IRR; upside ${r.scenarios.upside.irr}% IRR. Hurdle ${r.hurdle.moic}x / ${r.hurdle.irr}%. Meets hurdle: ${r.meetsHurdle}.${r.entryAboveCeiling ? ` NOTE: implied ask ${r.impliedMultiple}x is above the financeable ceiling.` : ''}
+DETERMINISTIC RECOMMENDATION: ${memoBase.recommendation}.
+Write the memo narrative now (STRICT JSON only).`;
+  let parsed = null;
+  try { parsed = jsonFromRaw(await complete({ system: MEMO_SYSTEM, user, maxTokens: 520, temperature: 0.3 })); } catch { parsed = null; }
+  if (!parsed || typeof parsed.thesis !== 'string') {
+    return { ...memoBase, generated: false };
+  }
+  const risks = Array.isArray(parsed.keyRisks)
+    ? parsed.keyRisks.filter((x) => x && typeof x.risk === 'string').map((x) => ({ risk: String(x.risk).slice(0, 160), mitigant: String(x.mitigant || '').slice(0, 200) })).slice(0, 6)
+    : memoBase.keyRisks;
+  return {
+    ...memoBase,
+    generated: true,
+    model: getModelInfo().model,
+    thesis: String(parsed.thesis).slice(0, 700),
+    sourcingAngle: String(parsed.sourcingAngle || memoBase.sourcingAngle).slice(0, 500),
+    marketRead: String(parsed.marketRead || '').slice(0, 500),
+    keyRisks: risks.length ? risks : memoBase.keyRisks,
+    recommendationNote: String(parsed.recommendationNote || '').slice(0, 300)
+  };
+}
+
