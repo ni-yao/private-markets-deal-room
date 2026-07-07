@@ -40,5 +40,6 @@ test-results/
 *.tmp
 app/scripts/news-agent.env
 app/scripts/deal-agent.env
+app/scripts/persona-agents.env
 app/scripts/_sample-news.json
 app/scripts/__pycache__/

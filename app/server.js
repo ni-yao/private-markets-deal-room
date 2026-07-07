@@ -70,6 +70,7 @@ import { runAction, chat } from './lib/agents.js';
 import { getModelInfo } from './lib/ai.js';
 import { newsAgentConfigured } from './lib/newsAgent.js';
 import { chatDealAgent, dealAgentInfo } from './lib/dealAgent.js';
+import { chatPersonaAgent, personaAgentsInfo } from './lib/personaAgent.js';
 import { dealMcpHandler, dealMcpMethodNotAllowed, dealMcpInfo } from './lib/mcp/dealServer.js';
 import { mcpAuthMiddleware, mcpAuthInfo } from './lib/mcp/entraAuth.js';
 import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
@@ -99,6 +100,7 @@ api.get('/config', (_req, res) => {
     appName: 'The Deal Room',
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
     dealAgent: dealAgentInfo().configured ? 'live' : 'demo',
+    personaAgents: personaAgentsInfo(),
     dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo() },
     m365: { configured: m365Configured(), connected: m365Connected(), files: m365FilesScope() },
     morningstar: morningstarReady() ? 'live' : 'demo',
@@ -450,6 +452,25 @@ api.post('/deals/:id/chat', async (req, res) => {
 
 // Deal Room Analyst — the Foundry agent with access to ALL deals.
 api.get('/deal-agent', (_req, res) => res.json(dealAgentInfo()));
+
+// The 5 persona agents (analyst, partner, retail-md, ai-md, supply-md).
+api.get('/persona-agents', (_req, res) => res.json(personaAgentsInfo()));
+// Chat with a specific persona agent. It reads the pipeline and ACTS on it through
+// its persona-scoped tools (server-side persona authorization enforced on writes).
+// Body: { message, dealId?, previousResponseId? }.
+api.post('/persona-agents/:persona/chat', async (req, res) => {
+  const message = (req.body?.message || '').toString().slice(0, 2000);
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const dealId = req.body?.dealId ? String(req.body.dealId) : undefined;
+  const previousResponseId = req.body?.previousResponseId ? String(req.body.previousResponseId) : undefined;
+  try {
+    const out = await chatPersonaAgent({ persona: req.params.persona, message, dealId, previousResponseId });
+    if (out?.error) return res.status(400).json(out);
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'persona-agent chat failed', detail: String(err?.message || err) });
+  }
+});
 
 // Portfolio-wide or single-deal-scoped chat with the analyst agent.
 // Body: { message, dealId?, scope? ('portfolio'|'deal'), previousResponseId? }.
