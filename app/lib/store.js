@@ -11,7 +11,7 @@ import { runStep as runStepAgent } from './agents.js';
 import { messagesToSignals } from './ingest/signals.js';
 import { SOURCES, catalysts, catalystById } from '../data/news.js';
 import { researchFor } from '../data/research.js';
-import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage, generateTriageBrief, generateScreeningMemo } from './agents.js';
+import { classifyCatalyst, assessCandidate, chatCandidate, agentForStage, generateTriageBrief, generateScreeningMemo, generateFinalMemo, generateFindingsSynthesis } from './agents.js';
 import { scoutNews, newsAgentConfigured } from './newsAgent.js';
 import { morningstarConfigured, quality as morningstarQuality } from './mcp/morningstar.js';
 import { fetchFilings, fetchFormD, scanFormD, downloadEntireFiling } from './filings.js';
@@ -20,6 +20,7 @@ import { markSync } from './connectors.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildScorecard, buildTriageScore, buildMemoBase } from './screening.js';
+import { buildDiligencePlan, buildFindingsReport, buildFinalMemoBase, buildExecutionPack, buildCloseoutPlan } from './diligence.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
 import { ensureDealChannel, m365Connected } from './m365/graph.js';
 import { generateAnalystReport } from './analystReport.js';
@@ -999,6 +1000,61 @@ const SAFE_BLOB_PATH = /^\d{1,10}\/\d{18}\/[A-Za-z0-9._-]+$/;
 export async function getSavedFilingFile(blobPath) {
   if (!SAFE_BLOB_PATH.test(String(blobPath || ''))) return null;
   return getBlobFile(blobPath);
+}
+
+// ---- Stage-2 deal artifact: the real PE deliverable per diligence step --------
+// D1 Diligence Plan · D2 Findings/Red-Flag Report · D3 Final IC Memo ·
+// D4 Execution Pack · D5 Close-out & 100-Day Plan. Deterministic core
+// (lib/diligence.js) is authoritative; the AI layer adds narrative for D2/D3.
+// Cached on the deal (deal.artifacts[step]) so re-opening a step is instant;
+// `force` re-runs it. The step's diligence findings feed the plan & memo so the
+// artifacts are internally consistent for a given deal.
+const DEAL_ARTIFACT_STEPS = new Set(['D1', 'D2', 'D3', 'D4', 'D5']);
+
+// Pull the screening-memo risks captured for this deal's candidate (drives the
+// D1 plan's workstream prioritization). Falls back to the memo section text.
+function dealMemoRisks(deal) {
+  const cand = candidates.find((c) => c.company.toLowerCase() === deal.company.toLowerCase());
+  const art = cand?.artifacts?.O4;
+  if (art?.keyRisks?.length) return art.keyRisks.map((r) => (typeof r === 'string' ? r : r.risk));
+  return (deal.memoSections || []).filter((s) => /risk/i.test(s.title)).map((s) => s.content).filter(Boolean);
+}
+
+export async function getDealArtifact(dealId, step, { force = false } = {}) {
+  const deal = getDealRaw(dealId);
+  if (!deal) return null;
+  if (!DEAL_ARTIFACT_STEPS.has(step)) return { step, kind: 'none' };
+
+  deal.artifacts = deal.artifacts || {};
+  const cached = deal.artifacts[step];
+  // D2/D3 carry an AI narrative — re-attempt a prior fallback so it self-heals;
+  // D1/D4/D5 are deterministic, so a cached copy is always fine.
+  const aiStep = step === 'D2' || step === 'D3';
+  if (!force && cached && (!aiStep || cached.generated)) return cached;
+
+  let artifact;
+  if (step === 'D1') {
+    artifact = buildDiligencePlan(deal, dealMemoRisks(deal));
+  } else if (step === 'D2') {
+    const base = buildFindingsReport(deal);
+    artifact = await generateFindingsSynthesis(deal, base);
+  } else if (step === 'D3') {
+    const findings = buildFindingsReport(deal);
+    const base = buildFinalMemoBase(deal, { findings });
+    artifact = await generateFinalMemo(deal, base);
+  } else if (step === 'D4') {
+    const findings = buildFindingsReport(deal);
+    const memo = buildFinalMemoBase(deal, { findings });
+    artifact = buildExecutionPack(deal, { memo });
+  } else {
+    artifact = buildCloseoutPlan(deal);
+  }
+  artifact.step = step;
+
+  deal.artifacts[step] = artifact;
+  persistDeal(deal);
+  logEvent(deal.id, 'deal-artifact', { step, kind: artifact.kind, generated: !!artifact.generated });
+  return artifact;
 }
 
 // ===========================================================================

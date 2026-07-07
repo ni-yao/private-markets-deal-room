@@ -5,6 +5,7 @@ import { SourcingFramework } from './SourcingFramework';
 import { ScreeningGate } from './ScreeningGate';
 import { CohortDesk } from './CohortDesk';
 import { Workspace } from './Workspace';
+import { DealArtifactPanel } from './DealArtifacts';
 import { CxoSummary, NewsSummary } from './SourcingSummaries';
 
 interface Props {
@@ -205,6 +206,22 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
               onLaunch={onLaunchDeal}
               launching={launching}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Stage-2 deal artifact (D1–D5) — the real PE deliverable for this step */}
+      {deal && step.stage === 'diligence' && (
+        <div className="panel" style={{ marginBottom: 18 }}>
+          <div className="ph">
+            <span className="ic">✦</span>
+            <h3>{step.title} · deliverable</h3>
+            <span className="sub" style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 11.5, textTransform: 'none', letterSpacing: 0 }}>
+              grounded in the live deal record
+            </span>
+          </div>
+          <div className="pb" style={{ padding: 0 }}>
+            <DealArtifactPanel dealId={deal.id} step={step.key} />
           </div>
         </div>
       )}

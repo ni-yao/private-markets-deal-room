@@ -5,6 +5,9 @@
 import { complete, getModelInfo } from './ai.js';
 import { LANES } from '../data/personas.js';
 
+// Compact money formatter for prompt text ($M in, B/M out).
+const money = (m) => (m == null ? '—' : m >= 1000 ? `$${(m / 1000).toFixed(1)}B` : `$${Math.round(m)}M`);
+
 // Catalyst-classifier agent — labels a news finding with its catalyst category.
 // Keyword-weighted scoring over the catalyst taxonomy (real logic, runs offline);
 // this is the "AI agent run against each finding" in the O1 news desk.
@@ -642,6 +645,73 @@ Write the memo narrative now (STRICT JSON only).`;
     marketRead: String(parsed.marketRead || '').slice(0, 500),
     keyRisks: risks.length ? risks : memoBase.keyRisks,
     recommendationNote: String(parsed.recommendationNote || '').slice(0, 300)
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Stage-2 (diligence) NARRATIVE generators — enrich the deterministic diligence
+// artifacts (lib/diligence.js) with grounded model-written prose. Same pattern:
+// try the model for strict JSON, fall back to the deterministic base so the
+// artifact is always complete. Numbers stay authoritative from diligence.js.
+// ---------------------------------------------------------------------------
+
+// D3 · Final IC Memo — thesis, value-creation narrative and exit rationale around
+// the diligence-backed numbers and findings synthesis.
+const FINAL_MEMO_SYSTEM = `You are the deal sponsor writing the FINAL INVESTMENT COMMITTEE MEMO narrative for a US mid-market PE fund (Fund IV), after confirmatory due diligence is complete.
+You are given the deterministic diligence-backed returns, the QoE-adjusted financials, and the diligence findings synthesis. Write the qualitative sections that wrap those facts.
+Ground everything in the provided facts; be decisive and specific; never contradict the provided returns or findings — reference them. This is the comprehensive, diligence-backed memo (not the earlier pre-screen).
+Respond with STRICT JSON ONLY — no prose, no fences — exactly:
+{"thesis":"<=3 sentence diligence-backed investment thesis","valueCreation":["<lever with a specific target>","..."],"exitRationale":"<=2 sentence exit thesis: routes, timing, likely acquirers","recommendationNote":"<=1 sentence rationale for the APPROVE/CONDITIONAL/DECLINE call"}`;
+
+export async function generateFinalMemo(deal, memoBase) {
+  const r = memoBase.returns;
+  const synth = (memoBase.synthesis || []).map((s) => `${s.workstream}: ${s.worst}`).join('; ');
+  const user = `TARGET: ${deal.company} — ${deal.sector}, ${money(deal.dealSize)} EV.
+QoE-ADJUSTED FINANCIALS: revenue ${money(memoBase.financials.revenue)}, adjusted EBITDA ${money(memoBase.financials.adjustedEbitda)} (${memoBase.financials.ebitdaMargin}% reported margin).
+DILIGENCE-BACKED RETURNS: ${r.entryMultiple}x entry, ${r.leverage} leverage, ${r.holdYears}-yr hold. Base ${r.scenarios.base.moic}x / ${r.scenarios.base.irr}% IRR; downside ${r.scenarios.downside.irr}%; upside ${r.scenarios.upside.irr}%. Meets hurdle (>=2.0x/>=20%): ${r.meetsHurdle}.
+DD FINDINGS SYNTHESIS (worst severity per workstream): ${synth || 'clean'}.
+DETERMINISTIC RECOMMENDATION: ${memoBase.recommendation}.
+Write the final IC memo narrative now (STRICT JSON only).`;
+  let parsed = null;
+  try { parsed = jsonFromRaw(await complete({ system: FINAL_MEMO_SYSTEM, user, maxTokens: 520, temperature: 0.3 })); } catch { parsed = null; }
+  if (!parsed || typeof parsed.thesis !== 'string') return { ...memoBase, generated: false };
+  return {
+    ...memoBase,
+    generated: true,
+    model: getModelInfo().model,
+    thesis: String(parsed.thesis).slice(0, 700),
+    valueCreation: Array.isArray(parsed.valueCreation) && parsed.valueCreation.length
+      ? parsed.valueCreation.filter((v) => typeof v === 'string').slice(0, 6)
+      : memoBase.valueCreation,
+    exitRationale: String(parsed.exitRationale || '').slice(0, 400),
+    recommendationNote: String(parsed.recommendationNote || '').slice(0, 300)
+  };
+}
+
+// D2 · Findings report — a short synthesis line + the go/no-go read across the
+// severity-rated workstream findings.
+const FINDINGS_SYSTEM = `You are the deal-team VP synthesizing DUE-DILIGENCE FINDINGS for a US mid-market PE fund's deal team.
+Given the severity-rated findings across workstreams, write a tight synthesis a partner would read before the IC.
+Ground everything in the provided findings; be decisive; classify the overall read. Respond with STRICT JSON ONLY — no prose, no fences — exactly:
+{"synthesis":"<=3 sentence read across the workstreams","goNoGo":"<=1 sentence: proceed / proceed-with-reprice / renegotiate / walk, with why"}`;
+
+export async function generateFindingsSynthesis(deal, findingsReport) {
+  const lines = findingsReport.groups.map((g) => `${g.label} [${findingsReport.legend[g.worst]}]: ${g.findings.map((f) => f.finding).join(' ')}`).join('\n');
+  const user = `TARGET: ${deal.company} — ${deal.sector}.
+STATUS: ${findingsReport.status}. Counts: ${JSON.stringify(findingsReport.counts)}.
+WORKSTREAM FINDINGS:\n${lines}
+Write the synthesis now (STRICT JSON only).`;
+  let parsed = null;
+  try { parsed = jsonFromRaw(await complete({ system: FINDINGS_SYSTEM, user, maxTokens: 320, temperature: 0.3 })); } catch { parsed = null; }
+  if (!parsed || typeof parsed.synthesis !== 'string') {
+    return { ...findingsReport, generated: false };
+  }
+  return {
+    ...findingsReport,
+    generated: true,
+    model: getModelInfo().model,
+    synthesis: String(parsed.synthesis).slice(0, 500),
+    goNoGo: String(parsed.goNoGo || '').slice(0, 240)
   };
 }
 

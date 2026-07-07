@@ -333,6 +333,74 @@ export interface ScreeningMemo {
 
 export type CandidateArtifact = Scorecard | TriageScorecard | ScreeningMemo | { stage: string; kind: 'none' };
 
+// ---- Stage-2 deal artifacts: the real PE deliverable per diligence step -----
+// D1 Diligence Plan · D2 Findings Report · D3 Final IC Memo · D4 Execution Pack ·
+// D5 Close-out & 100-Day Plan.
+export interface PlanWorkstream {
+  key: string; label: string; adviser: string; scope: string;
+  priority: number; tier: 'critical' | 'high' | 'standard' | 'confirmatory';
+  focus: string | null;
+}
+export interface DiligencePlan {
+  step: string; kind: 'plan'; company: string;
+  workstreams: PlanWorkstream[];
+  budget: { item: string; amount: number }[];
+  budgetTotal: number;
+  timeline: { exclusivityWeeks: number; irlItems: string; phases: { name: string; window: string; detail: string }[] };
+  dataRoom: { platform: string; sections: number; note: string };
+  headline: string;
+}
+
+export interface DdFinding { workstream: string; severity: string; finding: string; impact: string }
+export interface FindingsGroup { key: string; label: string; findings: DdFinding[]; worst: string }
+export interface FindingsReport {
+  step: string; kind: 'findings'; company: string;
+  groups: FindingsGroup[];
+  counts: Record<string, number>;
+  status: string; headline: string;
+  legend: Record<string, string>;
+  generated?: boolean; model?: string; synthesis?: string; goNoGo?: string;
+}
+
+export interface FinalIcMemo {
+  step: string; kind: 'ic-memo'; company: string;
+  generated?: boolean; model?: string;
+  recommendation: 'APPROVE' | 'CONDITIONAL' | 'DECLINE';
+  execSummary: string; thesis: string;
+  valueCreation: string[];
+  financials: { revenue: number; ebitda: number; ebitdaMargin: number; adjustedEbitda: number; note: string };
+  returns: MemoReturns;
+  synthesis: { workstream: string; worst: string; top: string }[];
+  keyRisks: MemoRisk[];
+  exit: { routes: { route: string; note: string }[]; holdYears: number; exitMultiple: string };
+  exitRationale?: string;
+  ask: string;
+  recommendationNote?: string;
+  hurdle: { irr: number; moic: number; note: string };
+}
+
+export interface ExecutionPack {
+  step: string; kind: 'execution'; company: string;
+  icDecision: { vote: string; status: string; champion: string };
+  spaTerms: { term: string; detail: string }[];
+  rwi: { used: boolean; premiumPct: string; retentionPct: string; note: string };
+  conditionsPrecedent: { item: string; status: string; detail: string }[];
+  fundsFlow: { sources: { label: string; amount: number }[]; uses: { label: string; amount: number }[] };
+  compliance: { check: string; framework: string; status: string }[];
+  headline: string;
+}
+
+export interface CloseoutPlan {
+  step: string; kind: 'closeout'; company: string;
+  hundredDay: { phase: string; items: string[] }[];
+  valueCreation: { lever: string; target: string }[];
+  governance: { board: string; mip: string; reporting: string };
+  records: { item: string; detail: string }[];
+  headline: string;
+}
+
+export type DealArtifact = DiligencePlan | FindingsReport | FinalIcMemo | ExecutionPack | CloseoutPlan | { step: string; kind: 'none' };
+
 export interface ChatMessage {
   role: 'user' | 'agent';
   content: string;

@@ -53,6 +53,7 @@ import {
   gateCandidate,
   sendToScreening,
   launchDeal,
+  getDealArtifact,
   ensureDealTeamsChannel,
   getMdOptions,
   assignSwimlane,
@@ -455,6 +456,19 @@ api.post('/deals/:id/advance', (req, res) => {
   const deal = advanceDeal(req.params.id);
   if (!deal) return res.status(404).json({ error: 'deal not found' });
   res.json(deal);
+});
+
+// Stage-2 deal artifact — the real PE deliverable for a diligence step:
+// D1 Diligence Plan · D2 Findings/Red-Flag Report · D3 Final IC Memo ·
+// D4 Execution Pack · D5 Close-out & 100-Day Plan.
+api.post('/deals/:id/artifact/:step', async (req, res) => {
+  try {
+    const out = await getDealArtifact(req.params.id, req.params.step, { force: !!req.body?.force });
+    if (!out) return res.status(404).json({ error: 'deal not found' });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'deal artifact failed', detail: String(err?.message || err) });
+  }
 });
 
 api.post('/deals/:id/back', (req, res) => {

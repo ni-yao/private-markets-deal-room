@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.27.0',
+    date: '2026-07-06',
+    image: 'dealroom-app:v40',
+    revision: 'ca-dealroom-orch-dev-swc--0000036',
+    title: 'Stage 2 built out — the full diligence-to-close deal room (D1–D5)',
+    tag: 'feature',
+    highlights: [
+      'The five Stage-2 diligence steps are no longer empty shells — each now expands to the real deliverable a US mid-market PE firm produces, grounded in fresh research across 235 findings from 100 practitioner sources (Big-4 DD guides, Bain/BCG commercial DD, Wall Street Prep, CFI, M&I/Multiple Expansion, law-firm SPA guides, ILPA, Datasite/Ansarada).',
+      'D1 Launch → a Diligence Plan: eight confirmatory workstreams (financial/QoE, commercial, legal, tax, operational, tech/cyber, HR, ESG) scoped and prioritized from the deal’s own screening-memo risks, each with the adviser a firm engages, a DD budget breakdown and a 7–9 week exclusivity timeline.',
+      'D2 Diligence → a Findings / Red-Flag Report: severity-rated findings per workstream (deal-stopper / price-adjuster / closing-condition / post-close) rolled into a go/no-go read — QoE EBITDA haircut, customer concentration, change-of-control consents, Phase I ESA and more.',
+      'D3 Synthesis → the Final IC Memo: a diligence-backed memo with returns off QoE-adjusted EBITDA (base/upside/downside MOIC & IRR vs the fund hurdle), thesis, value-creation plan, a findings-synthesis grid by workstream, key risks, exit analysis and the exact IC authorization sought.',
+      'D4 Approval → an Execution Pack (IC decision, SPA key terms, R&W insurance, conditions precedent incl. HSR, and a sources-&-uses funds flow) and D5 Archive → a Close-out & 100-Day Plan (value-creation levers, the 3-phase 100-day plan, governance/MIP/reporting, and records/audit). Deterministic and grounded first, with an AI narrative layer on D2/D3.'
+    ]
+  },
+  {
     version: 'v0.26.0',
     date: '2026-07-06',
     image: 'dealroom-app:v39',

@@ -22,6 +22,7 @@ import type {
   PipelineFunnel,
   Cohort,
   CandidateArtifact,
+  DealArtifact,
   Pipeline,
   PassReasons,
   Candidate,
@@ -109,6 +110,8 @@ export const api = {
   cycleChecklistItem: (id: string, itemId: string) =>
     post<Deal>(`/api/deals/${id}/checklist/${itemId}/cycle`, {}),
   deal: (id: string) => get<Deal>(`/api/deals/${id}`),
+  dealArtifact: (id: string, step: string, force = false) =>
+    post<DealArtifact>(`/api/deals/${id}/artifact/${step}`, { force }),
   runStep: (id: string, stepKey: string) =>
     post<StepRunResult>(`/api/deals/${id}/steps/${stepKey}/run`, {}),
   advance: (id: string) => post<Deal>(`/api/deals/${id}/advance`, {}),
