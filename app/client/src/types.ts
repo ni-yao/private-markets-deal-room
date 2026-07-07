@@ -177,6 +177,7 @@ export interface Workspace {
   teamsChannelName?: string | null;
   sharePointUrl: string;
   sharePointProvisioned?: boolean;
+  channelsProvisioned?: boolean;
   channels: WorkspaceChannel[];
   folders: WorkspaceFolder[];
   templates: WorkspaceTemplate[];

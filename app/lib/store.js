@@ -51,8 +51,29 @@ function attachWorkspaces(list) {
         if (ws && ws.owner) sl.md = ws.owner;
       }
     }
+    normalizeTeamsLinks(d);
   }
   return list;
+}
+
+// Repair fabricated Teams channel deep-links once a REAL deal team exists. The
+// standard team template yields a single General channel; the per-workstream
+// `&channel=<name>` links buildWorkspace() constructs are placeholders that 404.
+// When a deal has a real, provisioned team webUrl (not the `groupId=deal-<slug>`
+// placeholder), point every channel + swimlane channel link at the real team so
+// nothing 404s — self-healing at boot without needing an M365 reconnect. Creating
+// distinct per-workstream channels needs admin-consent-gated Channel.Create; until
+// then workstream separation lives in the SharePoint VDR folders.
+function normalizeTeamsLinks(d) {
+  const w = d.workspace;
+  if (!w || !w.teamsProvisioned || !w.teamsUrl) return;
+  if (w.teamsUrl.includes('groupId=deal-')) return; // teamsUrl itself is still a placeholder
+  const real = w.teamsUrl;
+  let changed = false;
+  w.channels = (w.channels || []).map((c) => (c.url === real ? c : (changed = true, { ...c, url: real })));
+  w.swimlanes = (w.swimlanes || []).map((s) => (s.channelUrl === real ? s : (changed = true, { ...s, channelUrl: real })));
+  if (!w.channelsProvisioned) { w.channelsProvisioned = true; changed = true; }
+  if (changed) persistDeal(d);
 }
 
 let deals = [];
@@ -1491,6 +1512,21 @@ async function provisionDealChannel(deal) {
     if (channel.webUrl) deal.workspace.teamsUrl = channel.webUrl;
     deal.workspace.teamsProvisioned = true;
     deal.workspace.teamsChannelName = channel.displayName;
+
+    // Point every Teams link at the REAL deal team. The standard team template
+    // provisions a single General channel; creating distinct per-workstream
+    // channels needs the Channel.Create permission, which is admin-consent-gated
+    // in this tenant (the same wall that made us switch from a shared team to a
+    // team-per-deal). So each workstream chip opens the real deal team, and the
+    // per-workstream separation lives in the SharePoint VDR folders below. This
+    // replaces the fabricated `&channel=<name>` deep links that 404'd. If an
+    // admin later grants Channel.Create, this is the seam to create + link real
+    // channels here instead.
+    if (channel.webUrl) {
+      deal.workspace.channels = (deal.workspace.channels || []).map((c) => ({ ...c, url: channel.webUrl }));
+      deal.workspace.swimlanes = (deal.workspace.swimlanes || []).map((s) => ({ ...s, channelUrl: channel.webUrl }));
+      deal.workspace.channelsProvisioned = true;
+    }
   }
 
   // Provision the SharePoint VDR folders (best-effort — never block launch/Teams).
@@ -1525,13 +1561,13 @@ export async function ensureDealTeamsChannel(id) {
   if (!deal) return { error: 'not-found' };
   if (!deal.workspace) return { error: 'not-launched' };
   if (!m365Connected()) {
-    return { ok: false, provisioned: false, connected: false, teamsUrl: deal.workspace.teamsUrl, error: 'm365-not-connected' };
+    return { ok: false, provisioned: false, connected: false, teamsUrl: deal.workspace.teamsUrl, sharePointProvisioned: !!deal.workspace.sharePointProvisioned, workspace: deal.workspace, error: 'm365-not-connected' };
   }
   try {
     const channel = await provisionDealChannel(deal);
-    return { ok: true, provisioned: true, connected: true, teamsUrl: channel.webUrl, channel };
+    return { ok: true, provisioned: true, connected: true, teamsUrl: channel.webUrl, sharePointProvisioned: !!deal.workspace.sharePointProvisioned, workspace: deal.workspace, channel };
   } catch (err) {
-    return { ok: false, provisioned: false, connected: true, teamsUrl: deal.workspace.teamsUrl, error: String(err?.message || err).slice(0, 200) };
+    return { ok: false, provisioned: false, connected: true, teamsUrl: deal.workspace.teamsUrl, sharePointProvisioned: !!deal.workspace.sharePointProvisioned, workspace: deal.workspace, error: String(err?.message || err).slice(0, 200) };
   }
 }
 

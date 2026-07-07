@@ -1005,6 +1005,7 @@ button.src-row:hover:not(.src-th) { background: var(--canvas); }
 .wsp-chip { font-size: 10.5px; font-weight: 600; color: var(--ink-2); background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; }
 .wsp-chip:hover { border-color: var(--primary); color: var(--primary); }
 .wsp-chip.folder { font-family: inherit; }
+.wsp-res-note { margin-top: 8px; font-size: 10.5px; line-height: 1.5; color: var(--muted); }
 
 /* checklist */
 .wsp-cl-legend { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; }

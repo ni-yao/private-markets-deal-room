@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Deal, MdOption, Swimlane, ChecklistSection } from '../types';
 import { api } from '../api';
 
@@ -26,7 +26,9 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunch, launching }: Props) {
   const [sub, setSub] = useState<Sub>({ kind: 'overview' });
-  const ws = deal.workspace;
+  const [ws, setWs] = useState<Deal['workspace']>(deal.workspace);
+  // Re-seed local workspace when navigating between deals.
+  useEffect(() => { setWs(deal.workspace); }, [deal.id]);
 
   // Screened (pre-launch) deal — nothing provisioned yet.
   if (!ws) {
@@ -49,36 +51,56 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
     );
   }
 
-  const openExt = (url: string) => window.open(url, '_blank', 'noopener');
+  const openExt = (url?: string) => { if (url) window.open(url, '_blank', 'noopener'); };
 
-  // The deal's Teams channel is created at launch when M365 is connected. The
-  // button opens that live channel; if it wasn't provisioned yet (e.g. the deal
-  // was launched while M365 was disconnected), it provisions on demand — idempotent.
-  const [teamsBusy, setTeamsBusy] = useState(false);
-  const [teamsNote, setTeamsNote] = useState<string | null>(null);
-  const [liveTeamsUrl, setLiveTeamsUrl] = useState<string | null>(ws.teamsProvisioned ? ws.teamsUrl : null);
-  const teamsProvisioned = !!liveTeamsUrl;
+  // Both the Teams space and the SharePoint data room are provisioned via
+  // Microsoft Graph when M365 is connected. Until a resource is really
+  // provisioned its stored deep-link is a placeholder that 404s — so we NEVER
+  // navigate to it blindly. Instead every link is gated: if the resource is live
+  // we open its real URL; otherwise we provision on demand (idempotent) and open
+  // the freshly-resolved URL, or surface an actionable note.
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const teamsProvisioned = !!ws.teamsProvisioned && !!ws.teamsUrl;
+  const spProvisioned = !!ws.sharePointProvisioned;
 
-  const openTeams = async () => {
-    if (liveTeamsUrl) { openExt(liveTeamsUrl); return; }
-    setTeamsBusy(true);
-    setTeamsNote(null);
-    try {
-      const r = await api.ensureDealTeams(deal.id);
-      if (r.provisioned && r.teamsUrl) {
-        setLiveTeamsUrl(r.teamsUrl);
-        openExt(r.teamsUrl);
-      } else if (!r.connected) {
-        setTeamsNote('Connect Microsoft 365 on the Home page to create this deal’s Teams space.');
-      } else {
-        setTeamsNote(`Couldn’t create the Team${r.error ? ` (${r.error})` : ''} — try again shortly.`);
-      }
-    } catch {
-      setTeamsNote('Could not reach the server to create the Teams channel.');
-    } finally {
-      setTeamsBusy(false);
+  // Provision (idempotent) and merge the refreshed workspace into local state.
+  async function ensure(): Promise<Deal['workspace'] | undefined> {
+    const r = await api.ensureDealTeams(deal.id);
+    if (r.workspace) setWs(r.workspace);
+    if (!r.connected) {
+      setNote('Connect Microsoft 365 on the Home page, then reopen — this provisions the deal’s Teams space and SharePoint data room.');
+    } else if (!r.sharePointProvisioned) {
+      setNote('Reconnect Microsoft 365 on the Home page to grant SharePoint file access, then reopen — the data-room folders will be created.');
     }
-  };
+    return r.workspace;
+  }
+
+  // Teams: always open the REAL deal team (its General channel). Per-workstream
+  // channels aren’t created (Channel.Create needs admin consent), so every Teams
+  // link resolves to the deal team; workstreams are separated by SharePoint folders.
+  async function openTeams() {
+    if (teamsProvisioned) { openExt(ws.teamsUrl); return; }
+    setBusy(true); setNote(null);
+    try {
+      const fresh = await ensure();
+      if (fresh?.teamsProvisioned && fresh.teamsUrl) openExt(fresh.teamsUrl);
+    } catch { setNote('Could not reach the server to create the Teams space.'); }
+    finally { setBusy(false); }
+  }
+
+  // SharePoint: open a real folder/site/template URL — only once the data room is
+  // really provisioned. Otherwise provision on demand, then open the real URL.
+  async function openSp(pick: (w: NonNullable<Deal['workspace']>) => string | undefined) {
+    if (spProvisioned) { openExt(pick(ws)); return; }
+    setBusy(true); setNote(null);
+    try {
+      const fresh = await ensure();
+      if (fresh?.sharePointProvisioned) openExt(pick(fresh));
+      // else: ensure() has already set an actionable note.
+    } catch { setNote('Could not reach the server to provision SharePoint.'); }
+    finally { setBusy(false); }
+  }
 
   return (
     <div className="wsp">
@@ -89,16 +111,16 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
           <div className="wsp-sub">Provisioned by {ws.provisionedBy}</div>
         </div>
         <div className="wsp-links">
-          <button className="wsp-link teams" onClick={openTeams} disabled={teamsBusy}>
-            {teamsBusy ? 'Creating Team…' : teamsProvisioned ? 'Open in Teams ↗' : 'Create Teams space ↗'}
+          <button className="wsp-link teams" onClick={openTeams} disabled={busy}>
+            {busy ? 'Working…' : teamsProvisioned ? 'Open in Teams ↗' : 'Create Teams space ↗'}
           </button>
-          <button className="wsp-link spo" onClick={() => openExt(ws.sharePointUrl)}>
-            {ws.sharePointProvisioned ? 'Open SharePoint ✓ ↗' : 'Open SharePoint ↗'}
+          <button className="wsp-link spo" onClick={() => openSp((w) => w.sharePointUrl)} disabled={busy}>
+            {busy ? 'Working…' : spProvisioned ? 'Open SharePoint ✓ ↗' : 'Provision SharePoint ↗'}
           </button>
         </div>
       </div>
 
-      {teamsNote && <div className="wsp-teams-note">⚠ {teamsNote}</div>}
+      {note && <div className="wsp-teams-note">⚠ {note}</div>}
 
       {/* tabs */}
       <div className="wsp-tabs">
@@ -115,13 +137,13 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
       </div>
 
       {sub.kind === 'overview' && (
-        <Overview ws={ws} onOpenExt={openExt} onOpenTeams={openTeams} teamsProvisioned={teamsProvisioned} onGo={setSub} />
+        <Overview ws={ws} openTeams={openTeams} openSp={openSp} teamsProvisioned={teamsProvisioned} spProvisioned={spProvisioned} onGo={setSub} />
       )}
       {sub.kind === 'checklist' && (
         <Checklist sections={ws.checklist} onCycle={onCycleChecklist} stats={deal.checklistStats} />
       )}
       {sub.kind === 'templates' && (
-        <Templates ws={ws} onOpen={openExt} />
+        <Templates ws={ws} openSp={openSp} />
       )}
       {sub.kind === 'lane' && (
         <LanePage
@@ -129,7 +151,8 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
           deal={deal}
           mdOptions={mdOptions}
           onAssign={onAssign}
-          onOpen={openExt}
+          openTeams={openTeams}
+          openSp={openSp}
         />
       )}
     </div>
@@ -137,12 +160,12 @@ export function Workspace({ deal, mdOptions, onAssign, onCycleChecklist, onLaunc
 }
 
 /* ---------------- Architecture diagram (SVG hub-and-spoke) ---------------- */
-function Overview({ ws, onOpenExt, onOpenTeams, teamsProvisioned, onGo }: { ws: NonNullable<Deal['workspace']>; onOpenExt: (u: string) => void; onOpenTeams: () => void; teamsProvisioned: boolean; onGo: (s: Sub) => void }) {
+function Overview({ ws, openTeams, openSp, teamsProvisioned, spProvisioned, onGo }: { ws: NonNullable<Deal['workspace']>; openTeams: () => void; openSp: (pick: (w: NonNullable<Deal['workspace']>) => string | undefined) => void; teamsProvisioned: boolean; spProvisioned: boolean; onGo: (s: Sub) => void }) {
   // node: x,y are centre coordinates in the 960x430 viewBox
   const CX = 480, CY = 205;
   const nodes = [
-    { id: 'teams', label: 'Microsoft Teams', sub: teamsProvisioned ? (ws.teamsChannelName || 'deal team') : 'create deal team', x: 205, y: 70, color: '#4b53bc', act: onOpenTeams },
-    { id: 'spo', label: 'SharePoint · VDR', sub: `${ws.folders.length} folders${ws.sharePointProvisioned ? ' · live' : ''}`, x: 755, y: 70, color: '#036c70', act: () => onOpenExt(ws.sharePointUrl) },
+    { id: 'teams', label: 'Microsoft Teams', sub: teamsProvisioned ? (ws.teamsChannelName || 'deal team') : 'create deal team', x: 205, y: 70, color: '#4b53bc', act: openTeams },
+    { id: 'spo', label: 'SharePoint · VDR', sub: `${ws.folders.length} folders${spProvisioned ? ' · live' : ' · provision'}`, x: 755, y: 70, color: '#036c70', act: () => openSp((w) => w.sharePointUrl) },
     { id: 'checklist', label: 'DD Checklist', sub: 'request list', x: 120, y: 205, color: '#2563eb', act: () => onGo({ kind: 'checklist' }) },
     { id: 'templates', label: 'Templates', sub: `${ws.templates.length} docs`, x: 840, y: 205, color: '#b45309', act: () => onGo({ kind: 'templates' }) },
     ...ws.swimlanes.map((s, i) => ({
@@ -185,20 +208,22 @@ function Overview({ ws, onOpenExt, onOpenTeams, teamsProvisioned, onGo }: { ws: 
       {/* resource strips */}
       <div className="wsp-res">
         <div className="wsp-res-col">
-          <div className="wsp-res-h"><b>Teams channels</b><span onClick={() => onOpenExt(ws.teamsUrl)} className="wsp-res-open">open ↗</span></div>
+          <div className="wsp-res-h"><b>Teams channels</b><span onClick={openTeams} className="wsp-res-open">open ↗</span></div>
           <div className="wsp-chips">
             {ws.channels.map((c) => (
-              <button key={c.name} className="wsp-chip" title={c.purpose} onClick={() => onOpenExt(c.url)}>#{c.name}</button>
+              <button key={c.name} className="wsp-chip" title={`${c.purpose} — opens the deal team`} onClick={openTeams}>#{c.name}</button>
             ))}
           </div>
+          <div className="wsp-res-note">Chips open the deal team. Per-workstream channels require tenant-admin consent; workstream discussion runs in the deal team and workstream documents live in the SharePoint folders →</div>
         </div>
         <div className="wsp-res-col">
-          <div className="wsp-res-h"><b>SharePoint data room</b><span onClick={() => onOpenExt(ws.sharePointUrl)} className="wsp-res-open">open ↗</span></div>
+          <div className="wsp-res-h"><b>SharePoint data room</b><span onClick={() => openSp((w) => w.sharePointUrl)} className="wsp-res-open">open ↗</span></div>
           <div className="wsp-chips">
             {ws.folders.map((f) => (
-              <button key={f.name} className="wsp-chip folder" onClick={() => onOpenExt(f.url)}>📁 {f.name}</button>
+              <button key={f.name} className="wsp-chip folder" onClick={() => openSp((w) => w.folders.find((x) => x.name === f.name)?.url)}>📁 {f.name}</button>
             ))}
           </div>
+          {!spProvisioned && <div className="wsp-res-note">Connect Microsoft 365 on Home to provision these {ws.folders.length} folders as a real, indexed data room.</div>}
         </div>
       </div>
     </div>
@@ -239,11 +264,11 @@ function Checklist({ sections, onCycle, stats }: { sections: ChecklistSection[];
 
 /* ---------------- Templates ---------------- */
 const TPL_ICON: Record<string, string> = { Excel: '📊', Word: '📝', PowerPoint: '📽' };
-function Templates({ ws, onOpen }: { ws: NonNullable<Deal['workspace']>; onOpen: (u: string) => void }) {
+function Templates({ ws, openSp }: { ws: NonNullable<Deal['workspace']>; openSp: (pick: (w: NonNullable<Deal['workspace']>) => string | undefined) => void }) {
   return (
     <div className="wsp-templates">
       {ws.templates.map((t) => (
-        <button key={t.id} className="wsp-tpl" onClick={() => onOpen(t.url)}>
+        <button key={t.id} className="wsp-tpl" onClick={() => openSp((w) => w.templates.find((x) => x.id === t.id)?.url)}>
           <span className="wsp-tpl-ic">{TPL_ICON[t.type] || '📄'}</span>
           <span className="wsp-tpl-body">
             <span className="wsp-tpl-n">{t.name} <span className="wsp-tpl-ext">.{t.ext}</span></span>
@@ -257,12 +282,13 @@ function Templates({ ws, onOpen }: { ws: NonNullable<Deal['workspace']>; onOpen:
 }
 
 /* ---------------- Swimlane subpage ---------------- */
-function LanePage({ swimlane, deal, mdOptions, onAssign, onOpen }: {
+function LanePage({ swimlane, deal, mdOptions, onAssign, openTeams, openSp }: {
   swimlane: Swimlane;
   deal: Deal;
   mdOptions: MdOption[];
   onAssign: (lane: string, md: string) => void;
-  onOpen: (u: string) => void;
+  openTeams: () => void;
+  openSp: (pick: (w: NonNullable<Deal['workspace']>) => string | undefined) => void;
 }) {
   const color = LANE_COLOR[swimlane.lane];
   const relatedItems = (deal.workspace?.checklist || []).filter((s) => s.lane === swimlane.lane).flatMap((s) => s.items);
@@ -290,8 +316,8 @@ function LanePage({ swimlane, deal, mdOptions, onAssign, onOpen }: {
         </div>
         <div className="wsp-lane-card">
           <div className="wsp-lane-card-h">Workspace</div>
-          <button className="wsp-chip" onClick={() => onOpen(swimlane.channelUrl)}>Teams channel ↗</button>
-          <button className="wsp-chip folder" onClick={() => onOpen(swimlane.folderUrl)}>SharePoint folder ↗</button>
+          <button className="wsp-chip" onClick={openTeams}>Teams channel ↗</button>
+          <button className="wsp-chip folder" onClick={() => openSp((w) => w.swimlanes.find((s) => s.lane === swimlane.lane)?.folderUrl)}>SharePoint folder ↗</button>
           <div className="wsp-lane-prog">
             <div className="wsp-lane-prog-t"><span>Lane progress</span><b>{ws?.progress ?? 0}%</b></div>
             <div className="wsp-lane-prog-track"><i style={{ width: `${ws?.progress ?? 0}%`, background: color }} /></div>

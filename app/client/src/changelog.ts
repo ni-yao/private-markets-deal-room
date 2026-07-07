@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.30.0',
+    date: '2026-07-06',
+    image: 'dealroom-app:v43',
+    revision: 'ca-dealroom-orch-dev-swc--0000039',
+    title: 'Deal workspace links fixed — no more 404s on Teams channels or SharePoint folders',
+    tag: 'improvement',
+    highlights: [
+      'Fixed the Launch Orchestration workspace 404s. Every Teams and SharePoint link was previously a constructed placeholder deep-link; when the underlying resource wasn’t really provisioned yet, clicking it 404’d. Every link is now gated on real provisioning — the app never navigates to a placeholder URL.',
+      'Teams channels now open the real deal team. A team is created per deal at launch (the standard template provisions a single General channel), so every workstream chip — and each swimlane’s Teams button — opens that real deal team. Existing deals self-heal at boot: fabricated “&channel=…” links are repaired to the real team automatically.',
+      'Per-workstream Teams channels are honestly represented. Creating distinct channels per workstream (Commercial DD, Financial/QoE, Legal, Tech/AI, Operations, Tax, IC Prep) requires the admin-consent-gated Channel.Create permission, which this tenant restricts — so workstream discussion runs in the deal team and each workstream’s documents live in its own SharePoint folder. The UI states this clearly.',
+      'SharePoint folders provision on demand. If the data room isn’t live yet, clicking a folder (or “Provision SharePoint”) provisions it in place when Microsoft 365 is connected, then opens the real folder — otherwise it shows an actionable note to connect/reconnect M365 on the Home page (the folder taxonomy uses the user-consentable Files.ReadWrite.All scope).'
+    ]
+  },
+  {
     version: 'v0.29.0',
     date: '2026-07-06',
     image: 'dealroom-app:v42',

@@ -29,6 +29,7 @@ import type {
   Assessment,
   ChatMessage,
   CandidateChatLog,
+  Workspace,
   MdOption
 } from './types';
 
@@ -104,7 +105,7 @@ export const api = {
   mdOptions: () => get<MdOption[]>('/api/md-options'),
   launchDeal: (id: string) => post<Deal>(`/api/deals/${id}/launch`, {}),
   ensureDealTeams: (id: string) =>
-    post<{ ok?: boolean; provisioned: boolean; connected: boolean; teamsUrl: string; error?: string }>(`/api/deals/${id}/teams/ensure`, {}),
+    post<{ ok?: boolean; provisioned: boolean; connected: boolean; teamsUrl: string; sharePointProvisioned?: boolean; workspace?: Workspace; error?: string }>(`/api/deals/${id}/teams/ensure`, {}),
   assignSwimlane: (id: string, lane: string, md: string) =>
     patchReq<Deal>(`/api/deals/${id}/swimlanes/${lane}`, { md }),
   cycleChecklistItem: (id: string, itemId: string) =>
