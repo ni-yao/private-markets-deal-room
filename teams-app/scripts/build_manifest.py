@@ -50,7 +50,7 @@ def outline_icon(x, y):
     return WHITE if (x < 2 or x >= 30 or y < 2 or y >= 30) else CLEAR
 
 
-def build(host: str, sso_client_id=None) -> None:
+def build(host: str, sso_client_id=None, bot_id=None) -> None:
     os.makedirs(OUT, exist_ok=True)
     base = f"https://{host}"
     # Stable app id derived from the host (idempotent rebuilds).
@@ -95,6 +95,17 @@ def build(host: str, sso_client_id=None) -> None:
             "resource": f"api://{host}/{sso_client_id}",
         }
 
+    # Adaptive Card notifications (proactive; the bot posts, users don't chat it).
+    if bot_id:
+        manifest["bots"] = [
+            {
+                "botId": bot_id,
+                "scopes": ["team", "groupChat", "personal"],
+                "supportsFiles": False,
+                "isNotificationOnly": True,
+            }
+        ]
+
     with open(os.path.join(OUT, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
     with open(os.path.join(OUT, "color.png"), "wb") as f:
@@ -116,5 +127,6 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--host", required=True, help="Teams app FQDN (no scheme), e.g. ca-dealhub-teams-...azurecontainerapps.io")
     p.add_argument("--sso-client-id", default=None, help="Entra SSO app (client) id to emit webApplicationInfo for per-user SSO.")
+    p.add_argument("--bot-id", default=None, help="Azure Bot app id to emit the bots block for Adaptive Card notifications.")
     args = p.parse_args()
-    build(args.host, args.sso_client_id)
+    build(args.host, args.sso_client_id, args.bot_id)
