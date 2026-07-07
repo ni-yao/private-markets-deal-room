@@ -13,7 +13,7 @@
 // Every M365-dependent step goes through this module, so the single delegated
 // connection is reused everywhere.
 
-import { getAccessToken, hasLogin, NotLoggedInError } from '../mcp/oauth.js';
+import { getAccessToken, hasLogin, loadTokens, NotLoggedInError } from '../mcp/oauth.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
@@ -27,6 +27,19 @@ export function m365Configured() {
 // …and is CONNECTED once a user has signed in (delegated token stored).
 export function m365Connected() {
   return hasLogin('m365');
+}
+
+// Whether the stored delegated token carries the SharePoint/OneDrive file write
+// scope (Files.ReadWrite.All) — i.e. the deal SharePoint data room can actually
+// be provisioned. Surfaced in /config so the app (and the operator) can confirm,
+// after connecting M365, whether file access was granted without guesswork.
+export function m365FilesScope() {
+  try {
+    const rec = loadTokens('m365');
+    return /(^|\s)Files\.ReadWrite(\.All)?(\s|$)/i.test(rec?.scope || '');
+  } catch {
+    return false;
+  }
 }
 
 async function graph(path, { method = 'GET', body, headers = {}, expect } = {}) {

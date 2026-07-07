@@ -74,7 +74,7 @@ import { mcpAuthMiddleware, mcpAuthInfo } from './lib/mcp/entraAuth.js';
 import { listConnectors, testConnector } from './lib/connectors.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
-import { m365Configured, m365Connected } from './lib/m365/graph.js';
+import { m365Configured, m365Connected, m365FilesScope } from './lib/m365/graph.js';
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 
@@ -99,7 +99,7 @@ api.get('/config', (_req, res) => {
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
     dealAgent: dealAgentInfo().configured ? 'live' : 'demo',
     dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo() },
-    m365: { configured: m365Configured(), connected: m365Connected() },
+    m365: { configured: m365Configured(), connected: m365Connected(), files: m365FilesScope() },
     morningstar: morningstarReady() ? 'live' : 'demo',
     datastore: repoMode()
   });

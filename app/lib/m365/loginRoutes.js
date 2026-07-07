@@ -75,7 +75,14 @@ router.get('/login', (req, res) => {
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
-    prompt: 'select_account'
+    // Force the consent screen. All scopes here are USER-consentable in this
+    // tenant (the signed-in user self-consents — no admin approval), but when a
+    // NEW scope is added to an already-connected app, `prompt=select_account`
+    // lets Entra silently reissue the previously-consented scope set and drop the
+    // new one (this is exactly why Files.ReadWrite.All wasn't landing). Forcing
+    // consent makes the incremental grant deterministic so the SharePoint data
+    // room provisions for real.
+    prompt: 'consent'
   });
   res.redirect(`${AUTHORIZE}?${params.toString()}`);
 });
