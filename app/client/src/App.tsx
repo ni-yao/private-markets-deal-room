@@ -236,6 +236,7 @@ export default function App() {
                 onAssignSwimlane={assignSwimlane}
                 onContribute={recordContribution}
                 onCycleChecklist={cycleChecklist}
+                onDealUpdate={(d) => { setDeal(d); api.deals().then(setDeals); }}
                 onLaunchDeal={() => deal && launchDeal(deal.id)}
                 launching={!!deal && launchingId === deal.id}
                 launchingId={launchingId}

@@ -90,6 +90,48 @@ The **O1 · Deal Sourcing** station drills into the raw inputs an analyst screen
 ![sourcing framework](docs/sourcing-framework.png)
 ![screen thresholds](docs/sourcing-framework-screen.png)
 
+## IC Readiness cockpit & Fabric market intelligence
+
+On every diligence step (**D2 Diligence → D4 Approval**) the Station renders an
+**IC Readiness cockpit** — a decision-grade board that turns "readiness" from a
+completion percentage into the seven questions an Investment Committee actually
+asks, with an overall **READY / CONDITIONAL / NOT-READY** verdict derived from
+real gating facts (not an averaged progress bar):
+
+1. **Required artifacts complete?** — D1/D2/D3, IC-memo sections, recommendation, KYC.
+2. **Which workstreams are blocking?** — lane progress + open high-severity issues.
+3. **Which assumptions changed since the last IC draft?** — vs an assumption snapshot.
+4. **Which risks are unresolved?** — the operational **issue log** (severity · owner · resolution path · due date), add / mitigate / resolve inline.
+5. **What supports the recommendation?** — deal documents, finding sources **and real Fabric comparables / IC precedents**.
+6. **What is the exact IC ask?** — EV, entry multiple, equity check, base-case returns, hurdle, structure (from the returns engine).
+7. **Which conditions need approval?** — IC **conditions** with a proposed → accepted → satisfied lifecycle.
+
+![IC readiness cockpit](docs/ic-readiness-cockpit.png)
+
+The cockpit is **grounded in the fund's real market data in Microsoft Fabric /
+OneLake** (workspace *Deal Room*, lakehouse `deal_room_starter`, capacity
+`dealroomfabric`). `scripts/extract_fabric_cache.py` reads that OneLake data
+through the lakehouse SQL endpoint and materialises a real snapshot into the app
+datastore (`lib/fabric.js` serves it, honest `mode` in `/api/config.fabric`):
+
+- **Comparable & historical deals** — real deal type, implied valuation and outcome.
+- **IC voting precedents** — decision, votes and conditions from prior deals.
+- **Benchmark diligence findings** — across all five workstreams (Commercial /
+  Financial / Legal / Operational / Tax) with the severity mix.
+- **Company financials** — real SEC filing metrics.
+
+The operational primitives (issues, conditions, assumption snapshots) persist to
+the governed deal record in Cosmos and write audit events. All of this is exposed
+to the five Foundry **persona agents** and Copilot Studio through the Deal MCP
+server: `get_ic_readiness` + `get_market_intel` (reads) and `record_issue`,
+`resolve_issue`, `set_condition`, `snapshot_assumptions` (persona-governed writes).
+
+> **Live-binding note.** The app's managed identity reads the materialised Fabric
+> snapshot today; a one-time grant of *Viewer* on the Fabric workspace to the app
+> identity enables direct live SQL reads (`FABRIC_LIVE=true`). Cosmos remains the
+> deal system-of-record; Dataverse/D365 as a pipeline SoR is license/admin-gated
+> in this tenant and is not provisioned.
+
 ## Architecture
 
 - **Frontend** — React + TypeScript + Vite (no runtime UI deps), built to static

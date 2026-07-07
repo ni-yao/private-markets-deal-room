@@ -46,6 +46,10 @@ export const ACTIONS = {
   run_step: { label: 'Run a diligence step to produce its deliverable', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'] },
   record_finding: { label: 'Record a diligence finding into a workstream lane', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },
   record_contribution: { label: 'Contribute guidance, a value-add lever, or a diligence finding into a lane', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },
+  record_issue: { label: 'Log a diligence issue (severity + owner + resolution path) into the issue log', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },
+  resolve_issue: { label: 'Update or resolve a logged diligence issue', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'] },
+  set_condition: { label: 'Set or update an IC condition for approval', personas: ['analyst', 'partner'] },
+  snapshot_assumptions: { label: 'Snapshot the current key assumptions as an IC-draft baseline', personas: ['analyst', 'partner'] },
   assign_lane: { label: 'Assign a diligence lane to an MD', personas: ['analyst', 'partner'] },
   advance_deal: { label: 'Advance the deal to the next diligence step', personas: ['analyst', 'partner'] },
   approve_ic: { label: 'Record the IC approval and advance past the IC gate (D4)', personas: ['partner'] }
@@ -81,10 +85,10 @@ export function nextActions(persona, { kind, stage } = {}) {
     else if (stage === 'O4') out.push(...allow('gate_candidate'));
   } else if (kind === 'deal') {
     if (stage === 'SCR') out.push(...allow('launch_deal'));
-    else if (stage === 'D1') out.push(...allow('advance_deal'), ...allow('run_step'), ...allow('assign_lane'), ...allow('record_contribution'));
-    else if (stage === 'D2') out.push(...allow('record_contribution'), ...allow('record_finding'), ...allow('run_step'), ...allow('advance_deal'));
-    else if (stage === 'D3') out.push(...allow('record_contribution'), ...allow('run_step'), ...allow('advance_deal'));
-    else if (stage === 'D4') out.push(...allow('approve_ic'), ...allow('advance_deal'));
+    else if (stage === 'D1') out.push(...allow('advance_deal'), ...allow('run_step'), ...allow('assign_lane'), ...allow('record_contribution'), ...allow('record_issue'));
+    else if (stage === 'D2') out.push(...allow('record_contribution'), ...allow('record_finding'), ...allow('record_issue'), ...allow('resolve_issue'), ...allow('run_step'), ...allow('advance_deal'));
+    else if (stage === 'D3') out.push(...allow('record_contribution'), ...allow('record_issue'), ...allow('resolve_issue'), ...allow('set_condition'), ...allow('snapshot_assumptions'), ...allow('run_step'), ...allow('advance_deal'));
+    else if (stage === 'D4') out.push(...allow('set_condition'), ...allow('resolve_issue'), ...allow('approve_ic'), ...allow('advance_deal'));
     else if (stage === 'D5') out.push(...allow('run_step'));
   }
   return out;

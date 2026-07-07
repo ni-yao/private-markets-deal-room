@@ -59,6 +59,18 @@ import {
   assignSwimlane,
   recordContribution,
   cycleChecklistItem,
+  recordIssue,
+  resolveIssue,
+  setCondition,
+  updateCondition,
+  snapshotAssumptions,
+  getICReadiness,
+  marketIntel,
+  fabricStatus,
+  comparableDeals,
+  benchmarkFindings,
+  icPrecedents,
+  companyFinancials,
   advanceDeal,
   regressDeal,
   runStep,
@@ -104,6 +116,7 @@ api.get('/config', (_req, res) => {
     dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo() },
     m365: { configured: m365Configured(), connected: m365Connected(), files: m365FilesScope() },
     morningstar: morningstarReady() ? 'live' : 'demo',
+    fabric: fabricStatus(),
     datastore: repoMode()
   });
 });
@@ -233,6 +246,68 @@ api.post('/deals/:id/checklist/:itemId/cycle', (req, res) => {
   const r = cycleChecklistItem(req.params.id, req.params.itemId);
   if (r.error) return res.status(404).json(r);
   res.json(r.deal);
+});
+
+// IC Readiness Cockpit — the decision-grade board (7 questions + verdict),
+// grounded in real Fabric/OneLake market intelligence.
+api.get('/deals/:id/ic-readiness', (req, res) => {
+  const board = getICReadiness(req.params.id);
+  if (!board) return res.status(404).json({ error: 'not-found' });
+  res.json(board);
+});
+
+// Operational diligence: issue log (severity + owner + resolution path + due date).
+api.post('/deals/:id/issues', (req, res) => {
+  const { lane, title, severity, owner, resolutionPath, sources, dueDate, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = recordIssue(req.params.id, { lane, title, severity, owner, resolutionPath, sources, dueDate, by, persona: md });
+  if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+api.patch('/deals/:id/issues/:issueId', (req, res) => {
+  const { status, resolutionPath, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = resolveIssue(req.params.id, req.params.issueId, { status, resolutionPath, by, persona: md });
+  if (r.error) return res.status(r.error.endsWith('not-found') ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+
+// IC conditions (partner-owned).
+api.post('/deals/:id/conditions', (req, res) => {
+  const { text, owner, status, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = setCondition(req.params.id, { text, owner, status, by, persona: md });
+  if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+api.patch('/deals/:id/conditions/:condId', (req, res) => {
+  const { status, text, owner, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = updateCondition(req.params.id, req.params.condId, { status, text, owner, by });
+  if (r.error) return res.status(r.error.endsWith('not-found') ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+
+// Assumption snapshot — records the current key assumptions as an IC-draft baseline
+// so the cockpit can show what changed since the last draft.
+api.post('/deals/:id/assumption-snapshot', (req, res) => {
+  const { label, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = snapshotAssumptions(req.params.id, { label, by });
+  if (r.error) return res.status(404).json(r);
+  res.json(r.deal);
+});
+
+// Fabric / OneLake market intelligence — comparable deals, benchmark diligence
+// findings, IC voting precedents and real company financials.
+api.get('/market-intel', (_req, res) => res.json(marketIntel() || { info: fabricStatus(), companies: [], comparableDeals: [], benchmarkFindings: [], icPrecedents: [], companyFinancials: {} }));
+api.get('/market-intel/comps', (req, res) => res.json(comparableDeals({ sector: req.query.sector })));
+api.get('/market-intel/benchmarks', (req, res) => res.json(benchmarkFindings(req.query.workstream)));
+api.get('/market-intel/ic-precedents', (_req, res) => res.json(icPrecedents()));
+api.get('/market-intel/financials/:ticker', (req, res) => {
+  const f = companyFinancials(req.params.ticker);
+  if (!f) return res.status(404).json({ error: 'no-coverage' });
+  res.json(f);
 });
 
 // O1 · Deal Sourcing — CxO signals explorer

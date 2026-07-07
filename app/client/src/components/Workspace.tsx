@@ -86,7 +86,7 @@ export function Workspace({ deal, mdOptions, onAssign, onContribute, onCycleChec
   // channels aren’t created (Channel.Create needs admin consent), so every Teams
   // link resolves to the deal team; workstreams are separated by SharePoint folders.
   async function openTeams() {
-    if (teamsProvisioned) { openExt(ws.teamsUrl); return; }
+    if (teamsProvisioned && ws) { openExt(ws.teamsUrl); return; }
     setBusy(true); setNote(null);
     try {
       const fresh = await ensure();
@@ -101,7 +101,7 @@ export function Workspace({ deal, mdOptions, onAssign, onContribute, onCycleChec
   // attempt on-demand provisioning; if that can’t complete, show a clear,
   // actionable note and navigate nowhere.
   async function openSp(pick: (w: NonNullable<Deal['workspace']>) => string | undefined) {
-    if (spProvisioned) { openExt(pick(ws)); return; }
+    if (spProvisioned && ws) { openExt(pick(ws)); return; }
     setBusy(true); setNote(null);
     try {
       const fresh = await ensure();

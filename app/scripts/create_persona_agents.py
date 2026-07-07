@@ -67,6 +67,10 @@ READ_TOOLS = {
                              properties={"deal_id": {"type": "string"}, "step": {"type": "string", "enum": ["D1", "D2", "D3", "D4", "D5"]}}, required=["deal_id", "step"]),
     "get_next_actions": _fn("get_next_actions", "List the actions YOUR persona is allowed to take right now on a given deal or candidate. Always call this before acting.",
                             properties={"deal_id": {"type": "string"}, "candidate_id": {"type": "string"}}),
+    "get_ic_readiness": _fn("get_ic_readiness", "Get the IC Readiness board for a deal — the seven decision-grade IC questions (required artifacts, blocking workstreams, changed assumptions, unresolved risks, supporting sources, exact IC ask, conditions) + a READY / CONDITIONAL / NOT-READY verdict, grounded in real Fabric comparable deals and IC precedents.",
+                            properties={"deal_id": {"type": "string"}}, required=["deal_id"]),
+    "get_market_intel": _fn("get_market_intel", "Get the fund's real market intelligence from Fabric / OneLake: comparable & historical deals, benchmark diligence findings by workstream (Commercial/Financial/Legal/Operational/Tax), and IC voting precedents. Use to ground valuation, diligence scoping and IC conditions.",
+                            properties={"sector": {"type": "string", "description": "Optional sector to bias the comparables."}}),
 }
 
 ACTION_TOOLS = {
@@ -92,15 +96,23 @@ ACTION_TOOLS = {
                           properties={"deal_id": {"type": "string"}, "lane": LANE, "text": {"type": "string"}, "severity": SEVERITY, "source": {"type": "string"}}, required=["deal_id", "text"]),
     "record_contribution": _fn("record_contribution", "Contribute MD input into a lane: kind = guidance | value_add | diligence (severity for diligence). Sector MDs own-lane only. YOUR MAIN INPUT TOOL.",
                                properties={"deal_id": {"type": "string"}, "lane": LANE, "kind": {"type": "string", "enum": ["guidance", "value_add", "diligence"]}, "text": {"type": "string"}, "severity": SEVERITY, "source": {"type": "string"}}, required=["deal_id", "kind", "text"]),
+    "record_issue": _fn("record_issue", "Log an operational diligence ISSUE into the deal issue log: title, severity, optional owner/resolution_path/due_date, into a lane. Feeds the IC Readiness cockpit as an unresolved risk until resolved. Sector MDs own-lane only.",
+                        properties={"deal_id": {"type": "string"}, "lane": LANE, "title": {"type": "string"}, "severity": SEVERITY, "owner": {"type": "string"}, "resolution_path": {"type": "string"}, "due_date": {"type": "string"}}, required=["deal_id", "title"]),
+    "resolve_issue": _fn("resolve_issue", "Update or resolve a logged issue by issue_id: status = open | mitigating | resolved, with an optional resolution_path.",
+                         properties={"deal_id": {"type": "string"}, "issue_id": {"type": "string"}, "status": {"type": "string", "enum": ["open", "mitigating", "resolved"]}, "resolution_path": {"type": "string"}}, required=["deal_id", "issue_id"]),
+    "set_condition": _fn("set_condition", "Set (or draft) an IC condition-to-approve: text, optional owner, status = proposed | accepted | satisfied. Analyst/Partner only.",
+                         properties={"deal_id": {"type": "string"}, "text": {"type": "string"}, "owner": {"type": "string"}, "status": {"type": "string", "enum": ["proposed", "accepted", "satisfied"]}}, required=["deal_id", "text"]),
+    "snapshot_assumptions": _fn("snapshot_assumptions", "Snapshot the deal's current key assumptions as an IC-draft baseline so the cockpit can show what changed since the last draft. Analyst/Partner only.",
+                                properties={"deal_id": {"type": "string"}, "label": {"type": "string"}}, required=["deal_id"]),
 }
 
 # Which action tools each persona may call (mirrors lib/personaPolicy.js ACTIONS).
 PERSONA_ACTIONS = {
-    "analyst": ["send_to_screening", "screen_candidate", "triage_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "assign_lane", "advance_deal"],
-    "partner": ["send_to_screening", "screen_candidate", "triage_candidate", "gate_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "assign_lane", "advance_deal", "approve_ic"],
-    "retail-md": ["run_step", "record_finding", "record_contribution"],
-    "ai-md": ["run_step", "record_finding", "record_contribution"],
-    "supply-md": ["run_step", "record_finding", "record_contribution"],
+    "analyst": ["send_to_screening", "screen_candidate", "triage_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "set_condition", "snapshot_assumptions", "assign_lane", "advance_deal"],
+    "partner": ["send_to_screening", "screen_candidate", "triage_candidate", "gate_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "set_condition", "snapshot_assumptions", "assign_lane", "advance_deal", "approve_ic"],
+    "retail-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue"],
+    "ai-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue"],
+    "supply-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue"],
 }
 
 COMMON = """You are a specialist copilot for a US mid-market private-equity fund's "Deal Room". You have NO

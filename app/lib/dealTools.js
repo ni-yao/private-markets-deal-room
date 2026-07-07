@@ -12,7 +12,8 @@ import {
   listDeals, getDeal,
   getPipeline, getCandidatePublic, getCandidateArtifact, getDealArtifact,
   sendToScreening, screenCandidate, triageCandidate, gateCandidate,
-  launchDeal, advanceDeal, runStep, assignSwimlane, recordFinding, recordContribution
+  launchDeal, advanceDeal, runStep, assignSwimlane, recordFinding, recordContribution,
+  getICReadiness, marketIntel, recordIssue, resolveIssue, setCondition, snapshotAssumptions
 } from './store.js';
 import { can, nextActions, PERSONA_LANE } from './personaPolicy.js';
 
@@ -223,6 +224,50 @@ export async function dealArtifactView(dealId, step) {
   return a;
 }
 
+// The IC Readiness board for a deal — the seven decision-grade questions + verdict,
+// grounded in real Fabric/OneLake market intelligence. Bounded for tool output.
+export function icReadinessView(dealId) {
+  const b = getICReadiness(dealId);
+  if (!b) return { error: 'deal-not-found', deal_id: dealId };
+  return {
+    deal_id: b.dealId,
+    company: b.company,
+    stage: b.stage,
+    verdict: b.verdict,
+    requiredArtifacts: { complete: b.requiredArtifacts.complete, total: b.requiredArtifacts.total, missing: b.requiredArtifacts.items.filter((i) => !i.complete).map((i) => i.label) },
+    blockingWorkstreams: b.blockingWorkstreams.map((w) => ({ lane: w.label, owner: w.owner, reasons: w.reasons })),
+    changedAssumptions: b.changedAssumptions.note,
+    unresolvedRisks: b.unresolvedRisks.map((r) => ({ title: r.title, severity: r.severity, lane: r.laneLabel, owner: r.owner, status: r.status })),
+    conditions: b.conditions.map((c) => ({ text: c.text, status: c.status })),
+    icAsk: b.icAsk,
+    supportingSources: b.supportingSources.slice(0, 10).map((s) => `${s.label}${s.ref ? ` (${s.ref})` : ''}`),
+    comparableDeals: (b.marketIntel?.comparableDeals || []).slice(0, 5).map((c) => ({ company: c.company, dealType: c.dealType, impliedValuation: c.impliedValuation, status: c.status })),
+    icPrecedents: (b.marketIntel?.icPrecedents || []).map((p) => ({ deal: p.deal, decision: p.decision, votes: `${p.votesFor}-${p.votesAgainst}`, conditions: p.conditions })),
+    fabric: b.marketIntel?.source?.mode || 'unconfigured'
+  };
+}
+
+// Fabric / OneLake market intelligence — comparable & historical deals, benchmark
+// diligence findings by workstream, and IC voting precedents. Grounds valuation,
+// diligence scoping and IC conditions in the fund's real market data.
+export function marketIntelView({ sector } = {}) {
+  const mi = marketIntel();
+  if (!mi) return { fabric: 'unconfigured', note: 'Fabric market-intelligence snapshot not loaded.', comparableDeals: [], benchmarkFindings: [], icPrecedents: [] };
+  const norm = (x) => String(x || '').toLowerCase();
+  let comps = mi.comparableDeals || [];
+  if (sector) {
+    const key = norm(sector);
+    comps = comps.slice().sort((a, b) => (norm(b.thesis).includes(key) ? 1 : 0) - (norm(a.thesis).includes(key) ? 1 : 0));
+  }
+  return {
+    fabric: mi.info?.mode || 'materialized',
+    source: mi.info?.source || null,
+    comparableDeals: comps.slice(0, 8).map((c) => ({ company: c.company, ticker: c.ticker, dealType: c.dealType, dealValue: c.dealValue, impliedValuation: c.impliedValuation, stage: c.stage, status: c.status })),
+    benchmarkFindings: (mi.benchmarkFindings || []).map((w) => ({ workstream: w.workstream, total: w.total, byRisk: w.byRisk, topSamples: (w.samples || []).slice(0, 2).map((s) => ({ type: s.type, description: s.description, risk: s.risk })) })),
+    icPrecedents: (mi.icPrecedents || []).map((p) => ({ deal: p.deal, decision: p.decision, votes: `${p.votesFor}-${p.votesAgainst}`, conditions: p.conditions }))
+  };
+}
+
 // ===========================================================================
 //  ACTION tools — MOVE the pipeline forward, governed by persona policy.
 // ===========================================================================
@@ -243,8 +288,8 @@ function actor(persona) {
 export async function dispatchAction(name, args = {}, { persona } = {}) {
   if (!persona) return { error: 'persona-required', detail: 'No persona resolved for this caller; an action needs a persona.' };
 
-  // Lane matters for the lane-scoped contribution actions; derive it for authz.
-  const lane = (name === 'record_finding' || name === 'record_contribution')
+  // Lane matters for the lane-scoped contribution/issue actions; derive it for authz.
+  const lane = (name === 'record_finding' || name === 'record_contribution' || name === 'record_issue')
     ? (args.lane || PERSONA_LANE[persona])
     : undefined;
   const verdict = can(persona, name, { lane });
@@ -274,6 +319,14 @@ export async function dispatchAction(name, args = {}, { persona } = {}) {
         return withAudit(recordFinding(args.deal_id, lane, { text: args.text, severity: args.severity, source: args.source, by }), { name, persona });
       case 'record_contribution':
         return withAudit(recordContribution(args.deal_id, lane, { kind: args.kind, text: args.text, severity: args.severity, source: args.source, by, persona }), { name, persona });
+      case 'record_issue':
+        return withAudit(recordIssue(args.deal_id, { lane, title: args.title, severity: args.severity, owner: args.owner, resolutionPath: args.resolution_path, dueDate: args.due_date, by, persona }), { name, persona });
+      case 'resolve_issue':
+        return withAudit(resolveIssue(args.deal_id, args.issue_id, { status: args.status, resolutionPath: args.resolution_path, by, persona }), { name, persona });
+      case 'set_condition':
+        return withAudit(setCondition(args.deal_id, { text: args.text, owner: args.owner, status: args.status, by, persona }), { name, persona });
+      case 'snapshot_assumptions':
+        return withAudit(snapshotAssumptions(args.deal_id, { label: args.label, by }), { name, persona });
       default:
         return { error: 'unknown-action', name };
     }
@@ -335,6 +388,17 @@ export const TOOL_DESCRIPTIONS = {
     'List the actions YOUR persona is allowed to take right now on a given deal or candidate ' +
     '(pass deal_id or candidate_id). Always call this before acting so you propose only ' +
     'authorized, stage-valid moves.',
+  get_ic_readiness:
+    'Get the IC Readiness board for a deal — the decision-grade answer to the seven questions the ' +
+    'Investment Committee asks (required artifacts complete? blocking workstreams? changed assumptions? ' +
+    'unresolved risks? supporting sources? exact IC ask? conditions to approve?) plus an overall ' +
+    'READY / CONDITIONAL / NOT-READY verdict, grounded in real Fabric comparable deals and IC precedents.',
+  get_market_intel:
+    "Get the fund's real market intelligence from Fabric / OneLake: comparable & historical deals " +
+    '(deal type, value, implied valuation, outcome), benchmark diligence findings by workstream ' +
+    '(Commercial / Financial / Legal / Operational / Tax, with severity mix) and IC voting precedents ' +
+    '(decision, votes, conditions). Use to ground valuation, diligence scoping and IC conditions. ' +
+    'Pass an optional sector to bias the comparables.',
   // Action tools
   send_to_screening: 'Send a sourced target into the screening funnel (creates an O2 candidate). Analyst/Partner only.',
   screen_candidate: 'Record the Auto-Screen (O2) decision for a candidate: action = advance | pass | park (+ reason). Analyst/Partner only.',
@@ -351,6 +415,19 @@ export const TOOL_DESCRIPTIONS = {
   record_contribution:
     'Contribute MD input into a workstream lane through one of three lenses: kind = guidance (steer/direction for the lane), ' +
     'value_add (a value-creation lever/thesis input), or diligence (a finding, with severity = positive|neutral|caution|negative|risk). ' +
-    'Sector MDs may only contribute to their own lane; Analyst/Partner to any lane. This is the MD input entrypoint.'
+    'Sector MDs may only contribute to their own lane; Analyst/Partner to any lane. This is the MD input entrypoint.',
+  record_issue:
+    'Log an operational diligence issue into the deal issue log: title, severity (positive|neutral|caution|negative|risk), ' +
+    'optional owner, resolution_path and due_date, into a workstream lane. Feeds the IC Readiness cockpit as an unresolved ' +
+    'risk until resolved. Sector MDs may only log into their own lane; Analyst/Partner into any lane.',
+  resolve_issue:
+    'Update or resolve a logged issue by issue_id: status = open | mitigating | resolved, with an optional resolution_path. ' +
+    'Clears it from the cockpit unresolved-risk list when resolved.',
+  set_condition:
+    'Set (or draft) an IC condition-to-approve on a deal: text, optional owner, status = proposed | accepted | satisfied. ' +
+    'Surfaces in the cockpit as a condition the IC must clear. Analyst/Partner only.',
+  snapshot_assumptions:
+    "Snapshot the deal's current key assumptions (revenue, EBITDA, entry multiple, base-case IRR/MoIC, EV) as an IC-draft " +
+    'baseline, so the cockpit can show which assumptions changed since the last IC draft. Analyst/Partner only.'
 };
 

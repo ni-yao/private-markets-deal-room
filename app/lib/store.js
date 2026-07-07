@@ -32,6 +32,8 @@ import {
 } from '../data/candidates.js';
 import { initRepo, repoMode, companies as coRepo, deals as dealRepo, signals as sigRepo, recordEvent } from './repo/index.js';
 import { primeTokenCache } from './mcp/oauth.js';
+import { computeICReadiness, currentAssumptions } from './icReadiness.js';
+import { loadFabric, fabricInfo, getMarketIntel, getComparableDeals, getBenchmarkFindings, getICPrecedents, getCompanyFinancials, compsForDeal } from './fabric.js';
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
@@ -122,6 +124,7 @@ export async function hydrate() {
   const info = await initRepo();
   if (repoMode() !== 'cosmos') return { mode: repoMode(), companies: 0, deals: 0 };
   await primeTokenCache().catch(() => {});
+  await loadFabric().catch(() => {});
   try {
     const cos = await coRepo.list();
     desk = cos.filter((c) => c.kind === 'desk');
@@ -190,6 +193,9 @@ function makeScreenedDeal(cand, when) {
     ],
     compliance: [{ check: 'Sanctions / UBO screening', framework: 'KYC', status: 'pending' }],
     activity: [{ actor: 'Eleanor Bishop', action: 'PURSUE recorded at the Screening Gate', when: when || new Date().toISOString() }],
+    issues: [],
+    conditions: [],
+    assumptionSnapshots: [],
     hoursSaved: 0
   };
 }
@@ -1665,6 +1671,165 @@ export function recordContribution(id, lane, { kind = 'diligence', text, severit
 // Back-compat wrapper — a diligence finding is a diligence-kind contribution.
 export function recordFinding(id, lane, { text, severity = 'neutral', source = 'Diligence', by } = {}) {
   return recordContribution(id, lane, { kind: 'diligence', text, severity, source, by });
+}
+
+// ---- IC Readiness Cockpit primitives ---------------------------------------
+// Operational diligence made real: an issue log (severity + owner + resolution
+// path + due date + source citations), IC conditions (owner + satisfied state),
+// and assumption snapshots so the cockpit can show what changed since the last IC
+// draft. Every mutation persists to Cosmos and writes an audit event.
+
+const ISSUE_STATUSES = new Set(['open', 'mitigating', 'resolved']);
+const CONDITION_STATUSES = new Set(['proposed', 'accepted', 'satisfied']);
+let issueSeq = 1;
+
+export function recordIssue(id, { lane, title, severity = 'caution', owner, resolutionPath, sources, dueDate, by, persona } = {}) {
+  const deal = getDealRaw(id);
+  if (!deal) return { error: 'not-found' };
+  const t = String(title || '').trim().slice(0, 200);
+  if (!t) return { error: 'title-required' };
+  const sev = VALID_SEVERITY.has(severity) ? severity : 'caution';
+  const at = new Date().toISOString();
+  deal.issues = deal.issues || [];
+  const issue = {
+    id: `issue-${deal.id}-${issueSeq++}`,
+    lane: lane || null,
+    title: t,
+    severity: sev,
+    owner: owner || null,
+    status: 'open',
+    resolutionPath: resolutionPath ? String(resolutionPath).slice(0, 300) : null,
+    dueDate: dueDate || null,
+    sources: Array.isArray(sources) ? sources.slice(0, 8) : [],
+    by: by || null,
+    persona: persona || null,
+    at,
+    resolvedAt: null
+  };
+  deal.issues.unshift(issue);
+  deal.activity.unshift({ actor: by || 'Diligence', action: `Logged a ${sev} issue${lane ? ` in the ${lane} lane` : ''}: ${t}`, when: at });
+  persistDeal(deal);
+  logEvent(deal.id, 'issue-recorded', { lane: lane || null, severity: sev, owner: owner || null, persona: persona || null });
+  return { ok: true, issue, deal: getDeal(id) };
+}
+
+export function resolveIssue(id, issueId, { status = 'resolved', resolutionPath, by, persona } = {}) {
+  const deal = getDealRaw(id);
+  if (!deal) return { error: 'not-found' };
+  const issue = (deal.issues || []).find((i) => i.id === issueId);
+  if (!issue) return { error: 'issue-not-found' };
+  const st = ISSUE_STATUSES.has(status) ? status : 'resolved';
+  issue.status = st;
+  if (resolutionPath) issue.resolutionPath = String(resolutionPath).slice(0, 300);
+  const at = new Date().toISOString();
+  issue.resolvedAt = st === 'resolved' ? at : null;
+  deal.activity.unshift({ actor: by || 'Diligence', action: `Issue "${issue.title}" → ${st}`, when: at });
+  persistDeal(deal);
+  logEvent(deal.id, 'issue-updated', { issueId, status: st, by: by || null, persona: persona || null });
+  return { ok: true, issue, deal: getDeal(id) };
+}
+
+export function setCondition(id, { text, owner, status = 'proposed', by, persona } = {}) {
+  const deal = getDealRaw(id);
+  if (!deal) return { error: 'not-found' };
+  const t = String(text || '').trim().slice(0, 300);
+  if (!t) return { error: 'text-required' };
+  const st = CONDITION_STATUSES.has(status) ? status : 'proposed';
+  const at = new Date().toISOString();
+  deal.conditions = deal.conditions || [];
+  const cond = { id: `cond-${deal.id}-${deal.conditions.length + 1}`, text: t, owner: owner || null, status: st, by: by || null, persona: persona || null, at };
+  deal.conditions.unshift(cond);
+  deal.activity.unshift({ actor: by || 'Partner', action: `Set IC condition: ${t}`, when: at });
+  persistDeal(deal);
+  logEvent(deal.id, 'condition-set', { status: st, owner: owner || null, persona: persona || null });
+  return { ok: true, condition: cond, deal: getDeal(id) };
+}
+
+export function updateCondition(id, condId, { status, text, owner, by } = {}) {
+  const deal = getDealRaw(id);
+  if (!deal) return { error: 'not-found' };
+  const cond = (deal.conditions || []).find((c) => c.id === condId);
+  if (!cond) return { error: 'condition-not-found' };
+  if (status && CONDITION_STATUSES.has(status)) cond.status = status;
+  if (text) cond.text = String(text).slice(0, 300);
+  if (owner !== undefined) cond.owner = owner || null;
+  const at = new Date().toISOString();
+  deal.activity.unshift({ actor: by || 'Partner', action: `Condition "${cond.text}" → ${cond.status}`, when: at });
+  persistDeal(deal);
+  logEvent(deal.id, 'condition-updated', { condId, status: cond.status });
+  return { ok: true, condition: cond, deal: getDeal(id) };
+}
+
+export function snapshotAssumptions(id, { label, by } = {}) {
+  const deal = getDealRaw(id);
+  if (!deal) return { error: 'not-found' };
+  const figures = currentAssumptions(deal);
+  const at = new Date().toISOString();
+  deal.assumptionSnapshots = deal.assumptionSnapshots || [];
+  const snap = { label: label || `IC draft — ${new Date().toLocaleDateString()}`, at, by: by || null, figures };
+  deal.assumptionSnapshots.push(snap);
+  deal.activity.unshift({ actor: by || 'Analyst', action: `Snapshotted assumptions: "${snap.label}"`, when: at });
+  persistDeal(deal);
+  logEvent(deal.id, 'assumptions-snapshotted', { label: snap.label });
+  return { ok: true, snapshot: snap, deal: getDeal(id) };
+}
+
+// The decision-grade IC Readiness board, grounded in real Fabric/OneLake market
+// intelligence (comparable deals, IC voting precedents, benchmark findings).
+export function getICReadiness(id) {
+  const deal = getDealRaw(id);
+  if (!deal) return null;
+  const board = computeICReadiness(deal);
+  const comps = compsForDeal(deal);
+  const precedents = getICPrecedents();
+  const benchmarks = getBenchmarkFindings();
+  board.marketIntel = {
+    source: fabricInfo(),
+    comparableDeals: comps,
+    icPrecedents: precedents,
+    benchmarkFindings: benchmarks
+  };
+  // Real market evidence counts as supporting sources for the recommendation.
+  if (comps.length) {
+    board.supportingSources.unshift(
+      ...comps.slice(0, 3).map((c) => ({
+        kind: 'fabric-comp',
+        label: `${c.company} — ${c.dealType} (${c.status})`,
+        ref: c.impliedValuation ? `$${c.impliedValuation}M implied valuation` : null
+      }))
+    );
+  }
+  if (precedents.length) {
+    board.supportingSources.push(
+      ...precedents.slice(0, 2).map((p) => ({
+        kind: 'fabric-ic',
+        label: `IC precedent — ${p.deal}: ${p.decision}`,
+        ref: `${p.votesFor}–${p.votesAgainst} vote`
+      }))
+    );
+  }
+  board.counts.sources = board.supportingSources.length;
+  return board;
+}
+
+// ---- Fabric / OneLake market intelligence (read-through to the snapshot) ----
+export function marketIntel() {
+  return getMarketIntel();
+}
+export function fabricStatus() {
+  return fabricInfo();
+}
+export function comparableDeals(opts) {
+  return getComparableDeals(opts);
+}
+export function benchmarkFindings(workstream) {
+  return getBenchmarkFindings(workstream);
+}
+export function icPrecedents() {
+  return getICPrecedents();
+}
+export function companyFinancials(ticker) {
+  return getCompanyFinancials(ticker);
 }
 
 export function advanceDeal(id) {

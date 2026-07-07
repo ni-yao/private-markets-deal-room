@@ -17,7 +17,8 @@ import { DefaultAzureCredential, getBearerTokenProvider } from '@azure/identity'
 import { listDeals, getDealRaw } from './store.js';
 import {
   dispatchTool, dispatchAction, dealAnalystView, dealSummary,
-  listPipeline, candidateView, candidateArtifactView, dealArtifactView, nextActionsFor
+  listPipeline, candidateView, candidateArtifactView, dealArtifactView, nextActionsFor,
+  icReadinessView, marketIntelView
 } from './dealTools.js';
 import { PERSONAS, PERSONA_LABEL } from './personaPolicy.js';
 
@@ -40,7 +41,7 @@ const PERSONA_AGENT = {
 };
 
 // Read tools go to dispatchTool; everything else is an action -> dispatchAction.
-const READ_TOOLS = new Set(['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_next_actions']);
+const READ_TOOLS = new Set(['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_next_actions']);
 
 export function personaAgentsConfigured() {
   return !!RESPONSES_URL;
@@ -169,6 +170,10 @@ async function readDispatch(name, args, { persona, focusId, focusCompany }) {
       return await candidateArtifactView(args?.candidate_id);
     case 'get_deal_artifact':
       return await dealArtifactView(args?.deal_id, args?.step);
+    case 'get_ic_readiness':
+      return icReadinessView(args?.deal_id || focusId);
+    case 'get_market_intel':
+      return marketIntelView({ sector: args?.sector });
     case 'get_next_actions':
       return nextActionsFor(persona, { deal_id: args?.deal_id, candidate_id: args?.candidate_id });
     default:

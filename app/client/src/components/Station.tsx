@@ -6,6 +6,7 @@ import { ScreeningGate } from './ScreeningGate';
 import { CohortDesk } from './CohortDesk';
 import { Workspace } from './Workspace';
 import { DealArtifactPanel } from './DealArtifacts';
+import { ICCockpit } from './ICCockpit';
 import { CxoSummary, NewsSummary } from './SourcingSummaries';
 
 interface Props {
@@ -26,6 +27,7 @@ interface Props {
   onAssignSwimlane: (lane: string, md: string) => void;
   onContribute: (body: { lane: string; kind: string; text: string; severity?: string; source?: string; md?: string }) => void;
   onCycleChecklist: (itemId: string) => void;
+  onDealUpdate?: (d: Deal) => void;
   onLaunchDeal: () => void;
   launching: boolean;
   launchingId: string | null;
@@ -40,7 +42,7 @@ const LANE_META: Record<string, { label: string; color: string }> = {
   operations: { label: 'Operations', color: '#ea580c' }
 };
 
-export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onContribute, onCycleChecklist, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
+export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onContribute, onCycleChecklist, onDealUpdate, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
   const run = deal?.stepRuns[step.key];
   const produced = relation === 'done' || !!run;
   const idx = flow.steps.findIndex((s) => s.key === step.key);
@@ -224,6 +226,22 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
           </div>
           <div className="pb" style={{ padding: 0 }}>
             <DealArtifactPanel dealId={deal.id} step={step.key} />
+          </div>
+        </div>
+      )}
+
+      {/* IC Readiness Cockpit — decision-grade board (D2 diligence → D4 approval) */}
+      {deal && ['D2', 'D3', 'D4'].includes(step.key) && (
+        <div className="panel" style={{ marginBottom: 18 }}>
+          <div className="ph">
+            <span className="ic">◎</span>
+            <h3>IC Readiness cockpit</h3>
+            <span className="sub" style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 11.5, textTransform: 'none', letterSpacing: 0 }}>
+              decision-grade · grounded in Fabric market intelligence
+            </span>
+          </div>
+          <div className="pb" style={{ padding: 0 }}>
+            <ICCockpit dealId={deal.id} mdOptions={mdOptions} onDealUpdate={onDealUpdate} />
           </div>
         </div>
       )}

@@ -1,0 +1,28 @@
+IC Readiness cockpit + real Fabric/OneLake market intelligence (v0.31.0)
+
+Turn "readiness" into a decision-grade IC board grounded in the fund's real
+market data in Microsoft Fabric (workspace "Deal Room", lakehouse
+deal_room_starter, capacity dealroomfabric).
+
+- lib/fabric.js + scripts/extract_fabric_cache.py: materialise the real OneLake
+  data (comparable/historical deals, IC voting precedents, benchmark diligence
+  findings across Commercial/Financial/Legal/Operational/Tax, SEC financials)
+  into the app datastore; honest mode in /api/config.fabric; live-SQL upgrade
+  seam when the app identity is granted Viewer on the workspace.
+- lib/icReadiness.js: computeICReadiness = the 7 IC questions + READY/
+  CONDITIONAL/NOT-READY verdict from real gating facts.
+- store.js: issue log (severity/owner/resolution/due date), IC conditions
+  (proposed->accepted->satisfied), assumption snapshots; getICReadiness grounds
+  the board in Fabric comps + precedents; all persist to Cosmos + audit events.
+- REST: GET ic-readiness, market-intel*; issue/condition/snapshot endpoints.
+- MCP 19->25 tools: get_ic_readiness + get_market_intel (reads), record_issue/
+  resolve_issue/set_condition/snapshot_assumptions (persona-governed writes);
+  5 Foundry persona agents re-provisioned; personaPolicy extended.
+- UI: ICCockpit.tsx (7-question board + issue log + conditions + Fabric market-
+  intelligence panel) on D2-D4; types + api + theme.
+- Fix pre-existing Workspace.tsx closure narrowing so tsc is clean.
+
+Deployed image v52 / rev --0000048; verified live (datastore=cosmos,
+fabric=materialized, MCP=25 tools, cockpit renders real Fabric comps/precedents).
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.31.0',
+    date: '2026-07-07',
+    image: 'dealroom-app:v52',
+    revision: 'ca-dealroom-orch-dev-swc--0000048',
+    title: 'IC Readiness cockpit + real Fabric / OneLake market intelligence',
+    tag: 'feature',
+    highlights: [
+      'New IC Readiness cockpit on every diligence step (D2–D4) turns “readiness” from a completion percentage into a decision-grade board that answers the seven questions an Investment Committee actually asks: are the required artifacts complete, which workstreams are blocking, which assumptions changed since the last IC draft, which risks are unresolved, what supports the recommendation, what is the exact IC ask, and which conditions need approval — with an overall READY / CONDITIONAL / NOT-READY verdict derived from real gating facts, not an averaged progress bar.',
+      'Grounded in the fund’s real market data in Microsoft Fabric / OneLake (workspace “Deal Room”, lakehouse deal_room_starter). The cockpit and a new Market-intelligence panel surface real comparable & historical deals (deal type, implied valuation, outcome), IC voting precedents (decision, votes, conditions), benchmark diligence findings across all five workstreams (Commercial / Financial / Legal / Operational / Tax with severity mix), and real SEC filing financials — so valuation, diligence scoping and IC conditions are grounded in real data, and Fabric comparables count as supporting sources for the recommendation.',
+      'Operational diligence made real: an issue log with severity, owner, resolution path and due date (add / mitigate / resolve inline), IC conditions with an owner and a proposed → accepted → satisfied lifecycle, and assumption snapshots so the cockpit shows exactly what changed since the last IC draft. Every mutation persists to the governed deal record and writes an audit event.',
+      'Exposed to the agents too: the Deal MCP server grew from 19 to 25 tools — get_ic_readiness and get_market_intel (reads) plus record_issue, resolve_issue, set_condition and snapshot_assumptions (persona-governed writes) — and the five Foundry persona agents were re-provisioned so they can read the cockpit, ground answers in Fabric comparables/precedents, and log issues on their own lane (sector MDs) or set IC conditions (partner) under the same server-side authorization.'
+    ]
+  },
+  {
     version: 'v0.30.0',
     date: '2026-07-06',
     image: 'dealroom-app:v43',

@@ -27,13 +27,14 @@ import { z } from 'zod';
 import {
   dispatchTool, TOOL_DESCRIPTIONS, DEAL_SECTIONS,
   listPipeline, candidateView, candidateArtifactView, dealArtifactView,
+  icReadinessView, marketIntelView,
   dispatchAction, nextActionsFor
 } from '../dealTools.js';
 import { resolvePersona, PERSONAS } from '../personaPolicy.js';
 
-const SERVER_INFO = { name: 'deal-room-mcp', version: '2.0.0' };
-const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_next_actions'];
-const ACTION_TOOLS = ['send_to_screening', 'screen_candidate', 'triage_candidate', 'gate_candidate', 'launch_deal', 'advance_deal', 'approve_ic', 'run_step', 'assign_lane', 'record_finding', 'record_contribution'];
+const SERVER_INFO = { name: 'deal-room-mcp', version: '2.1.0' };
+const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_next_actions'];
+const ACTION_TOOLS = ['send_to_screening', 'screen_candidate', 'triage_candidate', 'gate_candidate', 'launch_deal', 'advance_deal', 'approve_ic', 'run_step', 'assign_lane', 'record_finding', 'record_contribution', 'record_issue', 'resolve_issue', 'set_condition', 'snapshot_assumptions'];
 const TOOL_NAMES = [...READ_TOOLS, ...ACTION_TOOLS];
 
 // Optional extra scope required for ACTION (write) tools, beyond the base /mcp auth.
@@ -103,6 +104,14 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
     },
     async ({ deal_id, step }) => toContent(await dealArtifactView(deal_id, step)));
 
+  server.registerTool('get_ic_readiness',
+    { title: 'Get IC readiness', description: TOOL_DESCRIPTIONS.get_ic_readiness, inputSchema: { deal_id: z.string().describe('The deal id.') } },
+    async ({ deal_id }) => toContent(icReadinessView(deal_id)));
+
+  server.registerTool('get_market_intel',
+    { title: 'Get market intelligence', description: TOOL_DESCRIPTIONS.get_market_intel, inputSchema: { sector: z.string().optional().describe('Optional sector to bias the comparable deals.') } },
+    async ({ sector }) => toContent(marketIntelView({ sector })));
+
   server.registerTool('get_next_actions',
     {
       title: 'Get next actions', description: TOOL_DESCRIPTIONS.get_next_actions,
@@ -148,6 +157,27 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
       severity: z.enum(['positive', 'neutral', 'caution', 'negative', 'risk']).optional().describe('For kind=diligence only.'),
       source: z.string().optional() },
     (a) => ({ deal_id: a.deal_id, lane: a.lane, kind: a.kind, text: a.text, severity: a.severity, source: a.source }));
+  action('record_issue',
+    { deal_id: z.string(),
+      lane: z.enum(['commercial', 'techai', 'operations']).optional().describe('Lane; defaults to your own lane for sector MDs.'),
+      title: z.string().describe('The issue title.'),
+      severity: z.enum(['positive', 'neutral', 'caution', 'negative', 'risk']).optional().describe('Issue severity.'),
+      owner: z.string().optional().describe('Who owns resolving it.'),
+      resolution_path: z.string().optional().describe('How it gets resolved.'),
+      due_date: z.string().optional().describe('Target resolution date (ISO).') },
+    (a) => ({ deal_id: a.deal_id, lane: a.lane, title: a.title, severity: a.severity, owner: a.owner, resolution_path: a.resolution_path, due_date: a.due_date }));
+  action('resolve_issue',
+    { deal_id: z.string(), issue_id: z.string().describe('The issue id (from get_ic_readiness unresolvedRisks).'),
+      status: z.enum(['open', 'mitigating', 'resolved']).optional().describe('New status.'),
+      resolution_path: z.string().optional() },
+    (a) => ({ deal_id: a.deal_id, issue_id: a.issue_id, status: a.status, resolution_path: a.resolution_path }));
+  action('set_condition',
+    { deal_id: z.string(), text: z.string().describe('The IC condition.'),
+      owner: z.string().optional(), status: z.enum(['proposed', 'accepted', 'satisfied']).optional() },
+    (a) => ({ deal_id: a.deal_id, text: a.text, owner: a.owner, status: a.status }));
+  action('snapshot_assumptions',
+    { deal_id: z.string(), label: z.string().optional().describe('A label for the snapshot, e.g. "IC pre-read v1".') },
+    (a) => ({ deal_id: a.deal_id, label: a.label }));
 
   return server;
 }

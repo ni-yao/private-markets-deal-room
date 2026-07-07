@@ -30,7 +30,13 @@ import type {
   ChatMessage,
   CandidateChatLog,
   Workspace,
-  MdOption
+  MdOption,
+  ICReadiness,
+  MarketIntel,
+  DealIssue,
+  IssueSeverity,
+  IssueStatus,
+  ConditionStatus
 } from './types';
 
 async function get<T>(url: string): Promise<T> {
@@ -115,6 +121,20 @@ export const api = {
   deal: (id: string) => get<Deal>(`/api/deals/${id}`),
   dealArtifact: (id: string, step: string, force = false) =>
     post<DealArtifact>(`/api/deals/${id}/artifact/${step}`, { force }),
+  icReadiness: (id: string) => get<ICReadiness>(`/api/deals/${id}/ic-readiness`),
+  recordIssue: (
+    id: string,
+    body: { lane?: string; title: string; severity?: IssueSeverity; owner?: string; resolutionPath?: string; dueDate?: string; sources?: { kind?: string; label: string; ref?: string }[]; md?: string }
+  ) => post<Deal>(`/api/deals/${id}/issues`, body),
+  resolveIssue: (id: string, issueId: string, body: { status?: IssueStatus; resolutionPath?: string; md?: string }) =>
+    patchReq<Deal>(`/api/deals/${id}/issues/${issueId}`, body),
+  setCondition: (id: string, body: { text: string; owner?: string; status?: ConditionStatus; md?: string }) =>
+    post<Deal>(`/api/deals/${id}/conditions`, body),
+  updateCondition: (id: string, condId: string, body: { status?: ConditionStatus; text?: string; owner?: string; md?: string }) =>
+    patchReq<Deal>(`/api/deals/${id}/conditions/${condId}`, body),
+  snapshotAssumptions: (id: string, body: { label?: string; md?: string }) =>
+    post<Deal>(`/api/deals/${id}/assumption-snapshot`, body),
+  marketIntel: () => get<MarketIntel>('/api/market-intel'),
   runStep: (id: string, stepKey: string) =>
     post<StepRunResult>(`/api/deals/${id}/steps/${stepKey}/run`, {}),
   advance: (id: string) => post<Deal>(`/api/deals/${id}/advance`, {}),
