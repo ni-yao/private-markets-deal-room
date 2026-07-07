@@ -27,13 +27,13 @@ import { z } from 'zod';
 import {
   dispatchTool, TOOL_DESCRIPTIONS, DEAL_SECTIONS,
   listPipeline, candidateView, candidateArtifactView, dealArtifactView,
-  icReadinessView, marketIntelView,
+  icReadinessView, marketIntelView, citationAuditView, canonicalCompaniesView, canonicalCompanyView,
   dispatchAction, nextActionsFor
 } from '../dealTools.js';
 import { resolvePersona, PERSONAS } from '../personaPolicy.js';
 
-const SERVER_INFO = { name: 'deal-room-mcp', version: '2.1.0' };
-const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_next_actions'];
+const SERVER_INFO = { name: 'deal-room-mcp', version: '2.3.0' };
+const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'get_next_actions'];
 const ACTION_TOOLS = ['send_to_screening', 'screen_candidate', 'triage_candidate', 'gate_candidate', 'launch_deal', 'advance_deal', 'approve_ic', 'run_step', 'assign_lane', 'record_finding', 'record_contribution', 'record_issue', 'resolve_issue', 'set_condition', 'snapshot_assumptions'];
 const TOOL_NAMES = [...READ_TOOLS, ...ACTION_TOOLS];
 
@@ -112,6 +112,18 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
     { title: 'Get market intelligence', description: TOOL_DESCRIPTIONS.get_market_intel, inputSchema: { sector: z.string().optional().describe('Optional sector to bias the comparable deals.') } },
     async ({ sector }) => toContent(marketIntelView({ sector })));
 
+  server.registerTool('get_citation_audit',
+    { title: 'Get citation audit', description: TOOL_DESCRIPTIONS.get_citation_audit, inputSchema: { deal_id: z.string().describe('The deal id.') } },
+    async ({ deal_id }) => toContent(citationAuditView(deal_id)));
+
+  server.registerTool('get_companies',
+    { title: 'Get canonical companies', description: TOOL_DESCRIPTIONS.get_companies, inputSchema: { in_funnel: z.boolean().optional().describe('Filter to companies that are (true) / are not (false) in the screening funnel.') } },
+    async ({ in_funnel }) => toContent(canonicalCompaniesView({ inFunnel: in_funnel })));
+
+  server.registerTool('get_company',
+    { title: 'Get canonical company', description: TOOL_DESCRIPTIONS.get_company, inputSchema: { id: z.string().describe('The canonical company id (co-…) or a feed id (desk/candidate/signal).') } },
+    async ({ id }) => toContent(canonicalCompanyView(id)));
+
   server.registerTool('get_next_actions',
     {
       title: 'Get next actions', description: TOOL_DESCRIPTIONS.get_next_actions,
@@ -136,22 +148,23 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
 
   const dispositionArg = z.enum(['advance', 'pass', 'park']).describe('advance | pass | park.');
   const reasonArg = z.string().optional().describe('Reason code / note for a pass or park.');
+  const laneEnum = z.enum(['commercial', 'financial', 'legal', 'tax', 'techai', 'operations', 'esg']);
 
   action('send_to_screening', { target_id: z.string().describe('The sourced target / desk id to send to screening.') }, (a) => ({ target_id: a.target_id, desk_id: a.target_id }));
   action('screen_candidate', { candidate_id: z.string(), action: dispositionArg, reason: reasonArg }, (a) => ({ candidate_id: a.candidate_id, action: a.action, reason: a.reason }));
   action('triage_candidate', { candidate_id: z.string(), action: dispositionArg, reason: reasonArg }, (a) => ({ candidate_id: a.candidate_id, action: a.action, reason: a.reason }));
   action('gate_candidate', { candidate_id: z.string(), action: dispositionArg, reason: reasonArg }, (a) => ({ candidate_id: a.candidate_id, action: a.action, reason: a.reason }));
   action('launch_deal', { deal_id: z.string() }, (a) => ({ deal_id: a.deal_id }));
-  action('advance_deal', { deal_id: z.string() }, (a) => ({ deal_id: a.deal_id }));
-  action('approve_ic', { deal_id: z.string() }, (a) => ({ deal_id: a.deal_id }));
+  action('advance_deal', { deal_id: z.string(), override_reason: z.string().optional().describe('PARTNER ONLY: reason to override an IC-readiness gate (advancing past a NOT-READY verdict into IC).') }, (a) => ({ deal_id: a.deal_id, override_reason: a.override_reason }));
+  action('approve_ic', { deal_id: z.string(), override_reason: z.string().optional().describe('Reason to approve at IC when the readiness verdict is NOT-READY (recorded as a partner override audit event).') }, (a) => ({ deal_id: a.deal_id, override_reason: a.override_reason }));
   action('run_step', { deal_id: z.string(), step: z.string().describe('The step key, e.g. D2.') }, (a) => ({ deal_id: a.deal_id, step: a.step }));
-  action('assign_lane', { deal_id: z.string(), lane: z.enum(['commercial', 'techai', 'operations']), md: z.string().describe('The MD id, e.g. supply-md.') }, (a) => ({ deal_id: a.deal_id, lane: a.lane, md: a.md }));
+  action('assign_lane', { deal_id: z.string(), lane: laneEnum, md: z.string().describe('The MD / lead id, e.g. supply-md, finance-md.') }, (a) => ({ deal_id: a.deal_id, lane: a.lane, md: a.md }));
   action('record_finding',
-    { deal_id: z.string(), lane: z.enum(['commercial', 'techai', 'operations']).optional().describe('Lane; defaults to your own lane for sector MDs.'), text: z.string().describe('The finding.'), severity: z.enum(['positive', 'neutral', 'caution', 'negative', 'risk']).optional(), source: z.string().optional() },
+    { deal_id: z.string(), lane: laneEnum.optional().describe('Lane; defaults to your own lane for sector MDs.'), text: z.string().describe('The finding.'), severity: z.enum(['positive', 'neutral', 'caution', 'negative', 'risk']).optional(), source: z.string().optional() },
     (a) => ({ deal_id: a.deal_id, lane: a.lane, text: a.text, severity: a.severity, source: a.source }));
   action('record_contribution',
     { deal_id: z.string(),
-      lane: z.enum(['commercial', 'techai', 'operations']).optional().describe('Lane; defaults to your own lane for sector MDs.'),
+      lane: laneEnum.optional().describe('Lane; defaults to your own lane for sector MDs.'),
       kind: z.enum(['guidance', 'value_add', 'diligence']).describe('guidance | value_add | diligence.'),
       text: z.string().describe('The contribution text.'),
       severity: z.enum(['positive', 'neutral', 'caution', 'negative', 'risk']).optional().describe('For kind=diligence only.'),
@@ -159,7 +172,7 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
     (a) => ({ deal_id: a.deal_id, lane: a.lane, kind: a.kind, text: a.text, severity: a.severity, source: a.source }));
   action('record_issue',
     { deal_id: z.string(),
-      lane: z.enum(['commercial', 'techai', 'operations']).optional().describe('Lane; defaults to your own lane for sector MDs.'),
+      lane: laneEnum.optional().describe('Lane; defaults to your own lane for sector MDs.'),
       title: z.string().describe('The issue title.'),
       severity: z.enum(['positive', 'neutral', 'caution', 'negative', 'risk']).optional().describe('Issue severity.'),
       owner: z.string().optional().describe('Who owns resolving it.'),

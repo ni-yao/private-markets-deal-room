@@ -521,13 +521,13 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        // Pinned to a single replica: the app's store is an in-memory source of
-        // truth persisted to Cosmos, so it must stay single-writer. Multiple
-        // replicas (with the UI AND the persona agents both writing) would let the
-        // in-memory copies diverge. Scale-out requires making writes Cosmos-
-        // authoritative (optimistic concurrency) first — see agent enablement plan.
+        // Cosmos is the authoritative datastore: deal writes use optimistic
+        // concurrency (_etag read-modify-write in lib/store.mutateDeal) so a stale
+        // replica can never clobber a newer write, and every replica re-reads from
+        // Cosmos on a short interval (lib/store background sync) so reads converge.
+        // That makes horizontal scale-out safe, so we run multiple replicas.
         minReplicas: 1
-        maxReplicas: 1
+        maxReplicas: 3
       }
     }
   }

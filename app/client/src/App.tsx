@@ -27,6 +27,9 @@ export default function App() {
   const [pipelineStage, setPipelineStage] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [gate, setGate] = useState(false);
+  const [icBlock, setIcBlock] = useState<import('./types').ICGateBlock | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overriding, setOverriding] = useState(false);
   const [signalsOpen, setSignalsOpen] = useState(false);
   const [newsOpen, setNewsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
@@ -149,15 +152,36 @@ export default function App() {
     if (!deal || !flow) return;
     const isGate = viewStep === flow.gate.afterStep;
     if (isGate) setGate(true);
-    const updated = await api.advance(deal.id);
+    const res = await api.advance(deal.id);
+    if (!res.ok) {
+      setGate(false);
+      setIcBlock(res.blocked); // IC-readiness gate blocked — open the override modal
+      return;
+    }
     await api.deals().then(setDeals);
     const finish = () => {
-      setDeal(updated);
-      setViewStep(updated.currentStep);
+      setDeal(res.deal);
+      setViewStep(res.deal.currentStep);
       setGate(false);
     };
     if (isGate) setTimeout(finish, 1500);
     else finish();
+  }
+
+  async function submitOverride() {
+    if (!deal || !icBlock || !overrideReason.trim()) return;
+    setOverriding(true);
+    try {
+      const res = await api.advance(deal.id, overrideReason.trim());
+      if (!res.ok) return; // still blocked (shouldn't happen for a partner override)
+      await api.deals().then(setDeals);
+      setDeal(res.deal);
+      setViewStep(res.deal.currentStep);
+      setIcBlock(null);
+      setOverrideReason('');
+    } finally {
+      setOverriding(false);
+    }
   }
 
   async function back() {
@@ -256,6 +280,37 @@ export default function App() {
             <h2>{flow.gate.label}</h2>
             <p>{flow.gate.detail}</p>
             <div className="spin2" />
+          </div>
+        </div>
+      )}
+
+      {icBlock && (
+        <div className="gate-overlay" onClick={() => !overriding && setIcBlock(null)}>
+          <div className="ic-override" onClick={(e) => e.stopPropagation()}>
+            <div className="ico-head">
+              <span className="ico-badge">IC GATE</span>
+              <h2>{icBlock.gate === 'ic-approval' ? 'IC approval blocked' : 'Cannot enter IC — not ready'}</h2>
+            </div>
+            <p className="ico-headline">{icBlock.verdict?.headline}</p>
+            {icBlock.verdict?.gating?.length > 0 && (
+              <ul className="ico-gating">
+                {icBlock.verdict.gating.map((g, i) => <li key={i}>{g}</li>)}
+              </ul>
+            )}
+            <p className="ico-note">Only the <b>Partner / Deal Sponsor</b> may override this gate, and the reason is recorded as an audit event on the deal.</p>
+            <textarea
+              className="ico-reason"
+              placeholder="Partner override reason (required) — e.g. Board pre-cleared; QoE lands before committee"
+              value={overrideReason}
+              onChange={(e) => setOverrideReason(e.target.value)}
+              rows={3}
+            />
+            <div className="ico-actions">
+              <button className="btn" onClick={() => { setIcBlock(null); setOverrideReason(''); }} disabled={overriding}>Cancel</button>
+              <button className="btn danger" onClick={submitOverride} disabled={overriding || !overrideReason.trim()}>
+                {overriding ? 'Overriding…' : 'Partner override & proceed'}
+              </button>
+            </div>
           </div>
         </div>
       )}

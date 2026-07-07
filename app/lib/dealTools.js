@@ -13,7 +13,8 @@ import {
   getPipeline, getCandidatePublic, getCandidateArtifact, getDealArtifact,
   sendToScreening, screenCandidate, triageCandidate, gateCandidate,
   launchDeal, advanceDeal, runStep, assignSwimlane, recordFinding, recordContribution,
-  getICReadiness, marketIntel, recordIssue, resolveIssue, setCondition, snapshotAssumptions
+  getICReadiness, marketIntel, recordIssue, resolveIssue, setCondition, snapshotAssumptions,
+  getCitationAudit, canonicalCompanies, canonicalCompany
 } from './store.js';
 import { can, nextActions, PERSONA_LANE } from './personaPolicy.js';
 
@@ -247,6 +248,56 @@ export function icReadinessView(dealId) {
   };
 }
 
+// Source-citation audit for a deal (point 5): key figures + memo numeric claims
+// mapped to sources, with the unsourced ones flagged. Bounded for tool output.
+export function citationAuditView(dealId) {
+  const a = getCitationAudit(dealId);
+  if (!a) return { error: 'deal-not-found', deal_id: dealId };
+  return {
+    deal_id: a.dealId,
+    company: a.company,
+    score: a.score,
+    clean: a.clean,
+    summary: a.summary,
+    unsourcedFigures: a.unsourcedFigures.map((f) => `${f.label}: ${f.value}`),
+    unsourcedClaims: a.unsourcedClaims.slice(0, 10).map((c) => `${c.figure} (in "${c.section}")`),
+    icAskBaseSourced: a.icAsk.baseSourced,
+    missingBase: a.icAsk.missingBase
+  };
+}
+
+// Canonical Company model (point 3): the unified, entity-resolved governed record
+// over the three sourcing feeds. list = every governed company + how many duplicate
+// feed records were resolved into one; single = the full profile for one company.
+export function canonicalCompaniesView({ inFunnel } = {}) {
+  const r = canonicalCompanies({ inFunnel });
+  return {
+    count: r.count,
+    fromFeeds: r.fromFeeds,
+    resolvedDuplicates: r.resolvedDuplicates,
+    companies: r.companies.slice(0, 40).map((c) => ({
+      id: c.id, name: c.name, sector: c.sector, region: c.region, ownership: c.ownership,
+      revenue: c.revenue, ebitda: c.ebitda, sources: c.sources, inFunnel: c.inFunnel,
+      funnelStage: c.funnel?.stage || null, disposition: c.funnel?.disposition || null
+    }))
+  };
+}
+
+export function canonicalCompanyView(id) {
+  const c = canonicalCompany(id);
+  if (!c) return { error: 'company-not-found', id };
+  return {
+    id: c.id, name: c.name, aliases: c.aliases, domain: c.domain, ticker: c.ticker,
+    sector: c.sector, subSector: c.subSector, region: c.region, country: c.country, hq: c.hq,
+    ownership: c.ownership, keywords: c.keywords,
+    financials: { revenue: c.revenue, ebitda: c.ebitda, ebitdaMargin: c.ebitdaMargin, growth: c.growth, dealSize: c.dealSize, estimated: c.estimated },
+    provenance: { sources: c.sources, discoveredVia: c.discoveredVia, firstSeen: c.firstSeen, feedIds: c.feedIds },
+    newsCount: (c.news || []).length,
+    signals: c.signals || null,
+    funnel: c.funnel ? { stage: c.funnel.stage, disposition: c.funnel.disposition, passReason: c.funnel.passReason } : null
+  };
+}
+
 // Fabric / OneLake market intelligence — comparable & historical deals, benchmark
 // diligence findings by workstream, and IC voting precedents. Grounds valuation,
 // diligence scoping and IC conditions in the fund's real market data.
@@ -310,23 +361,23 @@ export async function dispatchAction(name, args = {}, { persona } = {}) {
         return withAudit(await launchDeal(args.deal_id), { name, persona });
       case 'advance_deal':
       case 'approve_ic':
-        return withAudit(advanceDeal(args.deal_id), { name, persona });
+        return withAudit(await advanceDeal(args.deal_id, { persona, overrideReason: args.override_reason }), { name, persona });
       case 'run_step':
         return withAudit(await runStep(args.deal_id, args.step), { name, persona });
       case 'assign_lane':
-        return withAudit(assignSwimlane(args.deal_id, args.lane, args.md), { name, persona });
+        return withAudit(await assignSwimlane(args.deal_id, args.lane, args.md), { name, persona });
       case 'record_finding':
-        return withAudit(recordFinding(args.deal_id, lane, { text: args.text, severity: args.severity, source: args.source, by }), { name, persona });
+        return withAudit(await recordFinding(args.deal_id, lane, { text: args.text, severity: args.severity, source: args.source, by }), { name, persona });
       case 'record_contribution':
-        return withAudit(recordContribution(args.deal_id, lane, { kind: args.kind, text: args.text, severity: args.severity, source: args.source, by, persona }), { name, persona });
+        return withAudit(await recordContribution(args.deal_id, lane, { kind: args.kind, text: args.text, severity: args.severity, source: args.source, by, persona }), { name, persona });
       case 'record_issue':
-        return withAudit(recordIssue(args.deal_id, { lane, title: args.title, severity: args.severity, owner: args.owner, resolutionPath: args.resolution_path, dueDate: args.due_date, by, persona }), { name, persona });
+        return withAudit(await recordIssue(args.deal_id, { lane, title: args.title, severity: args.severity, owner: args.owner, resolutionPath: args.resolution_path, dueDate: args.due_date, by, persona }), { name, persona });
       case 'resolve_issue':
-        return withAudit(resolveIssue(args.deal_id, args.issue_id, { status: args.status, resolutionPath: args.resolution_path, by, persona }), { name, persona });
+        return withAudit(await resolveIssue(args.deal_id, args.issue_id, { status: args.status, resolutionPath: args.resolution_path, by, persona }), { name, persona });
       case 'set_condition':
-        return withAudit(setCondition(args.deal_id, { text: args.text, owner: args.owner, status: args.status, by, persona }), { name, persona });
+        return withAudit(await setCondition(args.deal_id, { text: args.text, owner: args.owner, status: args.status, by, persona }), { name, persona });
       case 'snapshot_assumptions':
-        return withAudit(snapshotAssumptions(args.deal_id, { label: args.label, by }), { name, persona });
+        return withAudit(await snapshotAssumptions(args.deal_id, { label: args.label, by }), { name, persona });
       default:
         return { error: 'unknown-action', name };
     }
@@ -336,7 +387,13 @@ export async function dispatchAction(name, args = {}, { persona } = {}) {
 }
 
 function withAudit(result, { name, persona }) {
-  if (result && result.error) return { ok: false, action: name, persona, error: result.error };
+  if (result && result.error) {
+    const out = { ok: false, action: name, persona, error: result.error };
+    if (result.detail) out.detail = result.detail;
+    if (result.verdict) out.verdict = result.verdict;
+    if (result.gate) out.gate = result.gate;
+    return out;
+  }
   return { ok: true, action: name, persona, result };
 }
 
@@ -399,14 +456,27 @@ export const TOOL_DESCRIPTIONS = {
     '(Commercial / Financial / Legal / Operational / Tax, with severity mix) and IC voting precedents ' +
     '(decision, votes, conditions). Use to ground valuation, diligence scoping and IC conditions. ' +
     'Pass an optional sector to bias the comparables.',
+  get_citation_audit:
+    'Get the source-citation audit for a deal: every numeric claim in the IC materials (key figures ' +
+    'and memo sections) mapped to a source fact or cited document, with unsourced figures flagged and ' +
+    'a 0–100 citation score. Use before finalizing an IC memo to confirm every number is defensible.',
+  get_companies:
+    "List the fund's canonical Company records — the unified, entity-resolved governed model over the three " +
+    'sourcing feeds (news/filings desk, screening-funnel candidates, CxO signals). One record per real company ' +
+    '(deduped by domain → registry → name), showing sources/provenance and funnel state. Reports how many duplicate ' +
+    'feed records were resolved into one.',
+  get_company:
+    'Get ONE canonical Company record by id (or a feed id): identity & aliases, classification, financials with an ' +
+    'estimated flag, provenance (which feeds sourced it), news count, CxO signals and funnel state — the single ' +
+    'governed record for a real company across every feed.',
   // Action tools
   send_to_screening: 'Send a sourced target into the screening funnel (creates an O2 candidate). Analyst/Partner only.',
   screen_candidate: 'Record the Auto-Screen (O2) decision for a candidate: action = advance | pass | park (+ reason). Analyst/Partner only.',
   triage_candidate: 'Record the Triage (O3) decision for a candidate: action = advance | pass | park (+ reason). Analyst/Partner only.',
   gate_candidate: 'Record the Screening-Gate (O4) decision: action = advance (PURSUE, creates a deal) | pass | park. PARTNER only.',
   launch_deal: 'Launch diligence on a screened deal — provisions the workspace and moves it to D1. Analyst/Partner only.',
-  advance_deal: 'Advance a deal to the next diligence step. Analyst/Partner only.',
-  approve_ic: 'Record the IC approval and advance the deal past the IC gate (D4). PARTNER only.',
+  advance_deal: 'Advance a deal to the next diligence step. Analyst/Partner only. Entering IC approval (D3→D4) is BLOCKED when the IC-readiness verdict is NOT-READY unless the Partner passes override_reason.',
+  approve_ic: 'Record the IC approval and advance the deal past the IC gate (D4→D5). PARTNER only. BLOCKED when the IC-readiness verdict is NOT-READY unless override_reason is provided (logged as a partner-override audit event).',
   run_step: 'Run a diligence step (by step key, e.g. D2) to produce its deliverable on the record.',
   assign_lane: 'Assign a diligence lane (commercial | techai | operations) to an MD. Analyst/Partner only.',
   record_finding:

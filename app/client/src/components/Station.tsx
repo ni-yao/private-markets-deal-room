@@ -38,9 +38,14 @@ interface Props {
 
 const LANE_META: Record<string, { label: string; color: string }> = {
   commercial: { label: 'Commercial', color: '#0d9488' },
+  financial: { label: 'Financial / QoE', color: '#2563eb' },
+  legal: { label: 'Legal', color: '#9333ea' },
+  tax: { label: 'Tax', color: '#0891b2' },
   techai: { label: 'Tech / AI', color: '#7c3aed' },
-  operations: { label: 'Operations', color: '#ea580c' }
+  operations: { label: 'Operations', color: '#ea580c' },
+  esg: { label: 'ESG', color: '#16a34a' }
 };
+const LANE_FALLBACK = { label: 'Workstream', color: '#64748b' };
 
 export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onContribute, onCycleChecklist, onDealUpdate, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
   const run = deal?.stepRuns[step.key];
@@ -357,7 +362,7 @@ function DataPanel({ deal, panel }: { deal: Deal; panel: string }) {
       <div style={{ marginBottom: 18 }}>
         <div className="lanes3">
           {deal.workstreams.map((w) => {
-            const m = LANE_META[w.lane];
+            const m = LANE_META[w.lane] || LANE_FALLBACK;
             return (
               <div className="lane" key={w.lane}>
                 <div className="lh"><span className="nm" style={{ color: m.color }}>{m.label}</span><span className="ow">{w.progress}%</span></div>

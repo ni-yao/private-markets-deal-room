@@ -21,7 +21,7 @@ import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
 import { buildScorecard, buildTriageScore, buildMemoBase } from './screening.js';
 import { buildDiligencePlan, buildFindingsReport, buildFinalMemoBase, buildExecutionPack, buildCloseoutPlan } from './diligence.js';
-import { buildWorkspace, checklistStats, MD_OPTIONS } from '../data/workspace.js';
+import { buildWorkspace, checklistStats, MD_OPTIONS, WORKSTREAM_DEFAULTS, ensureWorkspaceSwimlanes, LANE_ORDER } from '../data/workspace.js';
 import { ensureDealChannel, provisionDealFolders, m365Connected } from './m365/graph.js';
 import { generateAnalystReport } from './analystReport.js';
 import {
@@ -33,9 +33,39 @@ import {
 import { initRepo, repoMode, companies as coRepo, deals as dealRepo, signals as sigRepo, recordEvent } from './repo/index.js';
 import { primeTokenCache } from './mcp/oauth.js';
 import { computeICReadiness, currentAssumptions } from './icReadiness.js';
-import { loadFabric, fabricInfo, getMarketIntel, getComparableDeals, getBenchmarkFindings, getICPrecedents, getCompanyFinancials, compsForDeal } from './fabric.js';
+import { validateCitations } from './citations.js';
+import { buildCanonicalCompanies, canonicalSummary, companyId } from './companies.js';
+import { loadFabric, fabricInfo, getMarketIntel, getComparableDeals, getBenchmarkFindings, getICPrecedents, getCompanyFinancials, compsForDeal, refreshFabric } from './fabric.js';
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
+
+// Backfill the first-class functional lanes (financial / legal / tax / ESG) onto
+// deals created before they existed: add any missing workstream and any missing
+// workspace swimlane, preserving existing progress/owners. Persists if changed so
+// the migration is durable. Idempotent.
+function ensureFirstClassLanes(d) {
+  let changed = false;
+  d.workstreams = d.workstreams || [];
+  const have = new Set(d.workstreams.map((w) => w.lane));
+  for (const def of WORKSTREAM_DEFAULTS) {
+    if (!have.has(def.lane)) {
+      d.workstreams.push({ lane: def.lane, owner: def.owner, status: 'not_started', progress: 0, findings: [] });
+      changed = true;
+    }
+  }
+  if (changed) {
+    const rank = (l) => { const i = LANE_ORDER.indexOf(l); return i < 0 ? 99 : i; };
+    d.workstreams.sort((a, b) => rank(a.lane) - rank(b.lane));
+  }
+  if (d.workspace && ensureWorkspaceSwimlanes(d.workspace, d)) {
+    for (const sl of d.workspace.swimlanes) {
+      const ws = d.workstreams.find((w) => w.lane === sl.lane);
+      if (ws && ws.owner) sl.md = ws.owner;
+    }
+    changed = true;
+  }
+  return changed;
+}
 
 // Attach a provisioned workspace to every already-launched deal so the D1 view
 // is populated for all of them (screened deals get theirs on launch).
@@ -53,7 +83,9 @@ function attachWorkspaces(list) {
         if (ws && ws.owner) sl.md = ws.owner;
       }
     }
+    const migrated = ensureFirstClassLanes(d);
     normalizeTeamsLinks(d);
+    if (migrated) persistDeal(d);
   }
   return list;
 }
@@ -103,20 +135,81 @@ let sources = clone(SOURCES);         // news-desk source connectors (config)
 // unchanged; the in-memory arrays are the session source of truth and Cosmos is
 // the durable mirror rehydrated at boot. Desk companies and candidates share the
 // `companies` container, tagged by `kind` for rehydration.
-function persistDesk(c) {
-  coRepo.upsert({ ...c, kind: 'desk' }).catch(() => {});
+//
+// Writes are DURABLE, not silent: a transient Cosmos error is retried with backoff
+// and logged if it ultimately fails (never swallowed). Deal writes additionally go
+// through mutateDeal (read-modify-write with _etag optimistic concurrency) so that,
+// with multiple replicas all writing (the UI and the five persona agents), a stale
+// in-memory copy can never clobber a newer one — Cosmos is the authoritative writer.
+function durableWrite(label, fn) {
+  let attempt = 0;
+  const run = () => fn().catch((err) => {
+    attempt++;
+    if (attempt <= 4) { setTimeout(run, 200 * attempt); return; }
+    console.error(`[store] durable write failed (${label}) after ${attempt} attempts: ${String(err?.message || err)}`);
+  });
+  run();
 }
-function persistCand(c) {
-  coRepo.upsert({ ...c, kind: 'candidate' }).catch(() => {});
+function persistDesk(c) { durableWrite(`desk ${c.id}`, () => coRepo.upsert({ ...c, kind: 'desk' })); }
+function persistCand(c) { durableWrite(`cand ${c.id}`, () => coRepo.upsert({ ...c, kind: 'candidate' })); }
+function persistSignal(c) { durableWrite(`signal ${c.id}`, () => sigRepo.upsert({ ...c, kind: 'signal' })); }
+// Deal transition functions with external side effects (launchDeal / runStep) use
+// this durable in-place persist; all pure deal mutations go through mutateDeal.
+function persistDeal(d) { durableWrite(`deal ${d.id}`, () => dealRepo.upsert(d)); }
+function logEvent(companyId, type, detail) { durableWrite(`event ${type}`, () => recordEvent({ companyId, type, detail })); }
+
+function upsertDealCache(doc) {
+  const i = deals.findIndex((d) => d.id === doc.id);
+  if (i >= 0) deals[i] = doc; else deals.push(doc);
+  return doc;
 }
-function persistDeal(d) {
-  dealRepo.upsert(d).catch(() => {});
+
+// Cosmos-authoritative read-modify-write for a single deal. Reads the latest deal
+// (authoritative), lets `reducer(deal)` mutate it in place — returning result meta,
+// or `{ error }` to abort with no write — then writes conditionally on the doc's
+// `_etag`. On a concurrent-modification conflict (412) it re-reads and re-applies,
+// so no update is lost or clobbered even under multiple replicas. Returns
+// `{ ...meta, ok: true, deal: <derived> }` or `{ error }`.
+async function mutateDeal(id, reducer) {
+  const ATTEMPTS = 5;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    let fresh = repoMode() === 'cosmos' ? await dealRepo.get(id).catch(() => null) : null;
+    if (!fresh) fresh = getDealRaw(id) || null;
+    if (!fresh) return { error: 'not-found' };
+    ensureFirstClassLanes(fresh);
+    const meta = reducer(fresh);
+    if (meta && meta.error) return meta;
+    try {
+      const written = await dealRepo.saveConcurrent(fresh);
+      upsertDealCache(written);
+      if (meta && meta.event) logEvent(written.id, meta.event, meta.detail);
+      return { ...(meta || {}), ok: true, deal: derive(written) };
+    } catch (err) {
+      if (err?.code === 412 && attempt < ATTEMPTS) continue; // concurrent write — re-read & retry
+      throw err;
+    }
+  }
+  return { error: 'write-conflict', detail: 'Could not persist after retries due to concurrent modifications.' };
 }
-function persistSignal(c) {
-  sigRepo.upsert({ ...c, kind: 'signal' }).catch(() => {});
-}
-function logEvent(companyId, type, detail) {
-  recordEvent({ companyId, type, detail }).catch(() => {});
+
+// Background read-through: every STORE_SYNC_MS each replica re-lists from Cosmos so
+// its in-memory read cache converges to the authoritative datastore — this is what
+// makes horizontal scale-out (maxReplicas > 1) safe for reads. Writes stay correct
+// via mutateDeal's optimistic concurrency. Unref'd so it never holds the process open.
+let bgSync = null;
+function startBackgroundSync() {
+  if (bgSync || repoMode() !== 'cosmos') return;
+  const TTL = Number(process.env.STORE_SYNC_MS || 5000);
+  bgSync = setInterval(async () => {
+    try {
+      const [cos, ds, sig] = await Promise.all([coRepo.list(), dealRepo.list(), sigRepo.list()]);
+      desk = cos.filter((c) => c.kind === 'desk');
+      candidates = cos.filter((c) => c.kind === 'candidate');
+      deals = attachWorkspaces(ds);
+      signalCompanies = sig;
+    } catch { /* transient; the next tick retries */ }
+  }, TTL);
+  if (bgSync.unref) bgSync.unref();
 }
 
 // Load persisted state from Cosmos at startup (empty on a fresh datastore).
@@ -136,6 +229,7 @@ export async function hydrate() {
   } catch {
     /* keep empty in-memory state on a read failure */
   }
+  startBackgroundSync();
   return { mode: 'cosmos', companies: desk.length + candidates.length, deals: deals.length, signals: signalCompanies.length };
 }
 
@@ -180,8 +274,12 @@ function makeScreenedDeal(cand, when) {
     ],
     workstreams: [
       { lane: 'commercial', owner: 'retail-md', status: 'not_started', progress: 0, findings: [] },
+      { lane: 'financial', owner: 'finance-md', status: 'not_started', progress: 0, findings: [] },
+      { lane: 'legal', owner: 'legal-md', status: 'not_started', progress: 0, findings: [] },
+      { lane: 'tax', owner: 'tax-md', status: 'not_started', progress: 0, findings: [] },
       { lane: 'techai', owner: 'ai-md', status: 'not_started', progress: 0, findings: [] },
-      { lane: 'operations', owner: 'supply-md', status: 'not_started', progress: 0, findings: [] }
+      { lane: 'operations', owner: 'supply-md', status: 'not_started', progress: 0, findings: [] },
+      { lane: 'esg', owner: 'esg-md', status: 'not_started', progress: 0, findings: [] }
     ],
     documents: [{ name: 'Investment Screen.pdf', type: 'Screen', pages: 6, status: 'parsed' }],
     memoSections: [
@@ -1160,6 +1258,7 @@ function publicCandidate(c) {
   const sc = scoreCandidate(c);
   return {
     id: c.id,
+    canonicalId: c.canonicalId || companyId({ ...c, name: c.company }),
     company: c.company,
     sector: c.sector,
     subSector: c.subSector,
@@ -1361,6 +1460,37 @@ export function getPipeline() {
   };
 }
 
+// ---- Canonical Company model (unified view over the three feeds) -------------
+// The News/filings desk, the funnel candidates and the CxO signal companies are
+// three sourcing feeds; lib/companies resolves them to ONE governed record per real
+// company (entity resolution by domain → registryId → name), merging each feed's
+// intelligence and folding funnel state in as a sub-object. This is the single
+// canonical company model the docs describe, exposed at runtime here.
+function buildCanonical() {
+  return buildCanonicalCompanies({ desk, candidates, signalCompanies });
+}
+
+export function canonicalCompanies({ inFunnel } = {}) {
+  let list = buildCanonical();
+  if (inFunnel === true) list = list.filter((c) => !!c.funnel);
+  else if (inFunnel === false) list = list.filter((c) => !c.funnel);
+  return {
+    count: list.length,
+    fromFeeds: { desk: desk.length, candidates: candidates.length, signals: signalCompanies.length },
+    resolvedDuplicates: (desk.length + candidates.length + signalCompanies.length) - list.length,
+    companies: list.map(canonicalSummary)
+  };
+}
+
+// One governed company record by canonical id — the full profile incl. embedded
+// news/signals/funnel, resolved across every feed that mentions the company.
+export function canonicalCompany(id) {
+  const list = buildCanonical();
+  const c = list.find((x) => x.id === id)
+    || list.find((x) => Object.values(x.feedIds || {}).includes(id)); // also accept a feed id
+  return c || null;
+}
+
 // Public view of ONE candidate by id (for the deal tools / agents).
 export function getCandidatePublic(id) {
   const c = candidates.find((x) => x.id === id);
@@ -1443,13 +1573,19 @@ export function gateCandidate(id, action, reason, note) {
 export function sendToScreening(deskId) {
   const d = findSourcingTarget(deskId);
   if (!d) return { error: 'target-not-found' };
-  if (candidates.some((c) => c.company.toLowerCase() === d.name.toLowerCase())) {
+  // Entity resolution: the desk company and the funnel candidate for the same real
+  // company share ONE canonical id, so we dedupe by canonical identity (not a brittle
+  // name/deskId string join) and stamp it onto both so the governed record links them.
+  const canonId = companyId({ ...d, name: d.name });
+  if (candidates.some((c) => (c.canonicalId || companyId({ ...c, name: c.company })) === canonId)) {
     return { error: 'already-in-funnel' };
   }
   const c = {
     id: `cand-new-${candSeq++}`,
+    canonicalId: canonId,
     deskId: d.id,
     company: d.name,
+    domain: d.domain || null,
     sector: d.sector,
     subSector: d.sector,
     region: d.region,
@@ -1463,15 +1599,18 @@ export function sendToScreening(deskId) {
     growth: d.growth,
     keywords: d.keywords || [],
     sources: d.sources || ['news'],
+    estimated: d.estimated !== false,
     stage: 'O2',
     disposition: 'active',
     passReason: null,
     passStage: null,
     sourcedAt: new Date().toISOString()
   };
+  d.canonicalId = canonId; // link the desk company to the same governed record
   candidates.push(c);
   persistCand(c);
-  logEvent(d.id, 'sent-to-screening', { candidate: c.id, company: c.company });
+  persistDesk(d);
+  logEvent(d.id, 'sent-to-screening', { candidate: c.id, company: c.company, canonicalId: canonId });
   return { ok: true, candidate: publicCandidate(c) };
 }
 
@@ -1598,32 +1737,32 @@ export function getMdOptions() {
 
 // Assign / reassign a swimlane's owning MD (updates the workspace + workstream).
 export function assignSwimlane(id, lane, md) {
-  const deal = getDealRaw(id);
-  if (!deal || !deal.workspace) return { error: 'not-found' };
-  if (!MD_OPTIONS.some((m) => m.id === md)) return { error: 'invalid-md' };
-  const sl = deal.workspace.swimlanes.find((s) => s.lane === lane);
-  if (!sl) return { error: 'lane-not-found' };
-  sl.md = md;
-  const ws = deal.workstreams.find((w) => w.lane === lane);
-  if (ws) ws.owner = md;
-  persistDeal(deal);
-  return { deal: getDeal(id) };
+  if (!MD_OPTIONS.some((m) => m.id === md)) return Promise.resolve({ error: 'invalid-md' });
+  return mutateDeal(id, (deal) => {
+    if (!deal.workspace) return { error: 'not-found' };
+    const sl = deal.workspace.swimlanes.find((s) => s.lane === lane);
+    if (!sl) return { error: 'lane-not-found' };
+    sl.md = md;
+    const ws = deal.workstreams.find((w) => w.lane === lane);
+    if (ws) ws.owner = md;
+    return { event: 'swimlane-assigned', detail: { lane, md } };
+  });
 }
 
 // Advance a DD checklist item: requested → received → reviewed (→ requested).
 export function cycleChecklistItem(id, itemId) {
-  const deal = getDealRaw(id);
-  if (!deal || !deal.workspace) return { error: 'not-found' };
-  const order = ['requested', 'received', 'reviewed'];
-  for (const sec of deal.workspace.checklist) {
-    const it = sec.items.find((x) => x.id === itemId);
-    if (it) {
-      it.status = order[(order.indexOf(it.status) + 1) % order.length];
-      persistDeal(deal);
-      return { deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    if (!deal.workspace) return { error: 'not-found' };
+    const order = ['requested', 'received', 'reviewed'];
+    for (const sec of deal.workspace.checklist) {
+      const it = sec.items.find((x) => x.id === itemId);
+      if (it) {
+        it.status = order[(order.indexOf(it.status) + 1) % order.length];
+        return { event: 'checklist-cycled', detail: { itemId, status: it.status } };
+      }
     }
-  }
-  return { error: 'item-not-found' };
+    return { error: 'item-not-found' };
+  });
 }
 
 // Record an MD CONTRIBUTION into a workstream lane through one of three lenses:
@@ -1640,32 +1779,29 @@ const KIND_LABEL = { guidance: 'guidance', value_add: 'value-add', diligence: 'f
 const KIND_PROGRESS = { guidance: 8, value_add: 8, diligence: 15 };
 
 export function recordContribution(id, lane, { kind = 'diligence', text, severity = 'neutral', source, by, persona } = {}) {
-  const deal = getDealRaw(id);
-  if (!deal) return { error: 'not-found' };
-  const ws = (deal.workstreams || []).find((w) => w.lane === lane);
-  if (!ws) return { error: 'lane-not-found' };
-  const k = CONTRIBUTION_KINDS.has(kind) ? kind : 'diligence';
-  const t = String(text || '').trim().slice(0, 600);
-  if (!t) return { error: 'text-required' };
-  // Severity only applies to a diligence finding; guidance/value-add are neutral.
-  const sev = k === 'diligence' ? (VALID_SEVERITY.has(severity) ? severity : 'neutral') : 'neutral';
-  const src = String(source || (k === 'diligence' ? 'Diligence' : KIND_LABEL[k])).slice(0, 60);
-  const at = new Date().toISOString();
-
-  ws.contributions = ws.contributions || [];
-  ws.contributions.unshift({ kind: k, text: t, severity: sev, source: src, by: by || null, persona: persona || null, at });
-  // A diligence contribution is also a finding, so the D2 findings view still shows it.
-  if (k === 'diligence') {
-    ws.findings = ws.findings || [];
-    ws.findings.unshift({ text: t, severity: sev, source: src });
-  }
-  ws.status = ws.status === 'not_started' ? 'in_progress' : ws.status;
-  ws.progress = Math.min(100, (ws.progress || 0) + (KIND_PROGRESS[k] || 10));
-  const verb = k === 'diligence' ? `Recorded a ${sev} finding` : `Added ${KIND_LABEL[k]}`;
-  deal.activity.unshift({ actor: by || 'Diligence agent', action: `${verb} in the ${lane} lane`, when: at });
-  persistDeal(deal);
-  logEvent(deal.id, 'contribution-recorded', { lane, kind: k, severity: sev, by: by || null, persona: persona || null });
-  return { ok: true, deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    const ws = (deal.workstreams || []).find((w) => w.lane === lane);
+    if (!ws) return { error: 'lane-not-found' };
+    const k = CONTRIBUTION_KINDS.has(kind) ? kind : 'diligence';
+    const t = String(text || '').trim().slice(0, 600);
+    if (!t) return { error: 'text-required' };
+    // Severity only applies to a diligence finding; guidance/value-add are neutral.
+    const sev = k === 'diligence' ? (VALID_SEVERITY.has(severity) ? severity : 'neutral') : 'neutral';
+    const src = String(source || (k === 'diligence' ? 'Diligence' : KIND_LABEL[k])).slice(0, 60);
+    const at = new Date().toISOString();
+    ws.contributions = ws.contributions || [];
+    ws.contributions.unshift({ kind: k, text: t, severity: sev, source: src, by: by || null, persona: persona || null, at });
+    // A diligence contribution is also a finding, so the D2 findings view still shows it.
+    if (k === 'diligence') {
+      ws.findings = ws.findings || [];
+      ws.findings.unshift({ text: t, severity: sev, source: src });
+    }
+    ws.status = ws.status === 'not_started' ? 'in_progress' : ws.status;
+    ws.progress = Math.min(100, (ws.progress || 0) + (KIND_PROGRESS[k] || 10));
+    const verb = k === 'diligence' ? `Recorded a ${sev} finding` : `Added ${KIND_LABEL[k]}`;
+    deal.activity.unshift({ actor: by || 'Diligence agent', action: `${verb} in the ${lane} lane`, when: at });
+    return { event: 'contribution-recorded', detail: { lane, kind: k, severity: sev, by: by || null, persona: persona || null } };
+  });
 }
 
 // Back-compat wrapper — a diligence finding is a diligence-kind contribution.
@@ -1684,94 +1820,84 @@ const CONDITION_STATUSES = new Set(['proposed', 'accepted', 'satisfied']);
 let issueSeq = 1;
 
 export function recordIssue(id, { lane, title, severity = 'caution', owner, resolutionPath, sources, dueDate, by, persona } = {}) {
-  const deal = getDealRaw(id);
-  if (!deal) return { error: 'not-found' };
-  const t = String(title || '').trim().slice(0, 200);
-  if (!t) return { error: 'title-required' };
-  const sev = VALID_SEVERITY.has(severity) ? severity : 'caution';
-  const at = new Date().toISOString();
-  deal.issues = deal.issues || [];
-  const issue = {
-    id: `issue-${deal.id}-${issueSeq++}`,
-    lane: lane || null,
-    title: t,
-    severity: sev,
-    owner: owner || null,
-    status: 'open',
-    resolutionPath: resolutionPath ? String(resolutionPath).slice(0, 300) : null,
-    dueDate: dueDate || null,
-    sources: Array.isArray(sources) ? sources.slice(0, 8) : [],
-    by: by || null,
-    persona: persona || null,
-    at,
-    resolvedAt: null
-  };
-  deal.issues.unshift(issue);
-  deal.activity.unshift({ actor: by || 'Diligence', action: `Logged a ${sev} issue${lane ? ` in the ${lane} lane` : ''}: ${t}`, when: at });
-  persistDeal(deal);
-  logEvent(deal.id, 'issue-recorded', { lane: lane || null, severity: sev, owner: owner || null, persona: persona || null });
-  return { ok: true, issue, deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    const t = String(title || '').trim().slice(0, 200);
+    if (!t) return { error: 'title-required' };
+    const sev = VALID_SEVERITY.has(severity) ? severity : 'caution';
+    const at = new Date().toISOString();
+    deal.issues = deal.issues || [];
+    const issue = {
+      id: `issue-${deal.id}-${issueSeq++}`,
+      lane: lane || null,
+      title: t,
+      severity: sev,
+      owner: owner || null,
+      status: 'open',
+      resolutionPath: resolutionPath ? String(resolutionPath).slice(0, 300) : null,
+      dueDate: dueDate || null,
+      sources: Array.isArray(sources) ? sources.slice(0, 8) : [],
+      by: by || null,
+      persona: persona || null,
+      at,
+      resolvedAt: null
+    };
+    deal.issues.unshift(issue);
+    deal.activity.unshift({ actor: by || 'Diligence', action: `Logged a ${sev} issue${lane ? ` in the ${lane} lane` : ''}: ${t}`, when: at });
+    return { issue, event: 'issue-recorded', detail: { lane: lane || null, severity: sev, owner: owner || null, persona: persona || null } };
+  });
 }
 
 export function resolveIssue(id, issueId, { status = 'resolved', resolutionPath, by, persona } = {}) {
-  const deal = getDealRaw(id);
-  if (!deal) return { error: 'not-found' };
-  const issue = (deal.issues || []).find((i) => i.id === issueId);
-  if (!issue) return { error: 'issue-not-found' };
-  const st = ISSUE_STATUSES.has(status) ? status : 'resolved';
-  issue.status = st;
-  if (resolutionPath) issue.resolutionPath = String(resolutionPath).slice(0, 300);
-  const at = new Date().toISOString();
-  issue.resolvedAt = st === 'resolved' ? at : null;
-  deal.activity.unshift({ actor: by || 'Diligence', action: `Issue "${issue.title}" → ${st}`, when: at });
-  persistDeal(deal);
-  logEvent(deal.id, 'issue-updated', { issueId, status: st, by: by || null, persona: persona || null });
-  return { ok: true, issue, deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    const issue = (deal.issues || []).find((i) => i.id === issueId);
+    if (!issue) return { error: 'issue-not-found' };
+    const st = ISSUE_STATUSES.has(status) ? status : 'resolved';
+    issue.status = st;
+    if (resolutionPath) issue.resolutionPath = String(resolutionPath).slice(0, 300);
+    const at = new Date().toISOString();
+    issue.resolvedAt = st === 'resolved' ? at : null;
+    deal.activity.unshift({ actor: by || 'Diligence', action: `Issue "${issue.title}" → ${st}`, when: at });
+    return { issue, event: 'issue-updated', detail: { issueId, status: st, by: by || null, persona: persona || null } };
+  });
 }
 
 export function setCondition(id, { text, owner, status = 'proposed', by, persona } = {}) {
-  const deal = getDealRaw(id);
-  if (!deal) return { error: 'not-found' };
-  const t = String(text || '').trim().slice(0, 300);
-  if (!t) return { error: 'text-required' };
-  const st = CONDITION_STATUSES.has(status) ? status : 'proposed';
-  const at = new Date().toISOString();
-  deal.conditions = deal.conditions || [];
-  const cond = { id: `cond-${deal.id}-${deal.conditions.length + 1}`, text: t, owner: owner || null, status: st, by: by || null, persona: persona || null, at };
-  deal.conditions.unshift(cond);
-  deal.activity.unshift({ actor: by || 'Partner', action: `Set IC condition: ${t}`, when: at });
-  persistDeal(deal);
-  logEvent(deal.id, 'condition-set', { status: st, owner: owner || null, persona: persona || null });
-  return { ok: true, condition: cond, deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    const t = String(text || '').trim().slice(0, 300);
+    if (!t) return { error: 'text-required' };
+    const st = CONDITION_STATUSES.has(status) ? status : 'proposed';
+    const at = new Date().toISOString();
+    deal.conditions = deal.conditions || [];
+    const cond = { id: `cond-${deal.id}-${(deal.conditions.length + 1)}-${issueSeq++}`, text: t, owner: owner || null, status: st, by: by || null, persona: persona || null, at };
+    deal.conditions.unshift(cond);
+    deal.activity.unshift({ actor: by || 'Partner', action: `Set IC condition: ${t}`, when: at });
+    return { condition: cond, event: 'condition-set', detail: { status: st, owner: owner || null, persona: persona || null } };
+  });
 }
 
 export function updateCondition(id, condId, { status, text, owner, by } = {}) {
-  const deal = getDealRaw(id);
-  if (!deal) return { error: 'not-found' };
-  const cond = (deal.conditions || []).find((c) => c.id === condId);
-  if (!cond) return { error: 'condition-not-found' };
-  if (status && CONDITION_STATUSES.has(status)) cond.status = status;
-  if (text) cond.text = String(text).slice(0, 300);
-  if (owner !== undefined) cond.owner = owner || null;
-  const at = new Date().toISOString();
-  deal.activity.unshift({ actor: by || 'Partner', action: `Condition "${cond.text}" → ${cond.status}`, when: at });
-  persistDeal(deal);
-  logEvent(deal.id, 'condition-updated', { condId, status: cond.status });
-  return { ok: true, condition: cond, deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    const cond = (deal.conditions || []).find((c) => c.id === condId);
+    if (!cond) return { error: 'condition-not-found' };
+    if (status && CONDITION_STATUSES.has(status)) cond.status = status;
+    if (text) cond.text = String(text).slice(0, 300);
+    if (owner !== undefined) cond.owner = owner || null;
+    const at = new Date().toISOString();
+    deal.activity.unshift({ actor: by || 'Partner', action: `Condition "${cond.text}" → ${cond.status}`, when: at });
+    return { condition: cond, event: 'condition-updated', detail: { condId, status: cond.status } };
+  });
 }
 
 export function snapshotAssumptions(id, { label, by } = {}) {
-  const deal = getDealRaw(id);
-  if (!deal) return { error: 'not-found' };
-  const figures = currentAssumptions(deal);
-  const at = new Date().toISOString();
-  deal.assumptionSnapshots = deal.assumptionSnapshots || [];
-  const snap = { label: label || `IC draft — ${new Date().toLocaleDateString()}`, at, by: by || null, figures };
-  deal.assumptionSnapshots.push(snap);
-  deal.activity.unshift({ actor: by || 'Analyst', action: `Snapshotted assumptions: "${snap.label}"`, when: at });
-  persistDeal(deal);
-  logEvent(deal.id, 'assumptions-snapshotted', { label: snap.label });
-  return { ok: true, snapshot: snap, deal: getDeal(id) };
+  return mutateDeal(id, (deal) => {
+    const figures = currentAssumptions(deal);
+    const at = new Date().toISOString();
+    deal.assumptionSnapshots = deal.assumptionSnapshots || [];
+    const snap = { label: label || `IC draft — ${new Date().toLocaleDateString()}`, at, by: by || null, figures };
+    deal.assumptionSnapshots.push(snap);
+    deal.activity.unshift({ actor: by || 'Analyst', action: `Snapshotted assumptions: "${snap.label}"`, when: at });
+    return { snapshot: snap, event: 'assumptions-snapshotted', detail: { label: snap.label } };
+  });
 }
 
 // The decision-grade IC Readiness board, grounded in real Fabric/OneLake market
@@ -1809,7 +1935,24 @@ export function getICReadiness(id) {
     );
   }
   board.counts.sources = board.supportingSources.length;
+  // Source-citation validation — flag numeric claims in IC materials that do not
+  // trace to a source fact/document (point 5). Compact form on the board.
+  const cit = validateCitations(deal);
+  board.citationAudit = {
+    score: cit.score, clean: cit.clean, summary: cit.summary,
+    totalClaims: cit.totalClaims, sourcedClaims: cit.sourcedClaims,
+    unsourcedClaims: cit.unsourcedClaims.length, unsourcedFigures: cit.unsourcedFigures.length
+  };
   return board;
+}
+
+// Full source-citation audit for a deal (point 5): every key figure, every numeric
+// claim in the IC memo sections, and the IC-ask provenance, each mapped to a source
+// or flagged unsourced.
+export function getCitationAudit(id) {
+  const deal = getDealRaw(id);
+  if (!deal) return null;
+  return { dealId: deal.id, company: deal.company, ...validateCitations(deal) };
 }
 
 // ---- Fabric / OneLake market intelligence (read-through to the snapshot) ----
@@ -1818,6 +1961,9 @@ export function marketIntel() {
 }
 export function fabricStatus() {
   return fabricInfo();
+}
+export function refreshFabricData() {
+  return refreshFabric();
 }
 export function comparableDeals(opts) {
   return getComparableDeals(opts);
@@ -1832,31 +1978,58 @@ export function companyFinancials(ticker) {
   return getCompanyFinancials(ticker);
 }
 
-export function advanceDeal(id) {
-  const deal = getDealRaw(id);
-  if (!deal) return null;
-  const idx = stepIndex(deal.stage);
-  if (idx < STEP_KEYS.length - 1) {
+// IC-readiness gated transitions: entering IC approval (D3 → D4) and the IC
+// approval itself (D4 → D5). Both are blocked when the readiness verdict is
+// NOT-READY, unless the PARTNER overrides with a written reason (logged as an
+// audit event). Other transitions are ungated.
+const IC_GATED = { D3: 'ic-entry', D4: 'ic-approval' };
+
+export async function advanceDeal(id, { persona, overrideReason } = {}) {
+  const r = await mutateDeal(id, (deal) => {
+    const idx = stepIndex(deal.stage);
+    if (idx >= STEP_KEYS.length - 1) return {}; // already at the end — no-op
+
+    const gate = IC_GATED[deal.stage];
+    if (gate) {
+      const board = computeICReadiness(deal);
+      if (board.verdict.state === 'NOT-READY') {
+        const reason = String(overrideReason || '').trim();
+        if (!reason) {
+          return { error: 'ic-not-ready', gate, verdict: board.verdict, detail: `Deal is NOT IC-ready — ${board.verdict.headline} A partner override with a written reason is required to proceed.` };
+        }
+        if (persona && persona !== 'partner') {
+          return { error: 'override-forbidden', gate, verdict: board.verdict, detail: 'Only the Partner / Deal Sponsor may override an IC-readiness gate.' };
+        }
+        const at = new Date().toISOString();
+        deal.icOverrides = deal.icOverrides || [];
+        deal.icOverrides.push({ stage: deal.stage, gate, verdict: board.verdict.state, gating: board.verdict.gating, reason, by: persona || 'partner', at });
+        deal.activity.unshift({ actor: 'Partner', action: `IC-readiness gate OVERRIDE at ${deal.stage} (${gate}) — verdict ${board.verdict.state}: ${reason}`, when: at });
+        logEvent(deal.id, 'ic-gate-override', { stage: deal.stage, gate, verdict: board.verdict.state, gating: board.verdict.gating, reason, by: persona || 'partner' });
+      }
+    }
+
     const crossedGate = deal.stage === GATE.afterStep;
     deal.stage = STEP_KEYS[idx + 1];
     const next = stepByKey(deal.stage);
+    const isICApproval = gate === 'ic-approval';
     deal.activity.unshift({
-      actor: crossedGate ? 'Power Automate' : 'Deal Orchestrator',
-      action: crossedGate ? `PURSUE — ${GATE.detail}` : `Advanced to ${next.code} · ${next.title}`,
+      actor: crossedGate ? 'Power Automate' : isICApproval ? 'Investment Committee' : 'Deal Orchestrator',
+      action: crossedGate ? `PURSUE — ${GATE.detail}` : isICApproval ? `IC APPROVED — advanced to ${next.code} · ${next.title}` : `Advanced to ${next.code} · ${next.title}`,
       when: new Date().toISOString()
     });
-  }
-  persistDeal(deal);
-  return getDeal(id);
+    return { event: isICApproval ? 'ic-approved' : 'deal-advanced', detail: { stage: deal.stage, by: persona || null } };
+  });
+  if (r.error) return r;
+  return r.deal;
 }
 
-export function regressDeal(id) {
-  const deal = getDealRaw(id);
-  if (!deal) return null;
-  const idx = stepIndex(deal.stage);
-  if (idx > 0) deal.stage = STEP_KEYS[idx - 1];
-  persistDeal(deal);
-  return getDeal(id);
+export async function regressDeal(id) {
+  const r = await mutateDeal(id, (deal) => {
+    const idx = stepIndex(deal.stage);
+    if (idx > 0) deal.stage = STEP_KEYS[idx - 1];
+    return { event: 'deal-regressed' };
+  });
+  return r.error ? null : r.deal;
 }
 
 export async function runStep(id, stepKey) {

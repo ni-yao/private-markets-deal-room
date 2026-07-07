@@ -212,6 +212,7 @@ export function computeICReadiness(deal) {
     supportingSources: sources,
     icAsk: ask,
     conditions,
+    overrides: (deal.icOverrides || []).map((o) => ({ stage: o.stage, gate: o.gate, verdict: o.verdict, reason: o.reason, by: o.by, at: o.at })),
     counts: {
       openIssues: openIssues.length,
       unresolvedRisks: unresolvedRisks.length,

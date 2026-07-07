@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Pipeline as PipelineData, Candidate } from '../types';
+import type { Pipeline as PipelineData, Candidate, CanonicalCompanies } from '../types';
 import { api } from '../api';
 
 interface Props {
@@ -15,9 +15,12 @@ export function Pipeline({ initialStage }: Props) {
   const [data, setData] = useState<PipelineData | null>(null);
   const [stageF, setStageF] = useState<string>('all');
   const [dispoF, setDispoF] = useState<string>('all');
+  const [canon, setCanon] = useState<CanonicalCompanies | null>(null);
+  const [showCanon, setShowCanon] = useState(false);
 
   useEffect(() => {
     api.stage1Pipeline().then(setData).catch(() => {});
+    api.companies().then(setCanon).catch(() => {});
   }, []);
   useEffect(() => {
     if (initialStage) { setStageF(initialStage); setDispoF('all'); }
@@ -78,6 +81,35 @@ export function Pipeline({ initialStage }: Props) {
         </label>
         <span className="pipe-count">{rows.length} of {counts.total}</span>
       </div>
+
+      {canon && (
+        <div className="gov-strip">
+          <div className="gov-head" onClick={() => setShowCanon((s) => !s)}>
+            <span className="gov-badge">GOVERNED MODEL</span>
+            <span className="gov-title">Canonical company records</span>
+            <span className="gov-stat"><b>{canon.count}</b> governed records</span>
+            <span className="gov-stat"><b>{canon.resolvedDuplicates}</b> duplicates resolved</span>
+            <span className="gov-feeds">from {canon.fromFeeds.desk} desk · {canon.fromFeeds.candidates} funnel · {canon.fromFeeds.signals} CxO signals</span>
+            <span className="gov-toggle">{showCanon ? 'Hide ▲' : 'Show ▼'}</span>
+          </div>
+          {showCanon && (
+            <div className="gov-list">
+              <div className="gov-note">One entity-resolved record per real company (deduped by domain → registry → name), merging every feed that mentions it.</div>
+              {canon.companies.map((c) => (
+                <div className="gov-row" key={c.id}>
+                  <span className="gov-co">{c.name}</span>
+                  <span className="gov-id">{c.id}</span>
+                  <span className="gov-provenance">
+                    {c.sources.map((s) => <span className={`gov-src ${s}`} key={s}>{s}</span>)}
+                    {Object.keys(c.feedIds).length > 1 && <span className="gov-merged">merged ×{Object.keys(c.feedIds).length}</span>}
+                  </span>
+                  <span className="gov-funnel">{c.inFunnel ? `${c.funnel?.stage} · ${c.funnel?.disposition}` : 'not in funnel'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="pipe-table">
         <div className="pipe-tr pipe-th">

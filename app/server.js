@@ -42,6 +42,8 @@ import {
   getStage1Funnel,
   getCohort,
   getPipeline,
+  canonicalCompanies,
+  canonicalCompany,
   getPassReasons,
   assessCohort,
   assessCandidateById,
@@ -65,8 +67,10 @@ import {
   updateCondition,
   snapshotAssumptions,
   getICReadiness,
+  getCitationAudit,
   marketIntel,
   fabricStatus,
+  refreshFabricData,
   comparableDeals,
   benchmarkFindings,
   icPrecedents,
@@ -222,8 +226,8 @@ api.post('/deals/:id/teams/ensure', async (req, res) => {
   if (r.error === 'not-launched') return res.status(409).json(r);
   res.json(r);
 });
-api.patch('/deals/:id/swimlanes/:lane', (req, res) => {
-  const r = assignSwimlane(req.params.id, req.params.lane, req.body?.md);
+api.patch('/deals/:id/swimlanes/:lane', async (req, res) => {
+  const r = await assignSwimlane(req.params.id, req.params.lane, req.body?.md);
   if (r.error) return res.status(r.error === 'invalid-md' ? 422 : 404).json(r);
   res.json(r.deal);
 });
@@ -231,19 +235,19 @@ api.patch('/deals/:id/swimlanes/:lane', (req, res) => {
 // is the dashboard-side entrypoint mirroring the MCP record_contribution tool.
 // `md` is the contributing MD's persona id (defaults to the lane's assigned MD);
 // the display name is resolved from the MD options.
-api.post('/deals/:id/contributions', (req, res) => {
+api.post('/deals/:id/contributions', async (req, res) => {
   const { lane, kind, text, severity, source, md } = req.body || {};
   if (!lane || !text) return res.status(422).json({ error: 'lane-and-text-required' });
   const mdName = (getMdOptions().find((m) => m.id === md) || {}).name || null;
-  const r = recordContribution(req.params.id, lane, { kind, text, severity, source, by: mdName, persona: md });
+  const r = await recordContribution(req.params.id, lane, { kind, text, severity, source, by: mdName, persona: md });
   if (r.error) {
     const code = r.error === 'not-found' || r.error === 'lane-not-found' ? 404 : 422;
     return res.status(code).json(r);
   }
   res.json(r.deal);
 });
-api.post('/deals/:id/checklist/:itemId/cycle', (req, res) => {
-  const r = cycleChecklistItem(req.params.id, req.params.itemId);
+api.post('/deals/:id/checklist/:itemId/cycle', async (req, res) => {
+  const r = await cycleChecklistItem(req.params.id, req.params.itemId);
   if (r.error) return res.status(404).json(r);
   res.json(r.deal);
 });
@@ -256,44 +260,52 @@ api.get('/deals/:id/ic-readiness', (req, res) => {
   res.json(board);
 });
 
+// Source-citation audit — numeric claims in IC materials mapped to source facts;
+// unsourced figures flagged (point 5).
+api.get('/deals/:id/citations', (req, res) => {
+  const audit = getCitationAudit(req.params.id);
+  if (!audit) return res.status(404).json({ error: 'not-found' });
+  res.json(audit);
+});
+
 // Operational diligence: issue log (severity + owner + resolution path + due date).
-api.post('/deals/:id/issues', (req, res) => {
+api.post('/deals/:id/issues', async (req, res) => {
   const { lane, title, severity, owner, resolutionPath, sources, dueDate, md } = req.body || {};
   const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
-  const r = recordIssue(req.params.id, { lane, title, severity, owner, resolutionPath, sources, dueDate, by, persona: md });
+  const r = await recordIssue(req.params.id, { lane, title, severity, owner, resolutionPath, sources, dueDate, by, persona: md });
   if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
   res.json(r.deal);
 });
-api.patch('/deals/:id/issues/:issueId', (req, res) => {
+api.patch('/deals/:id/issues/:issueId', async (req, res) => {
   const { status, resolutionPath, md } = req.body || {};
   const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
-  const r = resolveIssue(req.params.id, req.params.issueId, { status, resolutionPath, by, persona: md });
+  const r = await resolveIssue(req.params.id, req.params.issueId, { status, resolutionPath, by, persona: md });
   if (r.error) return res.status(r.error.endsWith('not-found') ? 404 : 422).json(r);
   res.json(r.deal);
 });
 
 // IC conditions (partner-owned).
-api.post('/deals/:id/conditions', (req, res) => {
+api.post('/deals/:id/conditions', async (req, res) => {
   const { text, owner, status, md } = req.body || {};
   const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
-  const r = setCondition(req.params.id, { text, owner, status, by, persona: md });
+  const r = await setCondition(req.params.id, { text, owner, status, by, persona: md });
   if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
   res.json(r.deal);
 });
-api.patch('/deals/:id/conditions/:condId', (req, res) => {
+api.patch('/deals/:id/conditions/:condId', async (req, res) => {
   const { status, text, owner, md } = req.body || {};
   const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
-  const r = updateCondition(req.params.id, req.params.condId, { status, text, owner, by });
+  const r = await updateCondition(req.params.id, req.params.condId, { status, text, owner, by });
   if (r.error) return res.status(r.error.endsWith('not-found') ? 404 : 422).json(r);
   res.json(r.deal);
 });
 
 // Assumption snapshot — records the current key assumptions as an IC-draft baseline
 // so the cockpit can show what changed since the last draft.
-api.post('/deals/:id/assumption-snapshot', (req, res) => {
+api.post('/deals/:id/assumption-snapshot', async (req, res) => {
   const { label, md } = req.body || {};
   const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
-  const r = snapshotAssumptions(req.params.id, { label, by });
+  const r = await snapshotAssumptions(req.params.id, { label, by });
   if (r.error) return res.status(404).json(r);
   res.json(r.deal);
 });
@@ -310,6 +322,13 @@ api.get('/market-intel/financials/:ticker', (req, res) => {
   res.json(f);
 });
 
+// Fabric status + data lineage; POST re-attempts a live lakehouse query.
+api.get('/fabric', (_req, res) => res.json(fabricStatus()));
+api.post('/fabric/refresh', async (_req, res) => {
+  const info = await refreshFabricData();
+  res.json(info);
+});
+
 // O1 · Deal Sourcing — CxO signals explorer
 api.get('/signals/mailbox', (_req, res) => res.json(getMailbox()));
 api.get('/signals/companies', (_req, res) => res.json(getSignalCompanies()));
@@ -317,6 +336,18 @@ api.get('/signals/companies/:id/crm', (req, res) => {
   const crm = getCrm(req.params.id);
   if (!crm) return res.status(404).json({ error: 'company not found' });
   res.json(crm);
+});
+
+// Canonical Company model — the unified, entity-resolved governed record over the
+// three sourcing feeds (news desk + funnel candidates + CxO signals).
+api.get('/companies', (req, res) => {
+  const inFunnel = req.query.inFunnel === 'true' ? true : req.query.inFunnel === 'false' ? false : undefined;
+  res.json(canonicalCompanies({ inFunnel }));
+});
+api.get('/companies/:id', (req, res) => {
+  const c = canonicalCompany(req.params.id);
+  if (!c) return res.status(404).json({ error: 'company-not-found' });
+  res.json(c);
 });
 
 // Data-source connectivity (Home connectivity panel). Real tests for Web + MCP
@@ -575,10 +606,12 @@ api.post('/deals/:id/steps/:stepKey/run', async (req, res) => {
   }
 });
 
-api.post('/deals/:id/advance', (req, res) => {
-  const deal = advanceDeal(req.params.id);
-  if (!deal) return res.status(404).json({ error: 'deal not found' });
-  res.json(deal);
+api.post('/deals/:id/advance', async (req, res) => {
+  const { overrideReason } = req.body || {};
+  const r = await advanceDeal(req.params.id, { overrideReason });
+  if (r && r.error === 'not-found') return res.status(404).json({ error: 'deal not found' });
+  if (r && r.error) return res.status(409).json(r); // ic-not-ready / override-forbidden
+  res.json(r);
 });
 
 // Stage-2 deal artifact — the real PE deliverable for a diligence step:
@@ -594,8 +627,8 @@ api.post('/deals/:id/artifact/:step', async (req, res) => {
   }
 });
 
-api.post('/deals/:id/back', (req, res) => {
-  const deal = regressDeal(req.params.id);
+api.post('/deals/:id/back', async (req, res) => {
+  const deal = await regressDeal(req.params.id);
   if (!deal) return res.status(404).json({ error: 'deal not found' });
   res.json(deal);
 });

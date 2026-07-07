@@ -23,7 +23,10 @@ export const PERSONA_LANE = {
   'supply-md': 'operations'
 };
 
-const LANE_LABEL = { commercial: 'Commercial DD', techai: 'Tech / AI DD', operations: 'Operations DD' };
+const LANE_LABEL = {
+  commercial: 'Commercial DD', financial: 'Financial / QoE', legal: 'Legal DD',
+  tax: 'Tax DD', techai: 'Tech / AI DD', operations: 'Operations DD', esg: 'ESG / Environmental'
+};
 
 // Human labels for the persona (for tool responses / next-action prompts).
 export const PERSONA_LABEL = {

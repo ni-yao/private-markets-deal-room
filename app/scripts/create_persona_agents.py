@@ -47,7 +47,7 @@ def _fn(name, description, properties=None, required=None):
 
 
 DISPOSITION = {"type": "string", "enum": ["advance", "pass", "park"], "description": "advance | pass | park."}
-LANE = {"type": "string", "enum": ["commercial", "techai", "operations"]}
+LANE = {"type": "string", "enum": ["commercial", "financial", "legal", "tax", "techai", "operations", "esg"]}
 SEVERITY = {"type": "string", "enum": ["positive", "neutral", "caution", "negative", "risk"]}
 
 READ_TOOLS = {
@@ -71,6 +71,12 @@ READ_TOOLS = {
                             properties={"deal_id": {"type": "string"}}, required=["deal_id"]),
     "get_market_intel": _fn("get_market_intel", "Get the fund's real market intelligence from Fabric / OneLake: comparable & historical deals, benchmark diligence findings by workstream (Commercial/Financial/Legal/Operational/Tax), and IC voting precedents. Use to ground valuation, diligence scoping and IC conditions.",
                             properties={"sector": {"type": "string", "description": "Optional sector to bias the comparables."}}),
+    "get_citation_audit": _fn("get_citation_audit", "Get the source-citation audit for a deal: every numeric claim in the IC materials mapped to a source fact or cited document, with unsourced figures flagged and a 0-100 citation score. Use before finalizing an IC memo to confirm every number is defensible.",
+                              properties={"deal_id": {"type": "string"}}, required=["deal_id"]),
+    "get_companies": _fn("get_companies", "List the fund's canonical Company records — the unified, entity-resolved governed model over the three sourcing feeds (news desk, funnel candidates, CxO signals). One record per real company, with provenance and funnel state; reports how many duplicate feed records were resolved into one.",
+                         properties={"in_funnel": {"type": "boolean", "description": "Filter to companies in (true) / not in (false) the screening funnel."}}),
+    "get_company": _fn("get_company", "Get ONE canonical Company record by id (co-...) or a feed id: identity & aliases, classification, financials with an estimated flag, provenance, news count, CxO signals and funnel state — the single governed record for a real company across every feed.",
+                       properties={"id": {"type": "string"}}, required=["id"]),
 }
 
 ACTION_TOOLS = {
@@ -84,10 +90,10 @@ ACTION_TOOLS = {
                           properties={"candidate_id": {"type": "string"}, "action": DISPOSITION, "reason": {"type": "string"}}, required=["candidate_id", "action"]),
     "launch_deal": _fn("launch_deal", "Launch diligence on a screened deal — provisions the workspace and moves it to D1.",
                        properties={"deal_id": {"type": "string"}}, required=["deal_id"]),
-    "advance_deal": _fn("advance_deal", "Advance a deal to the next diligence step.",
-                        properties={"deal_id": {"type": "string"}}, required=["deal_id"]),
-    "approve_ic": _fn("approve_ic", "Record the IC approval and advance the deal past the IC gate (D4). PARTNER only.",
-                      properties={"deal_id": {"type": "string"}}, required=["deal_id"]),
+    "advance_deal": _fn("advance_deal", "Advance a deal to the next diligence step. Entering IC approval (D3->D4) is BLOCKED when the IC-readiness verdict is NOT-READY unless the Partner passes override_reason.",
+                        properties={"deal_id": {"type": "string"}, "override_reason": {"type": "string", "description": "PARTNER ONLY: written reason to override a NOT-READY IC-readiness gate."}}, required=["deal_id"]),
+    "approve_ic": _fn("approve_ic", "Record the IC approval and advance the deal past the IC gate (D4->D5). PARTNER only. BLOCKED when the IC-readiness verdict is NOT-READY unless override_reason is provided (logged as a partner-override audit event).",
+                      properties={"deal_id": {"type": "string"}, "override_reason": {"type": "string", "description": "Reason to approve despite a NOT-READY verdict; recorded as a partner override."}}, required=["deal_id"]),
     "run_step": _fn("run_step", "Run a diligence step (by step key, e.g. D2) to produce its deliverable on the record.",
                     properties={"deal_id": {"type": "string"}, "step": {"type": "string"}}, required=["deal_id", "step"]),
     "assign_lane": _fn("assign_lane", "Assign a diligence lane to an MD.",

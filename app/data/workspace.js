@@ -23,11 +23,19 @@
 
 const TENANT = 'mngenvmcap336646';
 
-// The MDs a lane can be assigned to (the dropdown options).
+// The MDs / workstream leads a lane can be assigned to (the dropdown options).
+// The first three are the sector MDs that also have a conversational Foundry
+// persona agent; the four functional leads (finance / legal / tax / ESG) own the
+// functional diligence lanes that are first-class to IC readiness but are managed
+// by the deal team through the workspace rather than by a dedicated agent.
 export const MD_OPTIONS = [
   { id: 'retail-md', name: 'James Whitfield', title: 'Retail Sector MD' },
   { id: 'ai-md', name: 'Dr. Priya Nair', title: 'AI MD' },
   { id: 'supply-md', name: 'Diego Marquez', title: 'Supply-chain MD' },
+  { id: 'finance-md', name: 'Sarah Chen', title: 'Finance Director (QoE)' },
+  { id: 'legal-md', name: 'Marcus Webb', title: 'General Counsel' },
+  { id: 'tax-md', name: 'Ana Torres', title: 'Tax Director' },
+  { id: 'esg-md', name: 'Leah Okafor', title: 'ESG Lead' },
   { id: 'partner', name: 'Eleanor Bishop', title: 'Partner / Deal Sponsor' }
 ];
 
@@ -82,7 +90,7 @@ const CHECKLIST = [
     ]
   },
   {
-    id: 'fin', section: '2 · Financial Information (QoE)', workstream: 'Financial DD',
+    id: 'fin', section: '2 · Financial Information (QoE)', lane: 'financial', workstream: 'Financial DD',
     items: [
       { id: 'fin-1', text: 'Audited financials — P&L, BS, CF (last 5 FY)' },
       { id: 'fin-2', text: 'Monthly management accounts (last 24 months)' },
@@ -101,7 +109,7 @@ const CHECKLIST = [
     ]
   },
   {
-    id: 'legal', section: '4 · Legal & Regulatory',
+    id: 'legal', section: '4 · Legal & Regulatory', lane: 'legal',
     items: [
       { id: 'legal-1', text: 'Schedule of material contracts — change-of-control flags' },
       { id: 'legal-2', text: 'IP portfolio — patents, trademarks, chain of title' },
@@ -110,7 +118,7 @@ const CHECKLIST = [
     ]
   },
   {
-    id: 'tax', section: '5 · Tax',
+    id: 'tax', section: '5 · Tax', lane: 'tax',
     items: [
       { id: 'tax-1', text: 'Corporate income tax returns (last 4 years)' },
       { id: 'tax-2', text: 'Tax audit correspondence & assessments' },
@@ -136,7 +144,7 @@ const CHECKLIST = [
     ]
   },
   {
-    id: 'people', section: '8 · HR · ESG · Insurance',
+    id: 'people', section: '8 · HR · ESG · Insurance', lane: 'esg',
     items: [
       { id: 'people-1', text: 'Org chart, management bios, key-person map' },
       { id: 'people-2', text: 'Compensation, benefits & change-of-control terms' },
@@ -146,12 +154,34 @@ const CHECKLIST = [
   }
 ];
 
+// The internal diligence swimlanes stood up at kickoff, each owned by an MD /
+// functional lead and paired with the external advisor a firm would engage. The
+// three sector lanes (commercial / tech-AI / operations) plus the four functional
+// lanes (financial-QoE / legal / tax / ESG) that are first-class to IC readiness.
 const SWIMLANE_DEFAULTS = [
   {
     lane: 'commercial', label: 'Commercial DD', md: 'retail-md',
     advisor: 'Bain & Company', advisorType: 'Strategy consultant (CDD)',
     scope: ['Market sizing & share', 'Customer concentration & churn', 'Pricing power', '15–30 customer interviews'],
     deliverable: 'CDD report + market model'
+  },
+  {
+    lane: 'financial', label: 'Financial / QoE', md: 'finance-md',
+    advisor: 'EY (Ernst & Young)', advisorType: 'Quality of Earnings (QoE)',
+    scope: ['EBITDA bridge & add-back review', 'Revenue recognition & quality', 'Net working capital & debt-like items', 'Management-accounts reliability'],
+    deliverable: 'QoE report + normalized EBITDA'
+  },
+  {
+    lane: 'legal', label: 'Legal DD', md: 'legal-md',
+    advisor: 'Kirkland & Ellis', advisorType: 'Legal counsel (LDD)',
+    scope: ['Material contracts & change-of-control', 'Corporate & capitalization', 'Litigation & disputes', 'Regulatory licenses & permits'],
+    deliverable: 'Legal DD report + issues list'
+  },
+  {
+    lane: 'tax', label: 'Tax DD', md: 'tax-md',
+    advisor: 'PwC', advisorType: 'Tax structuring & DD',
+    scope: ['Historical tax exposures', 'Transfer pricing', 'Structuring & step-plan', 'Tax attributes (NOLs, credits)'],
+    deliverable: 'Tax DD report + structuring memo'
   },
   {
     lane: 'techai', label: 'Tech / AI DD', md: 'ai-md',
@@ -164,8 +194,25 @@ const SWIMLANE_DEFAULTS = [
     advisor: 'AlixPartners', advisorType: 'Operations advisory (ODD)',
     scope: ['Supplier map & concentration', 'Capacity & utilisation', 'COGS bridge', 'Integration readiness'],
     deliverable: 'ODD report + supplier map'
+  },
+  {
+    lane: 'esg', label: 'ESG / Environmental', md: 'esg-md',
+    advisor: 'ERM', advisorType: 'ESG & environmental advisory',
+    scope: ['SFDR Article 8/9 & PAI indicators', 'Environmental liabilities', 'Health & safety', 'Governance & DEI'],
+    deliverable: 'ESG DD report + PAI baseline'
   }
 ];
+
+// Lane → SharePoint VDR folder the swimlane's documents live in.
+const LANE_FOLDER = {
+  commercial: '03_Commercial & Sales',
+  financial: '02_Financial Information',
+  legal: '01_Corporate & Legal',
+  tax: '04_Tax',
+  techai: '09_IT & Technology',
+  operations: '10_Operations',
+  esg: '12_Environmental & Regulatory'
+};
 
 const slugify = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -194,9 +241,7 @@ export function buildWorkspace(deal, opts = {}) {
 
   // Assign each swimlane a channel + folder deep link.
   const swimlanes = SWIMLANE_DEFAULTS.map((s) => {
-    const folder = s.lane === 'commercial' ? '03_Commercial & Sales'
-      : s.lane === 'techai' ? '09_IT & Technology'
-        : '10_Operations';
+    const folder = LANE_FOLDER[s.lane] || '13_IC Materials';
     return {
       ...s,
       channelUrl: `${teamsUrl}&channel=${encodeURIComponent(s.label)}`,
@@ -236,4 +281,42 @@ export function checklistStats(workspace) {
   }
   const pct = total ? Math.round((100 * (reviewed + received * 0.5)) / total) : 0;
   return { total, reviewed, received, requested, pct };
+}
+
+// Canonical lane order (sector + functional), used to keep workstreams and
+// swimlanes in a stable, readable sequence across the app.
+export const LANE_ORDER = ['commercial', 'financial', 'legal', 'tax', 'techai', 'operations', 'esg'];
+
+// The default workstreams a screened deal is created with — one per first-class
+// diligence lane, each owned by its MD / functional lead. Single source of truth
+// reused by makeScreenedDeal and the backfill so existing deals gain the lanes.
+export const WORKSTREAM_DEFAULTS = SWIMLANE_DEFAULTS.map((s) => ({ lane: s.lane, owner: s.md }));
+
+// Backfill: add any first-class swimlane missing from an existing workspace (for
+// deals provisioned before the functional lanes became first-class), preserving
+// existing swimlanes and their assignments. Returns true if it changed anything.
+export function ensureWorkspaceSwimlanes(workspace, deal) {
+  if (!workspace) return false;
+  const slug = slugify(deal.id || deal.company);
+  const sharePointUrl = workspace.sharePointUrl || `https://${TENANT}.sharepoint.com/sites/DealRoom-${slug}`;
+  const teamsUrl = workspace.teamsUrl || `https://teams.microsoft.com/l/team/19%3Adeal-${slug}%40thread.tacv2/conversations?groupId=deal-${slug}&tenantId=${TENANT}`;
+  const provisionedChannel = workspace.teamsProvisioned && workspace.teamsUrl ? workspace.teamsUrl : null;
+  workspace.swimlanes = workspace.swimlanes || [];
+  const have = new Set(workspace.swimlanes.map((s) => s.lane));
+  let changed = false;
+  for (const s of SWIMLANE_DEFAULTS) {
+    if (have.has(s.lane)) continue;
+    const folder = LANE_FOLDER[s.lane] || '13_IC Materials';
+    workspace.swimlanes.push({
+      ...s,
+      channelUrl: provisionedChannel || `${teamsUrl}&channel=${encodeURIComponent(s.label)}`,
+      folderUrl: `${sharePointUrl}/Shared%20Documents/${encodeURIComponent(folder)}`
+    });
+    changed = true;
+  }
+  if (changed) {
+    const rank = (l) => { const i = LANE_ORDER.indexOf(l); return i < 0 ? 99 : i; };
+    workspace.swimlanes.sort((a, b) => rank(a.lane) - rank(b.lane));
+  }
+  return changed;
 }

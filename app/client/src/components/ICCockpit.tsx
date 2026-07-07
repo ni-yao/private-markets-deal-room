@@ -113,6 +113,17 @@ export function ICCockpit({ dealId, mdOptions, onDealUpdate }: Props) {
         </div>
       </div>
 
+      {board.overrides && board.overrides.length > 0 && (
+        <div className="icc-overrides">
+          <h5>⚠ Partner IC-gate overrides on record</h5>
+          {board.overrides.map((o, i) => (
+            <div className="icc-ovr" key={i}>
+              <b>{o.gate === 'ic-approval' ? 'IC approval' : 'IC entry'}</b> at {o.stage} over a {o.verdict} verdict — “{o.reason}” <span className="at">· {o.by} · {new Date(o.at).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="icc-grid">
         {/* 1 · Required artifacts */}
         <section className="icc-card">
@@ -217,6 +228,15 @@ export function ICCockpit({ dealId, mdOptions, onDealUpdate }: Props) {
         {/* 5 · Supporting sources */}
         <section className="icc-card">
           <h4><span className="icc-q">5</span> What supports the recommendation? <em>{board.supportingSources.length}</em></h4>
+          {board.citationAudit && (
+            <div className={`icc-cit ${board.citationAudit.clean ? 'clean' : 'flagged'}`}>
+              <div className="icc-cit-top">
+                <span className="icc-cit-score">{board.citationAudit.score}<i>/100</i></span>
+                <span className="icc-cit-label">Citation coverage · {board.citationAudit.sourcedClaims}/{board.citationAudit.totalClaims} claims sourced</span>
+              </div>
+              <div className="icc-cit-summary">{board.citationAudit.summary}</div>
+            </div>
+          )}
           <div className="icc-sources">
             {board.supportingSources.length === 0 && <div className="icc-empty">No sources on the record yet.</div>}
             {board.supportingSources.map((s, i) => (
@@ -281,9 +301,20 @@ export function ICCockpit({ dealId, mdOptions, onDealUpdate }: Props) {
           <div className="icc-fhead">
             <span className="icc-fic">◆</span>
             <h4>Market intelligence — Fabric · OneLake</h4>
-            <span className={`icc-fmode ${fabric?.mode}`}>{fabric?.mode === 'live' ? 'live' : fabric?.mode === 'materialized' ? 'Fabric snapshot' : 'unconfigured'}</span>
-            <span className="icc-fsrc">{fabric?.source || 'dealroomfabric'}</span>
+            <span className={`icc-fmode ${fabric?.mode}`}>{fabric?.mode === 'live' ? 'live query' : fabric?.mode === 'materialized' ? 'Fabric snapshot' : 'unconfigured'}</span>
+            {fabric?.freshness && <span className="icc-ffresh">as of {fabric.freshness.label}</span>}
+            <span className="icc-fsrc">{fabric?.lineage?.workspace || fabric?.source || 'dealroomfabric'}</span>
           </div>
+          {fabric?.lineage && (
+            <div className="icc-flineage">
+              <span className="icc-flin-lbl">Lineage</span>
+              <span className="icc-flin-path">{fabric.lineage.platform} › {fabric.lineage.workspace} › {fabric.lineage.lakehouse}</span>
+              <span className="icc-flin-tables">{fabric.lineage.tables.length} tables: {fabric.lineage.tables.join(', ')}</span>
+            </div>
+          )}
+          {fabric?.liveConfigured && fabric?.mode !== 'live' && fabric?.liveError && (
+            <div className="icc-flive-err">Live query unavailable — serving the materialized snapshot. {fabric.liveError}</div>
+          )}
           <div className="icc-fgrid">
             <div className="icc-fcol">
               <h5>Comparable & historical deals</h5>

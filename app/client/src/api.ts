@@ -32,6 +32,7 @@ import type {
   Workspace,
   MdOption,
   ICReadiness,
+  ICGateBlock,
   MarketIntel,
   DealIssue,
   IssueSeverity,
@@ -135,9 +136,20 @@ export const api = {
   snapshotAssumptions: (id: string, body: { label?: string; md?: string }) =>
     post<Deal>(`/api/deals/${id}/assumption-snapshot`, body),
   marketIntel: () => get<MarketIntel>('/api/market-intel'),
+  companies: (inFunnel?: boolean) => get<import('./types').CanonicalCompanies>(`/api/companies${inFunnel === undefined ? '' : `?inFunnel=${inFunnel}`}`),
   runStep: (id: string, stepKey: string) =>
     post<StepRunResult>(`/api/deals/${id}/steps/${stepKey}/run`, {}),
-  advance: (id: string) => post<Deal>(`/api/deals/${id}/advance`, {}),
+  advance: async (id: string, overrideReason?: string): Promise<{ ok: true; deal: Deal } | { ok: false; blocked: ICGateBlock }> => {
+    const r = await fetch(`/api/deals/${id}/advance`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(overrideReason ? { overrideReason } : {})
+    });
+    const payload = await r.json().catch(() => ({}));
+    if (r.ok) return { ok: true, deal: payload as Deal };
+    if (r.status === 409) return { ok: false, blocked: payload as ICGateBlock };
+    throw new Error(`${r.status} advance`);
+  },
   back: (id: string) => post<Deal>(`/api/deals/${id}/back`, {}),
   mailbox: () => get<Mailbox>('/api/signals/mailbox'),
   signalCompanies: () => get<SignalCompany[]>('/api/signals/companies'),

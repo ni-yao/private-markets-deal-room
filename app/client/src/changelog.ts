@@ -13,6 +13,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.32.0',
+    date: '2026-07-07',
+    image: 'dealroom-app:v53',
+    revision: 'ca-dealroom-orch-dev-swc--0000049',
+    title: 'Production hardening — Cosmos-authoritative writes, IC gates, live Fabric, first-class lanes, citations & canonical company model',
+    tag: 'improvement',
+    highlights: [
+      'Cosmos is now the authoritative datastore. Deal writes use optimistic-concurrency read-modify-write on the document _etag, so with multiple replicas (the UI and the five persona agents all writing) a stale in-memory copy can never clobber a newer one — verified with 10 concurrent writes landing with zero lost updates. Writes are durable (retried, never silently swallowed), every replica re-reads from Cosmos on a short interval, and a mis-configured datastore now fails loudly instead of silently degrading. Container Apps max replicas raised from 1 to 3.',
+      'IC-readiness gates are enforced. Entering IC approval (D3→D4) and the IC approval itself (D4→D5) are blocked when the readiness verdict is NOT-READY — only the Partner may override, and only with a written reason that is recorded as an audit event and surfaced on the cockpit. The dashboard shows a partner-override modal; the agents get the same gate through the MCP tools.',
+      'Financial/QoE, Legal, Tax and ESG are now first-class diligence lanes — full workstreams and workspace swimlanes (each with its owner and typical advisor: EY QoE, Kirkland legal, PwC tax, ERM ESG), not just issue-log lanes. Existing deals are backfilled automatically, so every deal now runs all seven lanes through the cockpit.',
+      'Source-citation validation. Every numeric claim in the IC materials (key figures and memo sections) is mapped to a source fact or cited document; unsourced figures are flagged with a 0–100 citation score on the cockpit and a full audit at /api/deals/:id/citations and via a new agent tool.',
+      'Live Fabric mode. The app now queries the Fabric lakehouse SQL endpoint directly (live) in addition to the materialized OneLake snapshot, boots fast on the snapshot and upgrades to live in the background, and shows data freshness (as-of) and full table-level lineage in the cockpit — degrading honestly to the snapshot with an explicit reason when a live query is not available.',
+      'Canonical Company model. The news/filings desk, the screening-funnel candidates and the CxO signals are now unified into one entity-resolved governed record per real company (deduped by domain → registry → name), exposed at /api/companies, in the pipeline’s new “governed model” strip, and to the agents — resolving the duplicate feed records into a single company profile with merged provenance and funnel state.'
+    ]
+  },
+  {
     version: 'v0.31.0',
     date: '2026-07-07',
     image: 'dealroom-app:v52',

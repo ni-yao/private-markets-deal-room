@@ -527,12 +527,27 @@ export interface FabricPrecedent {
 export interface FabricInfo {
   configured: boolean;
   mode: 'live' | 'materialized' | 'unconfigured';
+  live?: boolean;
+  liveConfigured?: boolean;
+  liveError?: string | null;
   workspace?: string;
+  lakehouse?: string;
   source?: string | null;
   sqlEndpoint?: string | null;
   capacity?: string;
   extractedAt?: string | null;
+  queriedAt?: string | null;
   loadedAt?: string | null;
+  freshness?: { asOf: string; ageMinutes: number; label: string } | null;
+  lineage?: {
+    platform: string;
+    workspace: string;
+    lakehouse: string;
+    endpoint: string | null;
+    database: string;
+    tables: string[];
+    mode: string;
+  };
   counts?: {
     companies: number;
     comparableDeals: number;
@@ -591,6 +606,16 @@ export interface ICReadiness {
     source: string;
   };
   conditions: { id: string; text: string; owner: string | null; status: ConditionStatus }[];
+  overrides?: { stage: string; gate: string; verdict: string; reason: string; by: string; at: string }[];
+  citationAudit?: {
+    score: number;
+    clean: boolean;
+    summary: string;
+    totalClaims: number;
+    sourcedClaims: number;
+    unsourcedClaims: number;
+    unsourcedFigures: number;
+  };
   counts: { openIssues: number; unresolvedRisks: number; blockingWorkstreams: number; conditions: number; sources: number };
   marketIntel?: {
     source: FabricInfo;
@@ -598,6 +623,48 @@ export interface ICReadiness {
     icPrecedents: FabricPrecedent[];
     benchmarkFindings: FabricBenchmark[];
   };
+}
+
+export interface CanonicalCompanySummary {
+  id: string;
+  name: string;
+  aliases: string[];
+  domain: string | null;
+  ticker: string | null;
+  sector: string | null;
+  subSector: string | null;
+  region: string | null;
+  country: string | null;
+  hq: string | null;
+  ownership: string | null;
+  revenue: number | null;
+  ebitda: number | null;
+  ebitdaMargin: number | null;
+  growth: number | null;
+  dealSize: number | null;
+  estimated: boolean;
+  sources: string[];
+  discoveredVia: string;
+  newsCount: number;
+  hasSignals: boolean;
+  inFunnel: boolean;
+  funnel: { stage: string; disposition: string; passReason: string | null } | null;
+  feedIds: Record<string, string>;
+  firstSeen: string | null;
+}
+
+export interface CanonicalCompanies {
+  count: number;
+  fromFeeds: { desk: number; candidates: number; signals: number };
+  resolvedDuplicates: number;
+  companies: CanonicalCompanySummary[];
+}
+
+export interface ICGateBlock {
+  error: 'ic-not-ready' | 'override-forbidden';
+  gate: 'ic-entry' | 'ic-approval';
+  detail: string;
+  verdict: { state: 'READY' | 'CONDITIONAL' | 'NOT-READY'; headline: string; gating: string[]; openConditions: number };
 }
 
 export interface MarketIntel {
