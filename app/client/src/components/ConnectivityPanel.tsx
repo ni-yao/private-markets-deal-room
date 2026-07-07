@@ -20,6 +20,7 @@ export function ConnectivityPanel() {
   const [connectors, setConnectors] = useState<Connector[] | null>(null);
   const [tests, setTests] = useState<Record<string, ConnectorTest>>({});
   const [testing, setTesting] = useState<Set<string>>(new Set());
+  const [disconnecting, setDisconnecting] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
@@ -61,6 +62,34 @@ export function ConnectivityPanel() {
     }
   }
 
+  // Disconnect an OAuth-backed connector: clears the stored token server-side,
+  // drops the stale "connected" test result, and refreshes the row's status.
+  async function disconnect(id: string, name: string) {
+    setDisconnecting((s) => new Set(s).add(id));
+    try {
+      const r = await api.disconnectConnector(id);
+      setTests((t) => {
+        const n = { ...t };
+        delete n[id];
+        return n;
+      });
+      const cs = await api.connectors();
+      setConnectors(cs);
+      setNotice({
+        kind: 'ok',
+        text: `${CONNECTOR_LABELS[id] ?? name} disconnected.${r.envTokenRemains ? ' A preconfigured token is still active on the server.' : ' Reconnect to sign in again.'}`
+      });
+    } catch {
+      setNotice({ kind: 'err', text: `Could not disconnect ${CONNECTOR_LABELS[id] ?? name} — please try again.` });
+    } finally {
+      setDisconnecting((s) => {
+        const n = new Set(s);
+        n.delete(id);
+        return n;
+      });
+    }
+  }
+
   if (!connectors) return null;
 
   const liveCount = connectors.filter((c) => (tests[c.id]?.status ?? c.status) === 'connected').length;
@@ -95,9 +124,11 @@ export function ConnectivityPanel() {
             c={c}
             test={tests[c.id]}
             testing={testing.has(c.id)}
+            disconnecting={disconnecting.has(c.id)}
             expanded={expanded === c.id}
             onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
             onTest={() => runTest(c.id)}
+            onDisconnect={() => disconnect(c.id, c.name)}
           />
         ))}
       </div>
@@ -114,13 +145,15 @@ function statusLabel(status: string): string {
   }
 }
 
-function ConnectorRow({ c, test, testing, expanded, onToggle, onTest }: {
+function ConnectorRow({ c, test, testing, disconnecting, expanded, onToggle, onTest, onDisconnect }: {
   c: Connector;
   test?: ConnectorTest;
   testing: boolean;
+  disconnecting: boolean;
   expanded: boolean;
   onToggle: () => void;
   onTest: () => void;
+  onDisconnect: () => void;
 }) {
   const role = ROLE_META[c.role];
   const status = testing && !test ? 'unknown' : (test?.status ?? c.status);
@@ -156,6 +189,11 @@ function ConnectorRow({ c, test, testing, expanded, onToggle, onTest }: {
               <a className="conn-connect" href={`${c.loginUrl ?? `/api/connectors/${c.provider}/login`}?returnTo=/`}>
                 🔗 Connect {c.name}
               </a>
+            )}
+            {c.connectable && status === 'connected' && (
+              <button className="conn-disconnect" onClick={onDisconnect} disabled={disconnecting}>
+                {disconnecting ? 'Disconnecting…' : '⛔ Disconnect'}
+              </button>
             )}
             {c.kind === 'database' && (
               <span className="conn-note">Integration not wired — no live connection.</span>

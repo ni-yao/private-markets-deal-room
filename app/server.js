@@ -71,7 +71,7 @@ import { newsAgentConfigured } from './lib/newsAgent.js';
 import { chatDealAgent, dealAgentInfo } from './lib/dealAgent.js';
 import { dealMcpHandler, dealMcpMethodNotAllowed, dealMcpInfo } from './lib/mcp/dealServer.js';
 import { mcpAuthMiddleware, mcpAuthInfo } from './lib/mcp/entraAuth.js';
-import { listConnectors, testConnector } from './lib/connectors.js';
+import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
 import { m365Configured, m365Connected, m365FilesScope } from './lib/m365/graph.js';
@@ -236,6 +236,17 @@ api.post('/connectors/:id/test', async (req, res) => {
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: 'connectivity test failed', detail: String(err?.message || err) });
+  }
+});
+// Disconnect an OAuth-backed connector (m365 / MCP provider): clears the stored
+// delegated token so the next use requires a fresh sign-in + consent.
+api.post('/connectors/:id/disconnect', async (req, res) => {
+  try {
+    const out = await disconnectConnector(req.params.id);
+    if (!out) return res.status(404).json({ error: 'unknown connector' });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'disconnect failed', detail: String(err?.message || err) });
   }
 });
 // In-app OAuth sign-in for MCP connectors: /connectors/:provider/login|callback

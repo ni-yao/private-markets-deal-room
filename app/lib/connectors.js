@@ -14,7 +14,7 @@
 
 import { newsAgentConfigured } from './newsAgent.js';
 import { McpSession } from './mcp/morningstar.js';
-import { hasLogin } from './mcp/oauth.js';
+import { hasLogin, clearTokens } from './mcp/oauth.js';
 import { testFilings, filingsConfigured } from './filings.js';
 import { m365Configured, m365Connected, me as m365Me } from './m365/graph.js';
 
@@ -203,4 +203,19 @@ export function listConnectors() {
       message: cached ? cached.message : null
     };
   });
+}
+
+// Disconnect an OAuth-backed connector: remove its stored delegated token so the
+// panel reports it as disconnected and the next use requires a fresh sign-in.
+// Only m365 + MCP providers hold a token; other kinds are not disconnectable.
+// Clears the cached test result + last-sync so the row flips immediately.
+export async function disconnectConnector(id) {
+  const c = CONNECTORS.find((x) => x.id === id);
+  if (!c) return null;
+  const tokenKey = c.kind === 'm365' ? 'm365' : c.kind === 'mcp' ? c.provider : null;
+  if (!tokenKey) return { id, name: c.name, disconnected: false, error: 'not-disconnectable' };
+  const out = await clearTokens(tokenKey);
+  delete lastResult[c.id];
+  delete lastSync[c.id];
+  return { id, name: c.name, disconnected: true, envTokenRemains: out.envTokenRemains };
 }

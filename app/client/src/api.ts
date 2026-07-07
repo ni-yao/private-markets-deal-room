@@ -123,6 +123,8 @@ export const api = {
   newsDesk: () => get<SourcingDesk>('/api/news/desk'),
   connectors: () => get<Connector[]>('/api/connectors'),
   testConnector: (id: string) => post<ConnectorTest>(`/api/connectors/${id}/test`, {}),
+  disconnectConnector: (id: string) =>
+    post<{ id: string; name: string; disconnected: boolean; envTokenRemains?: boolean; error?: string }>(`/api/connectors/${id}/disconnect`, {}),
   findMoreNews: () => post<{ revealed: unknown; desk: SourcingDesk }>('/api/news/find-more', {}),
   setFindingCatalyst: (id: string, catalyst: string) =>
     post<{ findingId: string; catalyst: string; companyId: string }>(`/api/news/findings/${id}/catalyst`, { catalyst }),
