@@ -17,6 +17,7 @@ import { morningstarConfigured, quality as morningstarQuality } from './mcp/morn
 import { fetchFilings, fetchFormD, scanFormD, downloadEntireFiling } from './filings.js';
 import { uploadFiles as uploadFilingFiles, getFile as getBlobFile } from './blob.js';
 import { writeFilingSet, listFilings, onelakeInfo, onelakeStatusSync, onelakeConfigured } from './onelake.js';
+import { getCompanyCommunications, aiSearchConfigured } from './aisearch.js';
 import { markSync } from './connectors.js';
 import { fundMandate, seedThemes, seedScreens } from '../data/mandates.js';
 import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scoring.js';
@@ -506,10 +507,34 @@ export function getSignalCompanies() {
   });
 }
 
-export function getCrm(companyId) {
+// CRM system of record (proof of concept): the company's real communications are
+// retrieved from the Azure AI Search index (dealroomaisearch) — IC status memos,
+// legal reviews, meeting notes, financial/valuation summaries and DD updates — until
+// the production CRM connector lands. Resolves the signal company's name, then reads
+// its communications timeline. Fails loudly with the real reason (no silent stub).
+export async function getCrm(companyId) {
   const c = bySignalId(companyId);
-  if (!c) return null;
-  return { companyId: c.id, company: c.name, ...(c.crm || { exists: false, note: 'No CRM record — net-new target.' }) };
+  const company = c ? c.name : null;
+  if (!company) return null;
+  if (!aiSearchConfigured()) {
+    return { companyId, company, exists: false, source: null, note: 'CRM index (Azure AI Search) is not configured — set AI_SEARCH_ENDPOINT / AI_SEARCH_INDEX.' };
+  }
+  try {
+    const crm = await getCompanyCommunications(company, { top: 25 });
+    return {
+      companyId,
+      company,
+      exists: crm.count > 0,
+      source: crm.source,
+      index: crm.index,
+      count: crm.count,
+      byType: crm.byType,
+      communications: crm.communications,
+      note: crm.count > 0 ? null : `No CRM communications found for ${company} in the index.`
+    };
+  } catch (e) {
+    return { companyId, company, exists: false, error: String(e?.message || e).slice(0, 240) };
+  }
 }
 
 // Ingest raw Microsoft Graph / WorkIQ messages into CxO signal companies:

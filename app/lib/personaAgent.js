@@ -18,7 +18,8 @@ import { listDeals, getDealRaw } from './store.js';
 import {
   dispatchTool, dispatchAction, dealAnalystView, dealSummary,
   listPipeline, candidateView, candidateArtifactView, dealArtifactView, nextActionsFor,
-  icReadinessView, marketIntelView, citationAuditView, canonicalCompaniesView, canonicalCompanyView
+  icReadinessView, marketIntelView, citationAuditView, canonicalCompaniesView, canonicalCompanyView,
+  documentSearchView, crmCommunicationsView
 } from './dealTools.js';
 import { PERSONAS, PERSONA_LABEL } from './personaPolicy.js';
 
@@ -41,7 +42,7 @@ const PERSONA_AGENT = {
 };
 
 // Read tools go to dispatchTool; everything else is an action -> dispatchAction.
-const READ_TOOLS = new Set(['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'get_next_actions']);
+const READ_TOOLS = new Set(['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'search_documents', 'get_crm', 'get_next_actions']);
 
 export function personaAgentsConfigured() {
   return !!RESPONSES_URL;
@@ -171,9 +172,13 @@ async function readDispatch(name, args, { persona, focusId, focusCompany }) {
     case 'get_deal_artifact':
       return await dealArtifactView(args?.deal_id, args?.step);
     case 'get_ic_readiness':
-      return icReadinessView(args?.deal_id || focusId);
+      return await icReadinessView(args?.deal_id || focusId);
     case 'get_market_intel':
       return marketIntelView({ sector: args?.sector });
+    case 'search_documents':
+      return await documentSearchView({ query: args?.query, company: args?.company || focusCompany, doc_type: args?.doc_type, kind: args?.kind });
+    case 'get_crm':
+      return await crmCommunicationsView(args?.company || focusCompany);
     case 'get_citation_audit':
       return citationAuditView(args?.deal_id || focusId);
     case 'get_companies':

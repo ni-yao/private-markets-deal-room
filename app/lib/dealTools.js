@@ -17,6 +17,7 @@ import {
   getCitationAudit, canonicalCompanies, canonicalCompany
 } from './store.js';
 import { can, nextActions, PERSONA_LANE } from './personaPolicy.js';
+import { searchDocuments, getCompanyCommunications, getDealDocumentEvidence, aiSearchConfigured } from './aisearch.js';
 
 // ---- projections (narrow, size-bounded views of the deal record) ------------
 const trim = (s, n) => (typeof s === 'string' && s.length > n ? s.slice(0, n - 1) + '…' : s || '');
@@ -227,9 +228,14 @@ export async function dealArtifactView(dealId, step) {
 
 // The IC Readiness board for a deal — the seven decision-grade questions + verdict,
 // grounded in real Fabric/OneLake market intelligence. Bounded for tool output.
-export function icReadinessView(dealId) {
+export async function icReadinessView(dealId) {
   const b = getICReadiness(dealId);
   if (!b) return { error: 'deal-not-found', deal_id: dealId };
+  // Ground the board in the real deal documents (CIMs + CRM) from AI Search, so the
+  // "supporting sources" answer cites actual documents, not just on-record tags.
+  const docEvidence = aiSearchConfigured()
+    ? await getDealDocumentEvidence(b.company, { query: `${b.company} investment thesis valuation risks diligence findings IC recommendation`, top: 5 })
+    : { configured: false, evidence: [] };
   return {
     deal_id: b.dealId,
     company: b.company,
@@ -242,6 +248,9 @@ export function icReadinessView(dealId) {
     conditions: b.conditions.map((c) => ({ text: c.text, status: c.status })),
     icAsk: b.icAsk,
     supportingSources: b.supportingSources.slice(0, 10).map((s) => `${s.label}${s.ref ? ` (${s.ref})` : ''}`),
+    documentEvidence: docEvidence.error
+      ? { error: docEvidence.error }
+      : docEvidence.evidence.map((e) => ({ document: e.title, type: e.docType, kind: e.kind, deal: e.deal, snippet: e.snippet })),
     comparableDeals: (b.marketIntel?.comparableDeals || []).slice(0, 5).map((c) => ({ company: c.company, dealType: c.dealType, impliedValuation: c.impliedValuation, status: c.status })),
     icPrecedents: (b.marketIntel?.icPrecedents || []).map((p) => ({ deal: p.deal, decision: p.decision, votes: `${p.votesFor}-${p.votesAgainst}`, conditions: p.conditions })),
     fabric: b.marketIntel?.source?.mode || 'unconfigured'
@@ -317,6 +326,38 @@ export function marketIntelView({ sector } = {}) {
     benchmarkFindings: (mi.benchmarkFindings || []).map((w) => ({ workstream: w.workstream, total: w.total, byRisk: w.byRisk, topSamples: (w.samples || []).slice(0, 2).map((s) => ({ type: s.type, description: s.description, risk: s.risk })) })),
     icPrecedents: (mi.icPrecedents || []).map((p) => ({ deal: p.deal, decision: p.decision, votes: `${p.votesFor}-${p.votesAgainst}`, conditions: p.conditions }))
   };
+}
+
+// ---- Document intelligence (Azure AI Search) --------------------------------
+// Grounded retrieval over the fund's ingested deal documents (CIMs + CRM comms).
+// Powers evidence-based analysis at every step; throws surface as a { error } field
+// so the agent sees the real reason rather than a silent empty result.
+
+export async function documentSearchView({ query, company, doc_type, kind } = {}) {
+  if (!aiSearchConfigured()) return { error: 'aisearch-unconfigured', note: 'Document index (Azure AI Search) is not configured.' };
+  if (!query || !String(query).trim()) return { error: 'query-required' };
+  try {
+    const r = await searchDocuments(query, { company, docType: doc_type, kind, top: 8 });
+    return {
+      query: r.query,
+      company: r.company,
+      index: r.index,
+      count: r.hits.length,
+      results: r.hits.map((h) => ({ document: h.title, kind: h.kind, type: h.docType, company: h.company, deal: h.deal, stage: h.stage, subject: h.emailSubject, date: h.date, snippet: h.snippet }))
+    };
+  } catch (e) {
+    return { error: 'aisearch-failed', detail: String(e?.message || e).slice(0, 240) };
+  }
+}
+
+export async function crmCommunicationsView(company) {
+  if (!aiSearchConfigured()) return { error: 'aisearch-unconfigured', note: 'CRM index (Azure AI Search) is not configured.' };
+  if (!company || !String(company).trim()) return { error: 'company-required' };
+  try {
+    return await getCompanyCommunications(company, { top: 25 });
+  } catch (e) {
+    return { error: 'aisearch-failed', detail: String(e?.message || e).slice(0, 240) };
+  }
 }
 
 // ===========================================================================
@@ -469,6 +510,16 @@ export const TOOL_DESCRIPTIONS = {
     'Get ONE canonical Company record by id (or a feed id): identity & aliases, classification, financials with an ' +
     'estimated flag, provenance (which feeds sourced it), news count, CxO signals and funnel state — the single ' +
     'governed record for a real company across every feed.',
+  search_documents:
+    "Search the fund's ingested DEAL DOCUMENTS with grounded hybrid retrieval (Azure AI Search over CIMs and CRM " +
+    'communications): pass a natural-language query and optionally a company, a doc_type (e.g. "IC Status", "Legal ' +
+    'Review", "Meeting Notes", "Valuation"), or kind ("cim" | "crm"). Returns the most relevant document passages ' +
+    'with source titles — use at ANY step to ground analysis, findings and IC numbers in the real documents and to ' +
+    'cite exactly which document a claim comes from.',
+  get_crm:
+    "Get a company's CRM communications timeline from the CRM system of record (IC status memos, legal review memos, " +
+    'meeting notes, financial/valuation summaries, due-diligence updates), grouped by type and newest first. Use to ' +
+    'understand deal history, advisor/counterparty exchanges, open items and where a deal stands before you act.',
   // Action tools
   send_to_screening: 'Send a sourced target into the screening funnel (creates an O2 candidate). Analyst/Partner only.',
   screen_candidate: 'Record the Auto-Screen (O2) decision for a candidate: action = advance | pass | park (+ reason). Analyst/Partner only.',

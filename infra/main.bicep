@@ -162,6 +162,16 @@ param mcpKeyAiMd string = ''
 @secure()
 param mcpKeySupplyMd string = ''
 
+@description('Azure AI Search endpoint for the deal-document / CRM index (e.g. https://dealroomaisearch.search.windows.net). Empty disables document intelligence.')
+param aiSearchEndpoint string = ''
+
+@description('Azure AI Search index name (the multimodal-rag deal-document + CRM index).')
+param aiSearchIndex string = ''
+
+@description('Azure AI Search read-only query key. Empty uses the app managed identity against the Search data plane instead.')
+@secure()
+param aiSearchKey string = ''
+
 @description('Container Registry SKU.')
 @allowed([
   'Basic'
@@ -511,6 +521,9 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
         { name: 'mcp-key-retail-md', value: empty(mcpKeyRetailMd) ? 'unset' : mcpKeyRetailMd }
         { name: 'mcp-key-ai-md', value: empty(mcpKeyAiMd) ? 'unset' : mcpKeyAiMd }
         { name: 'mcp-key-supply-md', value: empty(mcpKeySupplyMd) ? 'unset' : mcpKeySupplyMd }
+        // Azure AI Search query key for document intelligence + CRM (proof of concept).
+        // Inert 'unset' placeholder falls back to managed identity in the app until set.
+        { name: 'ai-search-key', value: empty(aiSearchKey) ? 'unset' : aiSearchKey }
       ]
       ingress: {
         external: true
@@ -557,6 +570,9 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'MCP_KEY_RETAIL_MD', secretRef: 'mcp-key-retail-md' }
             { name: 'MCP_KEY_AI_MD', secretRef: 'mcp-key-ai-md' }
             { name: 'MCP_KEY_SUPPLY_MD', secretRef: 'mcp-key-supply-md' }
+            { name: 'AI_SEARCH_ENDPOINT', value: aiSearchEndpoint }
+            { name: 'AI_SEARCH_INDEX', value: aiSearchIndex }
+            { name: 'AI_SEARCH_KEY', secretRef: 'ai-search-key' }
           ]
         }
       ]

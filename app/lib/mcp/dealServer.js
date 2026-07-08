@@ -28,12 +28,13 @@ import {
   dispatchTool, TOOL_DESCRIPTIONS, DEAL_SECTIONS,
   listPipeline, candidateView, candidateArtifactView, dealArtifactView,
   icReadinessView, marketIntelView, citationAuditView, canonicalCompaniesView, canonicalCompanyView,
+  documentSearchView, crmCommunicationsView,
   dispatchAction, nextActionsFor
 } from '../dealTools.js';
 import { resolvePersona, PERSONAS, can } from '../personaPolicy.js';
 
 const SERVER_INFO = { name: 'deal-room-mcp', version: '2.3.0' };
-const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'get_next_actions'];
+const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'search_documents', 'get_crm', 'get_next_actions'];
 const ACTION_TOOLS = ['send_to_screening', 'screen_candidate', 'triage_candidate', 'gate_candidate', 'launch_deal', 'advance_deal', 'approve_ic', 'run_step', 'assign_lane', 'record_finding', 'record_contribution', 'record_issue', 'resolve_issue', 'set_condition', 'snapshot_assumptions'];
 const TOOL_NAMES = [...READ_TOOLS, ...ACTION_TOOLS];
 
@@ -120,7 +121,7 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
 
   server.registerTool('get_ic_readiness',
     { title: 'Get IC readiness', description: TOOL_DESCRIPTIONS.get_ic_readiness, inputSchema: { deal_id: z.string().describe('The deal id.') } },
-    async ({ deal_id }) => toContent(icReadinessView(deal_id)));
+    async ({ deal_id }) => toContent(await icReadinessView(deal_id)));
 
   server.registerTool('get_market_intel',
     { title: 'Get market intelligence', description: TOOL_DESCRIPTIONS.get_market_intel, inputSchema: { sector: z.string().optional().describe('Optional sector to bias the comparable deals.') } },
@@ -137,6 +138,22 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
   server.registerTool('get_company',
     { title: 'Get canonical company', description: TOOL_DESCRIPTIONS.get_company, inputSchema: { id: z.string().describe('The canonical company id (co-…) or a feed id (desk/candidate/signal).') } },
     async ({ id }) => toContent(canonicalCompanyView(id)));
+
+  server.registerTool('search_documents',
+    {
+      title: 'Search deal documents', description: TOOL_DESCRIPTIONS.search_documents,
+      inputSchema: {
+        query: z.string().describe('Natural-language query, e.g. "customer concentration risk" or "valuation bridge".'),
+        company: z.string().optional().describe('Optional company name to focus on, e.g. "Allbirds".'),
+        doc_type: z.string().optional().describe('Optional CRM document type, e.g. "IC Status", "Legal Review", "Meeting Notes", "Valuation".'),
+        kind: z.enum(['cim', 'crm']).optional().describe('Restrict to CIMs (deal memoranda) or CRM communications.')
+      }
+    },
+    async ({ query, company, doc_type, kind }) => toContent(await documentSearchView({ query, company, doc_type, kind })));
+
+  server.registerTool('get_crm',
+    { title: 'Get CRM communications', description: TOOL_DESCRIPTIONS.get_crm, inputSchema: { company: z.string().describe('The company name, e.g. "Wayfair".') } },
+    async ({ company }) => toContent(await crmCommunicationsView(company)));
 
   server.registerTool('get_next_actions',
     {

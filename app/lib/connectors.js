@@ -16,6 +16,7 @@ import { newsAgentConfigured } from './newsAgent.js';
 import { McpSession } from './mcp/morningstar.js';
 import { hasLogin, clearTokens } from './mcp/oauth.js';
 import { testFilings, filingsConfigured } from './filings.js';
+import { aiSearchConfigured, testAiSearch } from './aisearch.js';
 import { m365Configured, m365Connected, me as m365Me } from './m365/graph.js';
 
 export const CONNECTORS = [
@@ -52,6 +53,11 @@ export const CONNECTORS = [
     id: 'edgar', name: 'SEC EDGAR', kind: 'edgar', role: 'confirm',
     primaryJob: 'US regulatory filings — 10-K, 10-Q, 8-K, proxies (free, official)',
     sweetSpot: 'Real public-company filings with clickable sources'
+  },
+  {
+    id: 'aisearch', name: 'Document Intelligence', kind: 'aisearch', role: 'confirm',
+    primaryJob: 'Grounded retrieval over deal documents (CIMs) & CRM communications',
+    sweetSpot: 'Evidence-based analysis + CRM system of record (Azure AI Search)'
   },
   {
     id: 'pitchbook', name: 'PitchBook', kind: 'database', role: 'discover',
@@ -94,6 +100,7 @@ function isConfigured(c) {
   if (c.kind === 'web') return newsAgentConfigured();
   if (c.kind === 'mcp') return hasLogin(c.provider);
   if (c.kind === 'edgar') return filingsConfigured();
+  if (c.kind === 'aisearch') return aiSearchConfigured();
   if (c.kind === 'm365') return m365Connected();
   return false;
 }
@@ -164,6 +171,20 @@ async function testM365(c) {
   }
 }
 
+async function testAiSearchConnector(c) {
+  if (!aiSearchConfigured()) {
+    return result(c, { ok: false, status: 'disconnected', latencyMs: null, message: 'Not configured — set AI_SEARCH_ENDPOINT and AI_SEARCH_INDEX.' });
+  }
+  const t0 = Date.now();
+  try {
+    const { latencyMs, count } = await testAiSearch();
+    markSync(c.id);
+    return result(c, { ok: true, status: 'connected', latencyMs, lastSync: getLastSync(c.id), message: `Healthy · index reachable in ${latencyMs}ms (${count ?? '?'} documents)` });
+  } catch (e) {
+    return result(c, { ok: false, status: 'degraded', latencyMs: Date.now() - t0, message: `Reachable but errored · ${String(e.message || e).slice(0, 90)}` });
+  }
+}
+
 // Run a real connectivity test for one connector. Databases (unwired) always
 // report disconnected. Soft-cached for CACHE_MS unless force=true.
 export async function testConnector(id, { force = false } = {}) {
@@ -175,6 +196,7 @@ export async function testConnector(id, { force = false } = {}) {
   if (c.kind === 'web') return testWeb(c);
   if (c.kind === 'mcp') return testMcp(c);
   if (c.kind === 'edgar') return testEdgar(c);
+  if (c.kind === 'aisearch') return testAiSearchConnector(c);
   if (c.kind === 'm365') return testM365(c);
   return result(c, { ok: false, status: 'disconnected', latencyMs: null, message: 'Integration not wired — no live connection.' });
 }
@@ -195,7 +217,7 @@ export function listConnectors() {
       primaryJob: c.primaryJob,
       sweetSpot: c.sweetSpot,
       configured,
-      testable: c.kind === 'web' || c.kind === 'edgar' ? true : c.kind === 'mcp' || c.kind === 'm365' ? configured : false,
+      testable: c.kind === 'web' || c.kind === 'edgar' || c.kind === 'aisearch' ? true : c.kind === 'mcp' || c.kind === 'm365' ? configured : false,
       connectable: c.kind === 'mcp' || c.kind === 'm365', // can be signed-in via OAuth
       status: cached ? cached.status : c.kind === 'database' ? 'disconnected' : configured ? 'unknown' : 'disconnected',
       latencyMs: cached ? cached.latencyMs : null,

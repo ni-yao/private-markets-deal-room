@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.36.0',
+    date: '2026-07-08',
+    image: 'dealroom-app:v58',
+    revision: 'ca-dealroom-orch-dev-swc--0000054',
+    title: 'Document intelligence + CRM system of record — grounded on Azure AI Search',
+    tag: 'feature',
+    highlights: [
+      'Connected the fund\u2019s ingested deal documents (Confidential Information Memoranda) and CRM communications (IC status, legal reviews, meeting notes, financial/valuation summaries, DD updates) via an Azure AI Search index (dealroomaisearch), with true hybrid retrieval \u2014 semantic ranking plus server-side vectorization (text-embedding-3-small) \u2014 so analysis is grounded in the real documents, not assumptions.',
+      'Added two research tools available at every step and to all five persona agents (in-app and in Teams): search_documents (hybrid search over CIMs + CRM, optionally scoped by company, document type, or kind) that cites the exact source document, and get_crm (a company\u2019s CRM communications timeline grouped by type). The IC Readiness board now also surfaces supporting document evidence pulled from the index.',
+      'Made the CRM the system of record for the proof of concept: the company CRM view now returns real communications retrieved from the index (replacing the placeholder \u201cno CRM record\u201d stub) until the production CRM connector is available. New REST endpoints: /api/documents/search, /api/companies/:company/crm, and /api/aisearch status; a \u201cDocument Intelligence\u201d connector with a live connectivity test appears on the Home panel.',
+      'Wired AI Search config through bicep (AI_SEARCH_ENDPOINT / AI_SEARCH_INDEX + an ai-search-key secret) with managed-identity as the alternative auth, and re-provisioned the persona agents so their instructions use the new document/CRM tools.'
+    ]
+  },
+  {
     version: 'v0.35.0',
     date: '2026-07-08',
     image: 'dealroom-app:v57',

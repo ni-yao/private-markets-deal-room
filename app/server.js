@@ -95,6 +95,8 @@ import { chatPersonaAgent, personaAgentsInfo } from './lib/personaAgent.js';
 import { dealMcpHandler, dealMcpReadonlyHandler, dealMcpPersonaHandler, dealMcpMethodNotAllowed, dealMcpInfo, dealMcpReadonlyInfo, dealMcpPersonaInfo } from './lib/mcp/dealServer.js';
 import { mcpAuthMiddleware, mcpReadonlyAuthMiddleware, mcpPersonaAuthMiddleware, mcpAuthInfo, mcpReadonlyKeyConfigured, mcpPersonaKeyInfo } from './lib/mcp/entraAuth.js';
 import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
+import { aiSearchStatus } from './lib/aisearch.js';
+import { documentSearchView, crmCommunicationsView } from './lib/dealTools.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
 import { m365Configured, m365Connected, m365FilesScope } from './lib/m365/graph.js';
@@ -132,6 +134,7 @@ api.get('/config', (_req, res) => {
     morningstar: morningstarReady() ? 'live' : 'demo',
     fabric: fabricStatus(),
     onelake: oneLakeStatus(),
+    aiSearch: aiSearchStatus(),
     datastore: repoMode()
   });
 });
@@ -333,6 +336,20 @@ api.get('/market-intel/financials/:ticker', (req, res) => {
   res.json(f);
 });
 
+// Document intelligence (Azure AI Search) — grounded retrieval over deal documents
+// (CIMs) + CRM communications, and the CRM system of record for the proof of concept.
+api.get('/aisearch', (_req, res) => res.json(aiSearchStatus()));
+api.get('/documents/search', async (req, res) => {
+  const out = await documentSearchView({ query: req.query.q, company: req.query.company, doc_type: req.query.doc_type, kind: req.query.kind });
+  if (out.error) return res.status(out.error === 'query-required' ? 400 : 502).json(out);
+  res.json(out);
+});
+api.get('/companies/:company/crm', async (req, res) => {
+  const out = await crmCommunicationsView(req.params.company);
+  if (out.error) return res.status(502).json(out);
+  res.json(out);
+});
+
 // Fabric status + data lineage; POST re-attempts a live lakehouse query.
 api.get('/fabric', (_req, res) => res.json(fabricStatus()));
 api.post('/fabric/refresh', async (_req, res) => {
@@ -343,10 +360,14 @@ api.post('/fabric/refresh', async (_req, res) => {
 // O1 · Deal Sourcing — CxO signals explorer
 api.get('/signals/mailbox', (_req, res) => res.json(getMailbox()));
 api.get('/signals/companies', (_req, res) => res.json(getSignalCompanies()));
-api.get('/signals/companies/:id/crm', (req, res) => {
-  const crm = getCrm(req.params.id);
-  if (!crm) return res.status(404).json({ error: 'company not found' });
-  res.json(crm);
+api.get('/signals/companies/:id/crm', async (req, res) => {
+  try {
+    const crm = await getCrm(req.params.id);
+    if (!crm) return res.status(404).json({ error: 'company not found' });
+    res.json(crm);
+  } catch (e) {
+    res.status(502).json({ error: 'crm-lookup-failed', detail: String(e?.message || e).slice(0, 240) });
+  }
 });
 
 // Canonical Company model — the unified, entity-resolved governed record over the
