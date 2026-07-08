@@ -5,195 +5,199 @@
 <title>The Deal Room — Architecture Map</title>
 <style>
   :root{
-    --ink:#e9eefb; --dim:#aab8d4; --line:#5ea0ef; --line2:#3f6ea0;
-    --chip:#152238; --chipedge:#2a3a5a; --hub:#123a63; --hubedge:#3f86d6;
-    --band:#0e1930;
+    --ink:#eaf0fb; --dim:#9fb0cc; --faint:#7386a5;
+    --app:#3f86d6; --appbg:#122740; --appedge:#295583;
+    --ai:#6f7ff0; --aibg:#181c3a; --aiedge:#3a3f7a;
+    --data:#37b3a3; --databg:#0f2e2a; --dataedge:#1f5f56;
+    --ext:#8593ad; --extbg:#181f32; --extedge:#333f5a;
+    --chan:#b98be0; --chanbg:#221836; --chanedge:#493a66;
+    --obs:#e0a23c; --obsbg:#261f10; --obsedge:#5a4a1f;
+    --flow:#5ea0ef; --ctrl:#7d8fb0;
+    --card:#101c30; --cardedge:#26344f;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0a1120;font-family:"Segoe UI",Roboto,Arial,sans-serif}
-  #stage{position:relative;width:1280px;height:720px;overflow:hidden;
-    background:radial-gradient(1100px 640px at 62% -8%,#14294a 0,#0a1120 58%);color:var(--ink)}
+  html,body{background:#070c17}
+  #stage{position:relative;width:1280px;height:720px;overflow:hidden;background:#0b1220;color:var(--ink);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 
-  .title{position:absolute;left:34px;top:22px;font-size:22px;font-weight:700;letter-spacing:.2px}
-  .title small{display:block;font-size:12.5px;font-weight:500;color:var(--dim);margin-top:3px;letter-spacing:.2px}
+  /* type scale: exactly 3 sizes (NNG visual hierarchy) */
+  .h-title{position:absolute;left:28px;top:18px;font-size:23px;font-weight:700;letter-spacing:.2px;z-index:6}
+  .h-sub{position:absolute;left:28px;top:48px;font-size:12.5px;color:var(--dim);font-weight:500;z-index:6}
 
-  /* zone bands */
-  .band{position:absolute;border:1px solid #1d2c48;border-radius:14px;
-    background:linear-gradient(180deg,rgba(20,32,56,.42),rgba(12,20,40,.24))}
-  .band .bl{position:absolute;top:8px;left:12px;font-size:10.5px;letter-spacing:1.4px;
-    text-transform:uppercase;color:#7f92b6;font-weight:700}
+  /* common-region zones */
+  .zone{position:absolute;border-radius:13px;border:1px solid;z-index:1}
+  .zone .zh{position:absolute;top:9px;left:13px;font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase}
 
-  /* nodes */
-  .node{position:absolute;width:150px;height:56px;background:var(--chip);
-    border:1px solid var(--chipedge);border-radius:11px;display:flex;align-items:center;gap:9px;
-    padding:0 11px;z-index:3;box-shadow:0 2px 10px rgba(0,0,0,.25)}
-  .node img{width:26px;height:26px;flex:0 0 auto}
-  .node span{font-size:12.5px;font-weight:600;line-height:1.15}
-  .node.sm{height:48px}
-  .node.hub{width:172px;height:92px;
-    background:linear-gradient(180deg,#153f68,#0f2b4b);border-color:var(--hubedge);
-    box-shadow:0 0 0 1px rgba(94,160,239,.25) inset,0 4px 18px rgba(20,60,110,.5);flex-direction:column;
-    align-items:flex-start;justify-content:center;gap:6px;padding:10px 13px}
-  .node.hub .r1{display:flex;align-items:center;gap:9px}
-  .node.hub img{width:30px;height:30px}
-  .node.hub span{font-size:14px;font-weight:700}
-  .node.hub .tags{display:flex;gap:5px;flex-wrap:wrap}
-  .node.hub .tags i{font-style:normal;font-size:9.5px;color:#bcd2f2;background:rgba(63,134,214,.18);
-    border:1px solid rgba(94,160,239,.3);border-radius:10px;padding:1px 6px}
-  .node.stack::before,.node.stack::after{content:"";position:absolute;inset:0;border-radius:11px;
-    border:1px solid var(--chipedge);background:var(--chip);z-index:-1}
-  .node.stack::before{transform:translate(4px,4px)}
-  .node.stack::after{transform:translate(8px,8px)}
+  /* nodes: one consistent shape/size per type */
+  .n{position:absolute;height:52px;background:var(--card);border:1px solid var(--cardedge);border-radius:10px;
+    display:flex;align-items:center;gap:9px;padding:0 11px;z-index:4}
+  .n img{width:25px;height:25px;flex:0 0 auto}
+  .n b{font-size:12.5px;font-weight:600;line-height:1.15;letter-spacing:.1px}
+  .n.hub{height:108px;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;
+    background:var(--appbg);border:1.5px solid var(--app);box-shadow:0 0 0 3px rgba(63,134,214,.12);z-index:5}
+  .n.hub .row{display:flex;align-items:center;gap:9px}
+  .n.hub img{width:29px;height:29px}
+  .n.hub b{font-size:14.5px;font-weight:700}
+  .n.hub .eps{display:flex;gap:5px}
+  .n.hub .eps i{font-style:normal;font-size:9.5px;color:#cfe0f6;background:rgba(63,134,214,.16);
+    border:1px solid rgba(94,160,239,.32);border-radius:9px;padding:1px 6px;font-family:Consolas,monospace}
+  .n.stack{box-shadow:3px 3px 0 -1px var(--card),3px 3px 0 0 var(--cardedge),6px 6px 0 -1px var(--card),6px 6px 0 0 var(--cardedge)}
+  .n.t-app{border-left:3px solid var(--app)} .n.t-ai{border-left:3px solid var(--ai)}
+  .n.t-data{border-left:3px solid var(--data)} .n.t-ext{border-left:3px solid var(--ext)}
+  .n.t-chan{border-left:3px solid var(--chan)} .n.t-obs{border-left:3px solid var(--obs)}
 
-  svg#wires{position:absolute;inset:0;width:1280px;height:720px;z-index:1;pointer-events:none}
-  .wire{fill:none;stroke:var(--line2);stroke-width:1.6}
-  .wire.solid{stroke:var(--line);stroke-width:1.8}
-  .wire.dash{stroke:#6f83a6;stroke-dasharray:4 4}
-  .wlabel{position:absolute;z-index:2;font-size:9.5px;color:#9db4d8;background:#0c1526;
-    border:1px solid #1d2c48;border-radius:9px;padding:1px 6px;transform:translate(-50%,-50%);white-space:nowrap}
+  svg#wires{position:absolute;inset:0;width:1280px;height:720px;z-index:3;pointer-events:none}
+  .elabel{position:absolute;z-index:4;font-size:9px;color:#c3d3ee;background:#0c1526;border:1px solid #223151;
+    border-radius:7px;padding:1px 5px;transform:translate(-50%,-50%);white-space:nowrap;letter-spacing:.2px}
 
-  .legend{position:absolute;right:20px;bottom:16px;z-index:4;display:flex;gap:16px;font-size:10.5px;color:var(--dim);
-    background:rgba(12,21,38,.7);border:1px solid #1d2c48;border-radius:10px;padding:7px 12px}
-  .legend b{display:inline-flex;align-items:center;gap:6px;font-weight:500}
-  .legend .sw{width:20px;height:0;border-top:2px solid var(--line)}
-  .legend .sw.d{border-top:2px dashed #6f83a6}
+  .legend{position:absolute;right:26px;top:20px;z-index:6;display:flex;flex-direction:column;gap:6px;
+    background:rgba(12,20,38,.82);border:1px solid #223151;border-radius:9px;padding:9px 12px}
+  .legend .lr{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--dim)}
+  .legend .sw{width:22px;height:0;border-top:2px solid var(--flow)}
+  .legend .sw.d{border-top:2px dashed var(--ctrl)}
 </style>
 </head>
 <body>
 <div id="stage">
-  <div class="title">The Deal Room — Solution Architecture
-    <small>AI Foundry agents · Container Apps · Cosmos DB · grounded on Fabric &amp; AI Search</small>
+  <div class="h-title">The Deal Room — Solution Architecture</div>
+  <div class="h-sub">AI Foundry persona agents · Azure Container Apps · Cosmos DB — grounded on Microsoft Fabric &amp; Azure AI Search</div>
+  <div class="legend">
+    <div class="lr"><span class="sw"></span> data / call flow</div>
+    <div class="lr"><span class="sw d"></span> identity · secrets · telemetry</div>
   </div>
 
-  <!-- Zone bands -->
-  <div class="band" style="left:24px;top:120px;width:172px;height:470px"><div class="bl">Channels</div></div>
-  <div class="band" style="left:212px;top:120px;width:172px;height:470px"><div class="bl">Identity &amp; Edge</div></div>
-  <div class="band" style="left:400px;top:120px;width:210px;height:470px"><div class="bl">Application</div></div>
-  <div class="band" style="left:626px;top:120px;width:196px;height:470px"><div class="bl">AI · Foundry</div></div>
-  <div class="band" style="left:838px;top:120px;width:196px;height:470px"><div class="bl">Data &amp; Documents</div></div>
-  <div class="band" style="left:1050px;top:120px;width:190px;height:470px"><div class="bl">External · M365</div></div>
-  <div class="band" style="left:400px;top:604px;width:634px;height:92px"><div class="bl">Observability</div></div>
+  <!-- ZONES -->
+  <div class="zone" style="left:24px;top:92px;width:150px;height:600px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Channels</div></div>
+  <div class="zone" style="left:186px;top:92px;width:170px;height:600px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Identity &amp; Edge</div></div>
+  <div class="zone" style="left:368px;top:92px;width:180px;height:600px;background:var(--appbg);border-color:var(--appedge)"><div class="zh" style="color:var(--app)">Application</div></div>
+  <div class="zone" style="left:560px;top:92px;width:184px;height:600px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Azure AI Foundry</div></div>
+  <div class="zone" style="left:756px;top:92px;width:184px;height:600px;background:var(--databg);border-color:var(--dataedge)"><div class="zh" style="color:var(--data)">Data &amp; Documents</div></div>
+  <div class="zone" style="left:952px;top:92px;width:170px;height:600px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">External · M365</div></div>
+  <div class="zone" style="left:1134px;top:92px;width:122px;height:600px;background:var(--obsbg);border-color:var(--obsedge)"><div class="zh" style="color:var(--obs)">Observe</div></div>
 
-  <!-- Wires drawn under nodes -->
   <svg id="wires"></svg>
 
+  <!-- NODES -->
   <!-- Channels -->
-  <div class="node" id="web"   style="left:35px;top:250px"><img src="icons/web.svg"><span>Web App (SPA)</span></div>
-  <div class="node" id="teams" style="left:35px;top:430px"><img src="icons/teams.svg"><span>Microsoft Teams</span></div>
-
-  <!-- Edge -->
-  <div class="node sm" id="entra" style="left:223px;top:170px"><img src="icons/entra.svg"><span>Entra ID</span></div>
-  <div class="node sm" id="apim"  style="left:223px;top:340px"><img src="icons/apim.svg"><span>API Management</span></div>
-  <div class="node sm" id="mi"    style="left:223px;top:500px"><img src="icons/managedidentity.svg"><span>Managed Identity</span></div>
-
+  <div class="n t-chan" id="web"   style="left:34px;top:300px;width:130px"><img src="icons/web.svg"><b>Web App</b></div>
+  <div class="n t-chan" id="teams" style="left:34px;top:520px;width:130px"><img src="icons/teams.svg"><b>Teams</b></div>
+  <!-- Identity & Edge -->
+  <div class="n t-ext" id="entra" style="left:196px;top:200px;width:150px"><img src="icons/entra.svg"><b>Entra ID</b></div>
+  <div class="n t-ext" id="apim"  style="left:196px;top:390px;width:150px"><img src="icons/apim.svg"><b>API Mgmt</b></div>
+  <div class="n t-ext" id="mi"    style="left:196px;top:560px;width:150px"><img src="icons/managedidentity.svg"><b>Managed ID</b></div>
   <!-- Application -->
-  <div class="node hub" id="ca" style="left:420px;top:255px">
-    <div class="r1"><img src="icons/containerapps.svg"><span>Container Apps</span></div>
-    <div class="tags"><i>API</i><i>SPA</i><i>MCP</i></div>
+  <div class="n hub" id="ca" style="left:378px;top:300px;width:160px">
+    <div class="row"><img src="icons/containerapps.svg"><b>Container Apps</b></div>
+    <div class="eps"><i>API</i><i>SPA</i><i>MCP</i></div>
   </div>
-  <div class="node sm" id="func" style="left:430px;top:470px"><img src="icons/function.svg"><span>Functions</span></div>
-
+  <div class="n t-app" id="func" style="left:378px;top:540px;width:160px"><img src="icons/function.svg"><b>Functions</b></div>
   <!-- AI -->
-  <div class="node sm" id="foundry" style="left:640px;top:158px"><img src="icons/cognitive.svg"><span>AI Foundry</span></div>
-  <div class="node sm stack" id="agents" style="left:640px;top:262px"><img src="icons/cognitive.svg"><span>Persona Agents ×5</span></div>
-  <div class="node sm" id="aisvcs" style="left:640px;top:378px"><img src="icons/cognitive.svg"><span>AI Services</span></div>
-  <div class="node sm" id="bing"   style="left:640px;top:482px"><img src="icons/web.svg"><span>Grounding · Bing</span></div>
-
-  <!-- Data & Documents -->
-  <div class="node sm" id="cosmos"  style="left:852px;top:150px"><img src="icons/cosmos.svg"><span>Cosmos DB</span></div>
-  <div class="node sm" id="search"  style="left:852px;top:236px"><img src="icons/search.svg"><span>AI Search</span></div>
-  <div class="node sm" id="fabric"  style="left:852px;top:322px"><img src="icons/fabric.svg"><span>Fabric · OneLake</span></div>
-  <div class="node sm" id="storage" style="left:852px;top:408px"><img src="icons/storage.svg"><span>Storage</span></div>
-  <div class="node sm" id="msg"     style="left:852px;top:494px"><img src="icons/servicebus.svg"><span>Bus · Event Grid</span></div>
-
+  <div class="n t-ai" id="foundry"      style="left:572px;top:190px;width:160px"><img src="icons/cognitive.svg"><b>AI Foundry</b></div>
+  <div class="n t-ai stack" id="agents" style="left:572px;top:320px;width:160px"><img src="icons/cognitive.svg"><b>Agents ×5</b></div>
+  <div class="n t-ai" id="aisvcs"       style="left:572px;top:450px;width:160px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
+  <div class="n t-ai" id="bing"         style="left:572px;top:580px;width:160px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
+  <!-- Data -->
+  <div class="n t-data" id="cosmos"  style="left:768px;top:180px;width:160px"><img src="icons/cosmos.svg"><b>Cosmos DB</b></div>
+  <div class="n t-data" id="search"  style="left:768px;top:290px;width:160px"><img src="icons/search.svg"><b>AI Search</b></div>
+  <div class="n t-data" id="fabric"  style="left:768px;top:400px;width:160px"><img src="icons/fabric.svg"><b>Fabric</b></div>
+  <div class="n t-data" id="storage" style="left:768px;top:510px;width:160px"><img src="icons/storage.svg"><b>Storage</b></div>
+  <div class="n t-data" id="msg"     style="left:768px;top:610px;width:160px"><img src="icons/servicebus.svg"><b>Bus · Grid</b></div>
   <!-- External -->
-  <div class="node sm" id="edgar" style="left:1062px;top:200px"><img src="icons/edgar.svg"><span>SEC EDGAR</span></div>
-  <div class="node sm" id="kv"    style="left:1062px;top:322px"><img src="icons/keyvault.svg"><span>Key Vault</span></div>
-  <div class="node sm" id="m365"  style="left:1062px;top:444px"><img src="icons/sharepoint.svg"><span>Microsoft 365</span></div>
-
-  <!-- Observability -->
-  <div class="node sm" id="appins" style="left:452px;top:628px"><img src="icons/appinsights.svg"><span>App Insights</span></div>
-  <div class="node sm" id="law"    style="left:648px;top:628px"><img src="icons/loganalytics.svg"><span>Log Analytics</span></div>
-  <div class="node sm" id="mon"    style="left:844px;top:628px"><img src="icons/monitor.svg"><span>Azure Monitor</span></div>
-
-  <div class="legend">
-    <b><span class="sw"></span> data / call flow</b>
-    <b><span class="sw d"></span> identity · secrets · telemetry</b>
-  </div>
+  <div class="n t-ext" id="edgar" style="left:962px;top:230px;width:150px"><img src="icons/edgar.svg"><b>SEC EDGAR</b></div>
+  <div class="n t-ext" id="kv"    style="left:962px;top:400px;width:150px"><img src="icons/keyvault.svg"><b>Key Vault</b></div>
+  <div class="n t-ext" id="m365"  style="left:962px;top:560px;width:150px"><img src="icons/sharepoint.svg"><b>Microsoft 365</b></div>
+  <!-- Observe -->
+  <div class="n t-obs" id="appins" style="left:1144px;top:230px;width:102px;padding:0 8px"><img src="icons/appinsights.svg"><b>Insights</b></div>
+  <div class="n t-obs" id="law"    style="left:1144px;top:400px;width:102px;padding:0 8px"><img src="icons/loganalytics.svg"><b>Logs</b></div>
+  <div class="n t-obs" id="mon"    style="left:1144px;top:560px;width:102px;padding:0 8px"><img src="icons/monitor.svg"><b>Monitor</b></div>
 </div>
 
 <script>
-  // Connector list: [from, to, style, optional label]
-  const WIRES = [
-    ['web','ca','solid'],
-    ['teams','agents','solid'],
-    ['agents','ca','solid','MCP'],
-    ['entra','ca','dash'],
-    ['mi','ca','dash'],
-    ['apim','foundry','dash'],
-    ['ca','foundry','solid'],
-    ['ca','cosmos','solid'],
-    ['ca','search','solid'],
-    ['ca','fabric','solid'],
-    ['ca','storage','solid'],
-    ['ca','msg','solid'],
-    ['msg','func','solid'],
-    ['ca','kv','dash'],
-    ['ca','edgar','solid'],
-    ['ca','m365','solid'],
-    ['agents','bing','solid'],
-    ['ca','aisvcs','solid'],
-    ['edgar','fabric','solid'],
-    ['ca','appins','dash'],
-    ['appins','law','dash'],
-    ['law','mon','dash']
-  ];
-  const stage = document.getElementById('stage');
-  const svg = document.getElementById('wires');
-  const SVGNS = 'http://www.w3.org/2000/svg';
+const SVGNS='http://www.w3.org/2000/svg';
+const stage=document.getElementById('stage'), svg=document.getElementById('wires');
+const defs=document.createElementNS(SVGNS,'defs');
+defs.innerHTML=
+ '<marker id="af" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5ea0ef"/></marker>'+
+ '<marker id="ac" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8fb0"/></marker>';
+svg.appendChild(defs);
 
-  // arrowhead marker
-  const defs = document.createElementNS(SVGNS,'defs');
-  defs.innerHTML = '<marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">'+
-    '<path d="M0,0 L6,3 L0,6 Z" fill="#5ea0ef"/></marker>'+
-    '<marker id="ahd" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">'+
-    '<path d="M0,0 L6,3 L0,6 Z" fill="#6f83a6"/></marker>';
-  svg.appendChild(defs);
+function box(id){const s=stage.getBoundingClientRect(),r=document.getElementById(id).getBoundingClientRect();
+  return {l:r.left-s.left,t:r.top-s.top,r:r.right-s.left,b:r.bottom-s.top,w:r.width,h:r.height,cx:(r.left+r.right)/2-s.left,cy:(r.top+r.bottom)/2-s.top};}
+function pt(id,side,frac){const b=box(id);frac=frac==null?0.5:frac;
+  if(side==='r')return{x:b.r,y:b.t+b.h*frac}; if(side==='l')return{x:b.l,y:b.t+b.h*frac};
+  if(side==='t')return{x:b.l+b.w*frac,y:b.t};   return{x:b.l+b.w*frac,y:b.b};}
+function ortho(points,r=9){
+  let d=`M ${points[0].x} ${points[0].y}`;
+  for(let i=1;i<points.length-1;i++){
+    const p=points[i],a=points[i-1],b=points[i+1];
+    const d1={x:Math.sign(p.x-a.x),y:Math.sign(p.y-a.y)}, d2={x:Math.sign(b.x-p.x),y:Math.sign(b.y-p.y)};
+    const rr=Math.min(r,Math.hypot(p.x-a.x,p.y-a.y)/2,Math.hypot(b.x-p.x,b.y-p.y)/2);
+    d+=` L ${p.x-d1.x*rr} ${p.y-d1.y*rr} Q ${p.x} ${p.y} ${p.x+d2.x*rr} ${p.y+d2.y*rr}`;
+  }
+  const e=points[points.length-1]; d+=` L ${e.x} ${e.y}`; return d;
+}
+function line(points,{ctrl=false,arrow=true}={}){
+  const p=document.createElementNS(SVGNS,'path');
+  p.setAttribute('d',ortho(points)); p.setAttribute('fill','none');
+  p.setAttribute('stroke',ctrl?'#7d8fb0':'#5ea0ef'); p.setAttribute('stroke-width',ctrl?1.5:1.9);
+  if(ctrl)p.setAttribute('stroke-dasharray','5 4');
+  if(arrow)p.setAttribute('marker-end',ctrl?'url(#ac)':'url(#af)');
+  svg.appendChild(p);
+}
+function tag(x,y,text){const t=document.createElement('div');t.className='elabel';t.textContent=text;
+  t.style.left=x+'px';t.style.top=y+'px';stage.appendChild(t);}
+function wire(points,opt={}){line(points,opt); if(opt.label){const i=Math.max(1,Math.floor(points.length/2));
+  const m=points[i-1],n=points[i]; tag((m.x+n.x)/2,(m.y+n.y)/2,opt.label);}}
 
-  function rectOf(id){
-    const el=document.getElementById(id), s=stage.getBoundingClientRect(), r=el.getBoundingClientRect();
-    return {x:r.left-s.left, y:r.top-s.top, w:r.width, h:r.height, cx:r.left-s.left+r.width/2, cy:r.top-s.top+r.height/2};
-  }
-  // anchor on the border of rect facing the other point
-  function anchor(a,b){
-    const dx=b.cx-a.cx, dy=b.cy-a.cy;
-    if(Math.abs(dx) > Math.abs(dy)*1.1){
-      return {x: a.cx + (dx>0? a.w/2 : -a.w/2), y: a.cy + dy*0.12};
-    } else if(Math.abs(dy) > Math.abs(dx)*1.1){
-      return {x: a.cx + dx*0.12, y: a.cy + (dy>0? a.h/2 : -a.h/2)};
-    }
-    return {x: a.cx + (dx>0? a.w/2 : -a.w/2), y: a.cy + (dy>0? a.h/2 : -a.h/2)};
-  }
-  function draw(){
-    for(const [from,to,style,label] of WIRES){
-      const A=rectOf(from), B=rectOf(to);
-      const p1=anchor(A,B), p2=anchor(B,A);
-      const mx=(p1.x+p2.x)/2;
-      const d=`M ${p1.x} ${p1.y} C ${mx} ${p1.y}, ${mx} ${p2.y}, ${p2.x} ${p2.y}`;
-      const path=document.createElementNS(SVGNS,'path');
-      path.setAttribute('d',d);
-      path.setAttribute('class','wire '+style);
-      path.setAttribute('marker-end', style==='dash' ? 'url(#ahd)' : 'url(#ah)');
-      svg.appendChild(path);
-      if(label){
-        const t=document.createElement('div');
-        t.className='wlabel'; t.textContent=label;
-        t.style.left=((p1.x+p2.x)/2)+'px'; t.style.top=((p1.y+p2.y)/2)+'px';
-        stage.appendChild(t);
-      }
-    }
-  }
-  draw();
+requestAnimationFrame(()=>{
+  // ---------- LEFT: channels & edge -> hub ----------
+  wire([pt('web','r'),{x:362,y:pt('web','r').y},{x:362,y:pt('ca','l',0.32).y},pt('ca','l',0.32)],{label:'HTTPS'});
+  wire([pt('entra','r'),{x:361,y:pt('entra','r').y},{x:361,y:pt('ca','l',0.12).y},pt('ca','l',0.12)],{ctrl:true,label:'auth'});
+  wire([pt('mi','r'),{x:361,y:pt('mi','r').y},{x:361,y:pt('ca','l',0.88).y},pt('ca','l',0.88)],{ctrl:true,label:'RBAC'});
+  wire([pt('apim','r'),{x:359,y:pt('apim','r').y},{x:359,y:pt('ca','l',0.62).y},pt('ca','l',0.62)],{ctrl:true,label:'gateway'});
+
+  // ---------- HUB -> AI zone (adjacent) ----------
+  wire([pt('ca','r',0.24),{x:556,y:pt('ca','r',0.24).y},{x:556,y:pt('foundry','l').y},pt('foundry','l')],{label:'reason · embed'});
+  wire([pt('agents','l'),{x:552,y:pt('agents','l').y},{x:552,y:pt('ca','r',0.78).y},pt('ca','r',0.78)],{label:'MCP'});
+  wire([pt('ca','r',0.95),{x:548,y:pt('ca','r',0.95).y},{x:548,y:pt('aisvcs','l').y},pt('aisvcs','l')],{label:'extract · safety'});
+  wire([pt('agents','b',0.5),{x:pt('agents','b').x,y:558},{x:pt('bing','t').x,y:558},pt('bing','t')],{label:'news'});
+
+  // ---------- Teams -> Agents (bottom trunk, clean) ----------
+  wire([pt('teams','b'),{x:pt('teams','b').x,y:668},{x:652,y:668},{x:652,y:pt('agents','b').y},pt('agents','b',0.74)],{label:'invoke'});
+
+  // ---------- HUB -> DATA via a vertical BUS + short taps (one feeder label) ----------
+  const busX=752;
+  // feeder: hub right -> cross AI zone at the Foundry/Agents gap (y=258) -> bus
+  const fy=pt('ca','r',0.14).y;
+  line([pt('ca','r',0.14),{x:550,y:fy},{x:550,y:258},{x:busX,y:258}]);
+  tag(645,250,'reads · docs · events');
+  // vertical bus spanning the data column
+  const yTop=pt('cosmos','l').y, yBot=pt('msg','l').y;
+  line([{x:busX,y:yTop},{x:busX,y:yBot}],{arrow:false});
+  // short taps into each data node
+  ['cosmos','search','fabric','storage','msg'].forEach(id=>{
+    const b=pt(id,'l'); line([{x:busX,y:b.y},b]);
+  });
+
+  // ---------- product-to-product ----------
+  wire([pt('msg','b',0.5),{x:pt('msg','b').x,y:678},{x:pt('func','b').x,y:678},pt('func','b',0.5)],{label:'trigger'});
+  wire([pt('edgar','l'),{x:946,y:pt('edgar','l').y},{x:946,y:pt('fabric','r',0.28).y},pt('fabric','r',0.28)],{label:'archive'});
+
+  // ---------- External M365 & Key Vault (perimeter, from the app) ----------
+  // Key Vault (secrets, dashed): top perimeter, then down the data/external gap into KV's LEFT (avoids EDGAR)
+  wire([pt('ca','t',0.7),{x:pt('ca','t',0.7).x,y:130},{x:948,y:130},{x:948,y:pt('kv','l').y},pt('kv','l')],{ctrl:true});
+  tag(940,362,'secrets');
+  // Microsoft 365 (Graph): from Storage area rightwards (Graph doc workspaces)
+  wire([pt('storage','r',0.7),{x:945,y:pt('storage','r',0.7).y},{x:945,y:pt('m365','l').y},pt('m365','l')],{label:'Graph'});
+  // EDGAR filings fetched by the app: top perimeter
+  wire([pt('ca','t',0.3),{x:pt('ca','t',0.3).x,y:120},{x:1000,y:120},{x:1000,y:pt('edgar','t').y},pt('edgar','t',0.5)],{});
+  tag(1000,175,'filings');
+
+  // ---------- Observability (telemetry chain) ----------
+  wire([pt('cosmos','r',0.7),{x:1129,y:pt('cosmos','r',0.7).y},{x:1129,y:pt('appins','l').y},pt('appins','l')],{ctrl:true,label:'telemetry'});
+  wire([pt('appins','b',0.5),{x:pt('appins','b').x,y:pt('law','t').y-10},pt('law','t',0.5)],{ctrl:true});
+  wire([pt('law','b',0.5),{x:pt('law','b').x,y:pt('mon','t').y-10},pt('mon','t',0.5)],{ctrl:true});
+});
 </script>
 </body>
 </html>
