@@ -43,7 +43,7 @@ const SCOPE = [
   // GroupMember.Read.All + TeamMember.ReadWrite.All auto-publish the channel to the
   // "Private Equity Deals" group members. All need tenant-ADMIN consent (Global Admin).
   'ChannelSettings.ReadWrite.All', 'Sites.ReadWrite.All', 'Files.ReadWrite.All',
-  'GroupMember.Read.All', 'TeamMember.ReadWrite.All'
+  'GroupMember.Read.All', 'TeamMember.ReadWrite.All', 'TeamsAppInstallation.ReadWriteForTeam'
 ].join(' ');
 
 // Pending authorizations keyed by state (short-lived).

@@ -109,6 +109,33 @@ async function setChannelThreads(teamId) {
 // idempotent (a user already on the team returns 4xx which we ignore). Needs
 // GroupMember.Read.All + TeamMember.ReadWrite.All (admin-consented).
 const PUBLISH_GROUP = 'Private Equity Deals';
+
+// Install the org-catalog Deal Dashboard Teams app into a deal team so its bot can
+// receive @mentions in the channel. The app is looked up by its manifest id
+// (externalId, stable per host). Best-effort + idempotent (409 = already installed).
+// Requires TeamsAppInstallation.ReadWriteForTeam (admin-consented).
+const TEAMS_APP_EXTERNAL_ID = process.env.TEAMS_APP_EXTERNAL_ID || '4d93c450-db97-5aef-91c4-1806db478dea';
+export async function installTeamsAppInTeam(teamId) {
+  if (!teamId) return { installed: false, reason: 'no-team' };
+  try {
+    const cat = await graph(`/appCatalogs/teamsApps?$filter=externalId eq '${TEAMS_APP_EXTERNAL_ID}'`);
+    const appId = cat?.value?.[0]?.id;
+    if (!appId) return { installed: false, reason: 'app-not-in-catalog' };
+    try {
+      await graph(`/teams/${teamId}/installedApps`, {
+        method: 'POST',
+        body: { 'teamsApp@odata.bind': `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}` }
+      });
+      return { installed: true, appId };
+    } catch (err) {
+      if (/→ 409|already|Conflict/i.test(String(err?.message || ''))) return { installed: true, already: true, appId };
+      return { installed: false, appId, error: String(err?.message || err).slice(0, 160) };
+    }
+  } catch (err) {
+    return { installed: false, error: String(err?.message || err).slice(0, 160) };
+  }
+}
+
 export async function publishTeamToGroup(teamId, groupName = PUBLISH_GROUP) {
   if (!teamId) return { added: 0, reason: 'no-team' };
   try {

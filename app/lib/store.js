@@ -23,7 +23,7 @@ import { scoreTargets, scoreScreen, gateCompany, validateScreen } from './scorin
 import { buildScorecard, buildTriageScore, buildMemoBase } from './screening.js';
 import { buildDiligencePlan, buildFindingsReport, buildFinalMemoBase, buildExecutionPack, buildCloseoutPlan } from './diligence.js';
 import { buildWorkspace, checklistStats, MD_OPTIONS, WORKSTREAM_DEFAULTS, ensureWorkspaceSwimlanes, LANE_ORDER } from '../data/workspace.js';
-import { ensureDealChannel, provisionDealFolders, m365Connected, publishTeamToGroup } from './m365/graph.js';
+import { ensureDealChannel, provisionDealFolders, m365Connected, publishTeamToGroup, installTeamsAppInTeam } from './m365/graph.js';
 import { generateAnalystReport } from './analystReport.js';
 import {
   PASS_REASONS,
@@ -1781,6 +1781,13 @@ async function provisionDealChannel(deal) {
       logEvent(deal.id, 'teams-published', pub);
     } catch (err) {
       logEvent(deal.id, 'teams-publish-error', { error: String(err?.message || err).slice(0, 160) });
+    }
+    // Install the Deal Dashboard app so its bot answers @mentions in the channel.
+    try {
+      const inst = await installTeamsAppInTeam(channel.teamId);
+      logEvent(deal.id, 'teams-app-installed', inst);
+    } catch (err) {
+      logEvent(deal.id, 'teams-app-install-error', { error: String(err?.message || err).slice(0, 160) });
     }
   }
 
