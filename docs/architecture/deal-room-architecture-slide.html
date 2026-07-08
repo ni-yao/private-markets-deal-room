@@ -5,19 +5,21 @@
 <title>The Deal Room — Architecture Map</title>
 <style>
   :root{
-    --ink:#eaf0fb; --dim:#9fb0cc;
-    --app:#3f86d6; --appbg:#122740; --appedge:#2f6098;
-    --ai:#6f7ff0; --aibg:#181c3a; --aiedge:#3a3f7a;
-    --data:#37b3a3; --databg:#0f2e2a; --dataedge:#1f6157;
-    --ext:#8593ad; --extbg:#181f32; --extedge:#333f5a;
-    --chan:#b98be0; --chanbg:#221836; --chanedge:#4b3c68;
-    --obs:#e0a23c; --obsbg:#261f10; --obsedge:#5a4a1f;
-    --flow:#5ea0ef; --ctrl:#7d8fb0;
-    --card:#101c30; --cardedge:#26344f;
+    --ink:#1d2b47; --dim:#5b6b86;
+    /* rich pastel domains: accent (rail/heading) · bg (zone fill) · edge (zone border) */
+    --app:#2f6fd0; --appbg:#dbe8fb; --appedge:#a9c8f2;
+    --ai:#6a5cd6; --aibg:#e7e3fb; --aiedge:#c4bcf1;
+    --data:#149e88; --databg:#d4f1ea; --dataedge:#a1ddcf;
+    --ext:#5b6b86; --extbg:#e6ebf3; --extedge:#c2ccdb;
+    --chan:#b25fc6; --chanbg:#f4e2f8; --chanedge:#e0b8ea;
+    --obs:#d5872a; --obsbg:#fbe9cf; --obsedge:#f0cf9c;
+    --flow:#2f6fd0; --ctrl:#8a97ac;
+    --card:#ffffff; --cardedge:#d6deec;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:#070c17}
-  #stage{position:relative;width:1280px;height:720px;overflow:hidden;background:#0b1220;color:var(--ink);
+  html,body{background:#e7ecf4}
+  #stage{position:relative;width:1280px;height:720px;overflow:hidden;color:var(--ink);
+    background:radial-gradient(1200px 700px at 60% -12%,#ffffff 0,#eef2f8 55%,#e7ecf4 100%);
     font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
 
   .h-title{position:absolute;left:26px;top:16px;font-size:22px;font-weight:700;letter-spacing:.2px;z-index:6}
@@ -27,28 +29,28 @@
   .zone .zh{position:absolute;top:8px;left:12px;font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
 
   .n{position:absolute;height:48px;background:var(--card);border:1px solid var(--cardedge);border-radius:10px;
-    display:flex;align-items:center;gap:9px;padding:0 11px;z-index:4}
+    display:flex;align-items:center;gap:9px;padding:0 11px;z-index:4;box-shadow:0 1px 3px rgba(29,43,71,.08)}
   .n img{width:24px;height:24px;flex:0 0 auto}
   .n b{font-size:12px;font-weight:600;line-height:1.15;letter-spacing:.1px}
   .n.hub{height:118px;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;
-    background:var(--appbg);border:1.5px solid var(--app);box-shadow:0 0 0 4px rgba(63,134,214,.12);z-index:5}
+    background:var(--appbg);border:1.5px solid var(--app);box-shadow:0 0 0 4px rgba(47,111,208,.14),0 3px 10px rgba(47,111,208,.18);z-index:5}
   .n.hub .row{display:flex;align-items:center;gap:10px}
   .n.hub img{width:34px;height:34px}
   .n.hub b{font-size:16px;font-weight:700}
   .n.hub .eps{display:flex;gap:5px}
-  .n.hub .eps i{font-style:normal;font-size:10px;color:#cfe0f6;background:rgba(63,134,214,.16);
-    border:1px solid rgba(94,160,239,.32);border-radius:9px;padding:1px 7px;font-family:Consolas,monospace}
+  .n.hub .eps i{font-style:normal;font-size:10px;color:#2f6fd0;background:#ffffff;
+    border:1px solid #a9c8f2;border-radius:9px;padding:1px 7px;font-family:Consolas,monospace}
   .n.stack{box-shadow:3px 3px 0 -1px var(--card),3px 3px 0 0 var(--cardedge),6px 6px 0 -1px var(--card),6px 6px 0 0 var(--cardedge)}
   .n.t-ai{border-left:3px solid var(--ai)} .n.t-data{border-left:3px solid var(--data)}
   .n.t-ext{border-left:3px solid var(--ext)} .n.t-chan{border-left:3px solid var(--chan)}
   .n.t-obs{border-left:3px solid var(--obs)} .n.t-app{border-left:3px solid var(--app)}
 
   svg#wires{position:absolute;inset:0;width:1280px;height:720px;z-index:3;pointer-events:none}
-  .elabel{position:absolute;z-index:4;font-size:9px;color:#c3d3ee;background:#0c1526;border:1px solid #223151;
-    border-radius:7px;padding:1px 5px;transform:translate(-50%,-50%);white-space:nowrap;letter-spacing:.2px}
+  .elabel{position:absolute;z-index:4;font-size:9px;color:#33425e;background:#ffffff;border:1px solid #cdd6e6;
+    border-radius:7px;padding:1px 5px;transform:translate(-50%,-50%);white-space:nowrap;letter-spacing:.2px;box-shadow:0 1px 2px rgba(29,43,71,.06)}
 
   .legend{position:absolute;right:24px;top:16px;z-index:6;display:flex;flex-direction:column;gap:5px;
-    background:rgba(12,20,38,.82);border:1px solid #223151;border-radius:9px;padding:8px 11px}
+    background:rgba(255,255,255,.9);border:1px solid #cdd6e6;border-radius:9px;padding:8px 11px;box-shadow:0 1px 3px rgba(29,43,71,.08)}
   .legend .lr{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--dim)}
   .legend .sw{width:20px;height:0;border-top:2px solid var(--flow)}
   .legend .sw.d{border-top:2px dashed var(--ctrl)}
@@ -121,8 +123,8 @@ const SVGNS='http://www.w3.org/2000/svg';
 const stage=document.getElementById('stage'), svg=document.getElementById('wires');
 const defs=document.createElementNS(SVGNS,'defs');
 defs.innerHTML=
- '<marker id="af" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#5ea0ef"/></marker>'+
- '<marker id="ac" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7d8fb0"/></marker>';
+ '<marker id="af" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2f6fd0"/></marker>'+
+ '<marker id="ac" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#8a97ac"/></marker>';
 svg.appendChild(defs);
 
 function box(id){const s=stage.getBoundingClientRect(),r=document.getElementById(id).getBoundingClientRect();
@@ -143,7 +145,7 @@ function ortho(points,r=9){
 function line(points,{ctrl=false,arrow=true}={}){
   const p=document.createElementNS(SVGNS,'path');
   p.setAttribute('d',ortho(points)); p.setAttribute('fill','none');
-  p.setAttribute('stroke',ctrl?'#7d8fb0':'#5ea0ef'); p.setAttribute('stroke-width',ctrl?1.5:1.9);
+  p.setAttribute('stroke',ctrl?'#8a97ac':'#2f6fd0'); p.setAttribute('stroke-width',ctrl?1.5:2);
   if(ctrl)p.setAttribute('stroke-dasharray','5 4');
   if(arrow)p.setAttribute('marker-end',ctrl?'url(#ac)':'url(#af)');
   svg.appendChild(p);
