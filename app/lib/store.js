@@ -1932,7 +1932,7 @@ export function recordIssue(id, { lane, title, severity = 'caution', owner, reso
     const at = new Date().toISOString();
     deal.issues = deal.issues || [];
     const issue = {
-      id: `issue-${deal.id}-${issueSeq++}`,
+      id: `issue-${deal.id}-${issueSeq++}-${Math.random().toString(36).slice(2, 7)}`,
       lane: lane || null,
       title: t,
       severity: sev,
@@ -1954,7 +1954,11 @@ export function recordIssue(id, { lane, title, severity = 'caution', owner, reso
 
 export function resolveIssue(id, issueId, { status = 'resolved', resolutionPath, by, persona } = {}) {
   return mutateDeal(id, (deal) => {
-    const issue = (deal.issues || []).find((i) => i.id === issueId);
+    // Robust to legacy duplicate ids (issueSeq reset across process restarts could
+    // mint the same id twice): target a still-open match first so we never resolve
+    // an already-closed duplicate while an open one lingers.
+    const matches = (deal.issues || []).filter((i) => i.id === issueId);
+    const issue = matches.find((i) => i.status === 'open' || i.status === 'mitigating') || matches[0];
     if (!issue) return { error: 'issue-not-found' };
     const st = ISSUE_STATUSES.has(status) ? status : 'resolved';
     issue.status = st;
