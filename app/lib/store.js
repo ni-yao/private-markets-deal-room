@@ -1854,15 +1854,15 @@ export async function provisionAllDealChannels() {
 // Resolve the deal whose provisioned Teams team matches the given id (AAD group
 // id, team id or channel/thread id) — used by the in-channel bot to map a
 // conversation to its deal.
-export function dealForTeam(teamId) {
-  if (!teamId) return null;
-  const t = String(teamId);
+export function dealForTeam(teamOrChannelId) {
+  if (!teamOrChannelId) return null;
+  const t = String(teamOrChannelId);
   const enc = encodeURIComponent(t);
-  const d = deals.find((x) => {
-    const tc = x.teamsChannel || {};
-    const url = (x.workspace && x.workspace.teamsUrl) || '';
-    return tc.teamId === t || tc.channelId === t || url.includes(t) || url.includes(enc);
-  });
+  // Channel id is unique per deal (deals now share one parent team), so match it
+  // first; then the workspace URL; then an UNAMBIGUOUS team id (team-per-deal fallback).
+  let d = deals.find((x) => (x.teamsChannel || {}).channelId === t);
+  if (!d) d = deals.find((x) => { const u = (x.workspace && x.workspace.teamsUrl) || ''; return u.includes(t) || u.includes(enc); });
+  if (!d) { const byTeam = deals.filter((x) => (x.teamsChannel || {}).teamId === t); if (byTeam.length === 1) d = byTeam[0]; }
   return d ? { dealId: d.id, company: d.company } : null;
 }
 

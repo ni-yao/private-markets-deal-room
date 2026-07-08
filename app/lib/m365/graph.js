@@ -111,28 +111,24 @@ async function setChannelThreads(teamId) {
 const PUBLISH_GROUP = 'Private Equity Deals';
 
 // Install the org-catalog Deal Dashboard Teams app into a deal team so its bot can
-// receive @mentions in the channel. The app is looked up by its manifest id
-// (externalId, stable per host). Best-effort + idempotent (409 = already installed).
+// receive @mentions in the channel. Uses the known org-catalog teamsApp id directly
+// (no catalog read scope needed). Best-effort + idempotent (409 = already installed).
 // Requires TeamsAppInstallation.ReadWriteForTeam (admin-consented).
-const TEAMS_APP_EXTERNAL_ID = process.env.TEAMS_APP_EXTERNAL_ID || '4d93c450-db97-5aef-91c4-1806db478dea';
+const TEAMS_APP_CATALOG_ID = process.env.TEAMS_APP_CATALOG_ID || '55a506df-b5f9-4096-9719-5fad2261eb38';
 export async function installTeamsAppInTeam(teamId) {
   if (!teamId) return { installed: false, reason: 'no-team' };
   try {
-    const cat = await graph(`/appCatalogs/teamsApps?$filter=externalId eq '${TEAMS_APP_EXTERNAL_ID}'`);
-    const appId = cat?.value?.[0]?.id;
-    if (!appId) return { installed: false, reason: 'app-not-in-catalog' };
-    try {
-      await graph(`/teams/${teamId}/installedApps`, {
-        method: 'POST',
-        body: { 'teamsApp@odata.bind': `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${appId}` }
-      });
-      return { installed: true, appId };
-    } catch (err) {
-      if (/→ 409|already|Conflict/i.test(String(err?.message || ''))) return { installed: true, already: true, appId };
-      return { installed: false, appId, error: String(err?.message || err).slice(0, 160) };
-    }
+    await graph(`/teams/${teamId}/installedApps`, {
+      method: 'POST',
+      body: { 'teamsApp@odata.bind': `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/${TEAMS_APP_CATALOG_ID}` }
+    });
+    console.log(`[install] app ${TEAMS_APP_CATALOG_ID} installed in team ${teamId}`);
+    return { installed: true, appId: TEAMS_APP_CATALOG_ID };
   } catch (err) {
-    return { installed: false, error: String(err?.message || err).slice(0, 160) };
+    const msg = String(err?.message || err);
+    if (/→ 409|already|Conflict/i.test(msg)) { console.log(`[install] app already in team ${teamId}`); return { installed: true, already: true, appId: TEAMS_APP_CATALOG_ID }; }
+    console.error(`[install] FAILED team ${teamId}: ${msg.slice(0, 260)}`);
+    return { installed: false, error: msg.slice(0, 160) };
   }
 }
 
@@ -167,7 +163,47 @@ export async function publishTeamToGroup(teamId, groupName = PUBLISH_GROUP) {
 // Idempotently ensure THIS deal has its own team; returns its live coordinates
 // (webUrl opens the team / its General channel). Reuses the team recorded on the
 // deal, or an existing joined team with the same name, before creating a new one.
+// Deal channel display name (Teams: ≤50 chars, limited punctuation).
+function channelName(deal) {
+  const base = String(deal.company || `Deal ${deal.id}`).replace(/[~#%&*{}/\\:<>?+|"'\[\]]/g, '').replace(/\s+/g, ' ').trim();
+  return base.slice(0, 48) || `Deal ${String(deal.id || '').slice(0, 20)}`;
+}
+
+// Create/reuse ONE channel per deal inside the pinned parent team (e.g. "Private
+// Equity Deals"), in the threads (chat) layout. Everyone in that team sees it and
+// the app/bot is installed once on the team. Requires Channel.Create (admin-consented).
+async function ensureDealChannelInParent(deal, parentTeamId, existing) {
+  const name = channelName(deal);
+  const team = await getTeam(parentTeamId);
+  if (existing?.channelId && existing.teamId === parentTeamId) {
+    try {
+      const c = await graph(`/teams/${parentTeamId}/channels/${existing.channelId}?$select=id,displayName,webUrl`);
+      if (c?.id) return { teamId: parentTeamId, channelId: c.id, webUrl: c.webUrl, displayName: c.displayName, createdAt: existing.createdAt || new Date().toISOString() };
+    } catch { /* recreate below */ }
+  }
+  const list = await graph(`/teams/${parentTeamId}/channels?$select=id,displayName,webUrl`).catch(() => null);
+  const found = (list?.value || []).find((c) => (c.displayName || '').toLowerCase() === name.toLowerCase());
+  if (found) {
+    try { await graph(`/teams/${parentTeamId}/channels/${found.id}`, { method: 'PATCH', body: { layoutType: 'chat' } }); } catch { /* best-effort threads */ }
+    return { teamId: parentTeamId, channelId: found.id, webUrl: found.webUrl, displayName: found.displayName, createdAt: new Date().toISOString() };
+  }
+  let created;
+  try {
+    created = await graph(`/teams/${parentTeamId}/channels`, { method: 'POST', body: { displayName: name, description: `${deal.company} — deal channel (auto-provisioned)`.slice(0, 1024), membershipType: 'standard', layoutType: 'chat' } });
+  } catch {
+    // Some tenants reject layoutType at creation — retry without it, then PATCH.
+    created = await graph(`/teams/${parentTeamId}/channels`, { method: 'POST', body: { displayName: name, membershipType: 'standard' } });
+    if (created?.id) { try { await graph(`/teams/${parentTeamId}/channels/${created.id}`, { method: 'PATCH', body: { layoutType: 'chat' } }); } catch { /* ignore */ } }
+  }
+  return { teamId: parentTeamId, channelId: created?.id || null, webUrl: created?.webUrl || team.webUrl, displayName: created?.displayName || name, createdAt: new Date().toISOString() };
+}
+
+// Idempotently ensure THIS deal has its own space. Prefers a channel in the pinned
+// parent team (M365_TEAM_ID); falls back to a team-per-deal when none is set.
 export async function ensureDealChannel(deal, existing) {
+  const parentTeamId = (process.env.M365_TEAM_ID || '').trim();
+  if (parentTeamId) return ensureDealChannelInParent(deal, parentTeamId, existing);
+
   const name = teamName(deal);
 
   // 1) already recorded on the deal → verify it still exists.
