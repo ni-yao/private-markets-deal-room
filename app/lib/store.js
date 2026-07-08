@@ -7,7 +7,7 @@
 import { seedSourcing } from '../data/deals.js';
 import { personas } from '../data/personas.js';
 import { STAGES, STEPS, STEP_KEYS, FLOW, GATE, stepByKey, stepIndex } from '../data/flow.js';
-import { runStep as runStepAgent } from './agents.js';
+import { stepMarkdown, applyStep } from './agents.js';
 import { messagesToSignals } from './ingest/signals.js';
 import { SOURCES, catalysts, catalystById } from '../data/news.js';
 import { researchFor } from '../data/research.js';
@@ -2183,13 +2183,21 @@ export async function regressDeal(id) {
 }
 
 export async function runStep(id, stepKey) {
-  const deal = getDealRaw(id);
-  if (!deal) return null;
   const step = stepByKey(stepKey);
   if (!step) return null;
-  const result = await runStepAgent({ deal, step });
-  persistDeal(deal);
-  return { result, deal: getDeal(id) };
+  const base = getDealRaw(id);
+  if (!base) return null;
+  // Phase 1: generate the artifact markdown (may call the model) against a snapshot —
+  // no persisted mutation here. Phase 2: apply the deterministic record mutations
+  // durably through mutateDeal (awaited, _etag-safe) so run_step can't lose writes or
+  // race a concurrent action (the previous fire-and-forget persist could).
+  const markdown = await stepMarkdown({ deal: base, step });
+  const r = await mutateDeal(id, (deal) => {
+    const { citations } = applyStep(deal, step, markdown);
+    return { event: 'step-run', detail: { step: step.key, citations } };
+  });
+  if (r.error) return r;
+  return { result: { stepKey: step.key, heading: `${step.code} · ${step.title}`, markdown, artifacts: step.produces }, deal: r.deal };
 }
 
 export function portfolioStats() {

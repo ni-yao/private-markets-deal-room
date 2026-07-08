@@ -278,7 +278,12 @@ function applyStepEffects(deal, step) {
   }
 }
 
-export async function runStep({ deal, step }) {
+// Split step execution into (1) an async artifact-generation phase that may call the
+// model but performs NO persisted mutation, and (2) a synchronous apply phase that
+// mutates the deal record. This lets the caller run (1) against a snapshot and then
+// persist (2) durably through the deal's optimistic-concurrency writer.
+
+export async function stepMarkdown({ deal, step }) {
   const ctx = buildContext(deal);
   const user = `You are the ${step.agent}.\nStep ${step.code} · ${step.title}.\n${step.what}\nDeliverables to produce: ${step.produces.join(', ')}.\n\nDEAL RECORD:\n${ctx}\n\nProduce the artifact now.`;
   let markdown = null;
@@ -288,9 +293,12 @@ export async function runStep({ deal, step }) {
     markdown = null;
   }
   if (!markdown) markdown = stepMock(deal, step);
+  return markdown;
+}
 
+// Synchronous mutation phase — safe to run inside a mutateDeal reducer.
+export function applyStep(deal, step, markdown) {
   applyStepEffects(deal, step);
-
   const hours = STEP_HOURS[step.key] || 4;
   deal.hoursSaved = (deal.hoursSaved || 0) + hours;
   deal.stepRuns = deal.stepRuns || {};
@@ -305,8 +313,13 @@ export async function runStep({ deal, step }) {
     action: `${step.title} — ${step.produces[0]}`,
     when: new Date().toISOString()
   });
+  return { hours, citations: extractSources(markdown) };
+}
 
-  return { stepKey: step.key, heading: `${step.code} · ${step.title}`, markdown, artifacts: step.produces, hours, citations: extractSources(markdown) };
+export async function runStep({ deal, step }) {
+  const markdown = await stepMarkdown({ deal, step });
+  const { hours, citations } = applyStep(deal, step, markdown);
+  return { stepKey: step.key, heading: `${step.code} · ${step.title}`, markdown, artifacts: step.produces, hours, citations };
 }
 
 function extractSources(md) {
