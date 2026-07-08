@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Build a sideloadable Teams app package (tab-only) for The Deal Room.
+"""Build a sideloadable Teams app package for The Deal Room.
 
-Generates manifest.json + color.png + outline.png and zips them so the channel
-tab can be uploaded to a team without needing an Azure Bot or SSO app first.
-Bot notifications and the Copilot declarative agent are added later (they need
-their own registrations); this package is the fastest path to a channel tab.
+Generates manifest.json + color.png + outline.png and zips them. Flags layer on
+the optional surfaces once their registrations exist:
+  --sso-client-id  adds webApplicationInfo (Entra SSO for the tab)
+  --bot-id         adds a notification-only bot (proactive Adaptive Card alerts)
+  --copilot        bundles the M365 Copilot declarative agent (reads deals via
+                   the Entra-secured MCP) and emits copilotAgents
+  --oauth-ref-id   fills the Teams Developer Portal OAuth registration id into
+                   the bundled apiPlugin.json
 
-Usage:
-  python3 scripts/build_manifest.py --host <teams-app-fqdn>
+Usage (full package):
+  python3 scripts/build_manifest.py --host <fqdn> \
+    --sso-client-id <id> --bot-id <id> --copilot [--oauth-ref-id <id>]
 """
 import argparse
 import json
@@ -60,7 +65,7 @@ def build(host: str, sso_client_id=None, bot_id=None, copilot=False, oauth_ref_i
     manifest = {
         "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
         "manifestVersion": "1.19",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "id": app_id,
         "developer": {
             "name": "Private Markets Deal Room",
@@ -71,7 +76,7 @@ def build(host: str, sso_client_id=None, bot_id=None, copilot=False, oauth_ref_i
         "name": {"short": "Deal Room", "full": "The Deal Room"},
         "description": {
             "short": "AI-native private-equity deal flow in Teams.",
-            "full": "A Teams channel dashboard for The Deal Room, backed by the shared Deal Room backend (single data source).",
+            "full": "The Deal Room brings your fund's live deal flow into Teams: a channel dashboard and personal tab (Entra SSO) over the shared Deal Room backend (single data source), proactive Adaptive Card alerts as deals advance, and an M365 Copilot agent that answers deal questions through the Entra-secured MCP. The deal chat is grounded in live data and screened by Azure AI Content Safety; a Bing-grounded news scout surfaces fresh M&A catalysts.",
         },
         "icons": {"color": "color.png", "outline": "outline.png"},
         "accentColor": "#6264A7",
