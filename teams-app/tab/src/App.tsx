@@ -37,6 +37,9 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(true);
   const [chatFocusDealId, setChatFocusDealId] = useState('');
   const [openDealId, setOpenDealId] = useState('');
+  const [canViewStage2, setCanViewStage2] = useState(true);
+  const [demoUsers, setDemoUsers] = useState<{ id: string; upn: string; label: string }[]>([]);
+  const [viewAs, setViewAs] = useState('user1');
 
   useEffect(() => {
     (async () => {
@@ -61,10 +64,20 @@ export default function App() {
       }).catch(() => {});
 
       getSsoToken().then((token) =>
-        fetch('/api/teams/context', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ssoToken: token }) }).then((r) => r.json())
-      ).then((ctx) => { if (ctx?.persona) setPersona(ctx.persona); }).catch(() => {});
+        fetch('/api/teams/context', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ssoToken: token, as: 'user1' }) }).then((r) => r.json())
+      ).then((ctx) => { if (ctx?.persona) setPersona(ctx.persona); if (Array.isArray(ctx?.demoUsers)) setDemoUsers(ctx.demoUsers); setCanViewStage2(!!ctx?.canViewStage2); }).catch(() => {});
     })();
   }, []);
+
+  // Re-evaluate stage access when the demo "view as" user changes. The demo
+  // override drives stage access server-side, so we skip the (slow) SSO token
+  // fetch here to keep switching instant.
+  useEffect(() => {
+    (async () => {
+      const ctx = await fetch('/api/teams/context', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ as: viewAs }) }).then((r) => r.json()).catch(() => null);
+      if (ctx) { setCanViewStage2(!!ctx.canViewStage2); if (ctx.persona) setPersona(ctx.persona); }
+    })();
+  }, [viewAs]);
 
   function askAbout(dealId: string) {
     setChatFocusDealId(dealId);
@@ -84,7 +97,13 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-r">
-          {persona?.name ? <span className="badge" title="Signed-in persona">{persona.name}{persona.title ? ` · ${persona.title}` : ''}</span> : null}
+          {persona?.name ? <span className="badge" title="Signed-in persona">{persona.name}</span> : null}
+          {demoUsers.length ? (
+            <select className="viewas" value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="Demo — view as (stage visibility)">
+              {demoUsers.map((u) => (<option key={u.id} value={u.upn}>👤 {u.label}</option>))}
+            </select>
+          ) : null}
+          <span className={`rolechip ${canViewStage2 ? 'full' : 'ltd'}`} title="Stage 2 (Diligence) is restricted to the deal team">{canViewStage2 ? 'Stage 1 + 2' : 'Stage 1 only'}</span>
           {cfg?.backendUrl ? <a className="dashlink" href={cfg.backendUrl} target="_blank" rel="noopener noreferrer">Full dashboard ↗</a> : null}
           <button className={`asktoggle${chatOpen ? ' on' : ''}`} onClick={() => setChatOpen((v) => !v)}>{chatOpen ? 'Hide agents' : '💬 Ask agents'}</button>
         </div>
@@ -97,7 +116,7 @@ export default function App() {
         {chatOpen ? <ChatPanel agents={agents} deals={deals} focusDealId={chatFocusDealId} onClose={() => setChatOpen(false)} /> : null}
       </div>
 
-      {openDealId ? <DealDetail dealId={openDealId} onClose={() => setOpenDealId('')} onAsk={(id) => { setOpenDealId(''); askAbout(id); }} /> : null}
+      {openDealId ? <DealDetail dealId={openDealId} canViewStage2={canViewStage2} onClose={() => setOpenDealId('')} onAsk={(id) => { setOpenDealId(''); askAbout(id); }} /> : null}
     </div>
   );
 }
@@ -113,6 +132,10 @@ html, body, #root { margin: 0; height: 100%; }
 .brand-s { color: var(--muted); font-size: 12px; }
 .topbar-r { display: flex; align-items: center; gap: 10px; }
 .badge { background: var(--chip); padding: 4px 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+.viewas { background: var(--input-bg); color: var(--fg); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 12px; max-width: 210px; }
+.rolechip { font-size: 11px; padding: 4px 9px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.rolechip.full { background: #1b7f37; color: #fff; }
+.rolechip.ltd { background: #b8860b; color: #fff; }
 .dashlink { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 600; }
 .dashlink:hover { text-decoration: underline; }
 .asktoggle { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); padding: 7px 12px; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 600; }

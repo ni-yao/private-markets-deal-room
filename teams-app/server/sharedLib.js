@@ -37,3 +37,31 @@ export async function personaForUser(identity) {
   for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   return personas[hash % personas.length];
 }
+
+// ---- Stage visibility (role-based) ------------------------------------------
+// Stage 1 (Origination & Screening) is visible to everyone with app access.
+// Stage 2 (Diligence & Approval) is restricted to the DEAL TEAM. Membership is
+// configurable via env; the demo uses user1-4 as the deal team and user5 as an
+// Analyst (Stage 1 only) to show the lockdown.
+const DEAL_TEAM = (process.env.DEAL_TEAM_UPNS || 'user1,user2,user3,user4')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+const ANALYSTS = (process.env.ANALYST_UPNS || 'user5')
+  .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+const localPart = (u) => String(u || '').split('@')[0].toLowerCase();
+
+export function stageAccessFor(upn) {
+  const l = localPart(upn);
+  if (DEAL_TEAM.includes(l)) return { role: 'deal-team', canViewStage2: true };
+  if (ANALYSTS.includes(l)) return { role: 'analyst', canViewStage2: false };
+  return { role: 'member', canViewStage2: false };
+}
+
+// Demo roster for the "View as" switcher (so the lockdown is demoable without
+// five separate sign-ins). In real Teams the signed-in SSO identity is used.
+export const DEMO_USERS = [
+  { id: 'user1', upn: 'user1', label: 'Deal Team — user1' },
+  { id: 'user2', upn: 'user2', label: 'Deal Team — user2' },
+  { id: 'user3', upn: 'user3', label: 'Deal Team — user3' },
+  { id: 'user4', upn: 'user4', label: 'Deal Team — user4' },
+  { id: 'user5', upn: 'user5', label: 'Analyst — user5 (Stage 1 only)' },
+];

@@ -44,12 +44,12 @@ function sourceHint(src?: string): string {
 
 type Tab = 'stages' | 'overview' | 'workspace' | 'ic';
 
-export default function DealDetail({ dealId, onClose, onAsk }: { dealId: string; onClose: () => void; onAsk: (id: string) => void }) {
+export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { dealId: string; canViewStage2: boolean; onClose: () => void; onAsk: (id: string) => void }) {
   const [deal, setDeal] = useState<DealFull | null>(null);
   const [ic, setIc] = useState<ICReadiness | null>(null);
   const [flow, setFlow] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('stages');
+  const [tab, setTab] = useState<Tab>('overview');
   const [selStep, setSelStep] = useState<string>('');
   const [busy, setBusy] = useState<string>('');
   const [note, setNote] = useState<string>('');
@@ -113,6 +113,10 @@ export default function DealDetail({ dealId, onClose, onAsk }: { dealId: string;
   const artifact = deal?.artifacts?.[viewStep];
   const verdict = ic?.verdict;
   const ws = deal?.workspace || {};
+  // Stage 2 (Diligence & Approval) is deal-team only. A deal is "in Stage 2"
+  // once its stage code is D* or its stage name mentions diligence/approval.
+  const inStage2 = /^d/i.test(String(deal?.stage || '')) || /diligence|approval/i.test(String(deal?.stageName || ''));
+  const stage2Locked = inStage2 && !canViewStage2;
 
   return (
     <div className="drawer-scrim" onClick={onClose}>
@@ -138,15 +142,25 @@ export default function DealDetail({ dealId, onClose, onAsk }: { dealId: string;
               </div>
             </div>
 
+            {!stage2Locked && (
             <div className="dd-tabs">
-              {(['stages', 'overview', 'workspace', 'ic'] as Tab[]).map((t) => (
+              {(['overview', 'stages', 'workspace', 'ic'] as Tab[]).map((t) => (
                 <button key={t} className={`dd-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>
                   {t === 'stages' ? 'Stages & orchestration' : t === 'overview' ? 'Overview' : t === 'workspace' ? 'Workspace' : 'IC readiness'}
                 </button>
               ))}
             </div>
+            )}
 
             <div className="drawer-body">
+              {stage2Locked ? (
+                <div className="dd-panel" style={{ textAlign: 'center', padding: '28px 18px' }}>
+                  <div style={{ fontSize: 26 }}>🔒</div>
+                  <div style={{ fontWeight: 700, marginTop: 6 }}>Stage 2 — Diligence &amp; Approval</div>
+                  <div className="muted" style={{ marginTop: 6 }}>This deal has entered Stage 2, which is restricted to the deal team. Ask a deal-team member (user1–user4) for access.</div>
+                </div>
+              ) : (
+              <>
               {note ? <div className="dd-actionnote">{note}</div> : null}
 
               {tab === 'stages' && (
@@ -159,9 +173,10 @@ export default function DealDetail({ dealId, onClose, onAsk }: { dealId: string;
                           const done = completed.has(s.key) || (curIdx >= 0 && steps.findIndex((x) => x.key === s.key) < curIdx);
                           const cur = s.key === deal.currentStep;
                           const on = s.key === viewStep;
+                          const lockedStep = /^d/i.test(s.key) && !canViewStage2;
                           return (
-                            <button key={s.key} className={`fstep-btn${cur ? ' cur' : ''}${done ? ' done' : ''}${on ? ' on' : ''}`} onClick={() => setSelStep(s.key)}>
-                              <span className="fs-key">{done ? '✓' : s.key}</span>
+                            <button key={s.key} className={`fstep-btn${cur ? ' cur' : ''}${done ? ' done' : ''}${on ? ' on' : ''}`} disabled={lockedStep} title={lockedStep ? 'Stage 2 — deal team only' : ''} style={lockedStep ? { opacity: 0.5, cursor: 'not-allowed' } : undefined} onClick={() => { if (!lockedStep) setSelStep(s.key); }}>
+                              <span className="fs-key">{lockedStep ? '🔒' : done ? '✓' : s.key}</span>
                               <span className="fs-label">{STEP_LABEL[s.key] || s.key}</span>
                             </button>
                           );
@@ -172,9 +187,13 @@ export default function DealDetail({ dealId, onClose, onAsk }: { dealId: string;
 
                   <div className="orch-bar">
                     {!deal.workspaceReady ? (
+                      canViewStage2 ? (
                       <button className="btn primary" disabled={!!busy} onClick={() => act('launch', `/api/deals/${dealId}/launch`)}>
                         {busy === 'launch' ? 'Launching…' : '▶ Launch diligence (provision workspace)'}
                       </button>
+                      ) : (
+                        <span className="muted">🔒 Launching diligence (Stage 2) is restricted to the deal team.</span>
+                      )
                     ) : (
                       <>
                         <button className="btn" disabled={!!busy} onClick={() => act('run', `/api/deals/${dealId}/steps/${deal.currentStep}/run`)}>
@@ -295,6 +314,8 @@ export default function DealDetail({ dealId, onClose, onAsk }: { dealId: string;
                     </div>
                   ) : null}
                 </section>
+              )}
+              </>
               )}
             </div>
           </>

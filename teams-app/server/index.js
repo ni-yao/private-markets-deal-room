@@ -15,7 +15,7 @@ import { existsSync } from 'fs';
 import { config, validateConfig, isBackendLive, isSsoConfigured, isBotConfigured, isDemoMode } from './config.js';
 import { proxyToBackend } from './proxy.js';
 import { exchangeOnBehalfOf, identityFromSsoToken } from './sso.js';
-import { personaForUser } from './sharedLib.js';
+import { personaForUser, stageAccessFor, DEMO_USERS } from './sharedLib.js';
 import { initBot } from './bot.js';
 import { postDealEvent } from './notifications.js';
 import { siteProxy, TEAMS_BOOTSTRAP_JS, TEAMS_CONFIG_HTML } from './siteProxy.js';
@@ -42,18 +42,25 @@ app.get('/api/teams/config', (_req, res) =>
   })
 );
 
-// Per-user context: Teams SSO token -> identity -> Deal Room persona.
+// Per-user context: Teams SSO token -> identity -> Deal Room persona + stage access.
 app.post('/api/teams/context', async (req, res) => {
   const ssoToken = req.body?.ssoToken || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   const identity = identityFromSsoToken(ssoToken);
+  const asOverride = String(req.body?.as || '').trim(); // demo "view as" (no SSO)
   const persona = await personaForUser(identity || {});
+  const access = stageAccessFor(asOverride || identity?.upn || '');
   let graphLinked = false;
   try {
     graphLinked = !!(await exchangeOnBehalfOf(ssoToken));
   } catch {
     graphLinked = false;
   }
-  res.json({ identity, persona, graphLinked });
+  res.json({
+    identity, persona, graphLinked,
+    role: access.role, canViewStage2: access.canViewStage2,
+    viewingAs: asOverride || identity?.upn || null,
+    demoUsers: DEMO_USERS,
+  });
 });
 
 // Internal seam to post a notification card (Phase 2 / testing).
