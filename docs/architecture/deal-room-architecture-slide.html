@@ -6,7 +6,6 @@
 <style>
   :root{
     --ink:#1d2b47; --dim:#5b6b86;
-    /* rich pastel domains: accent (rail/heading) · bg (zone fill) · edge (zone border) */
     --app:#2f6fd0; --appbg:#dbe8fb; --appedge:#a9c8f2;
     --ai:#6a5cd6; --aibg:#e7e3fb; --aiedge:#c4bcf1;
     --data:#149e88; --databg:#d4f1ea; --dataedge:#a1ddcf;
@@ -41,6 +40,7 @@
   .n.hub .eps i{font-style:normal;font-size:10px;color:#2f6fd0;background:#ffffff;
     border:1px solid #a9c8f2;border-radius:9px;padding:1px 7px;font-family:Consolas,monospace}
   .n.stack{box-shadow:3px 3px 0 -1px var(--card),3px 3px 0 0 var(--cardedge),6px 6px 0 -1px var(--card),6px 6px 0 0 var(--cardedge)}
+  .n.gw{background:#eef3fb;border-color:var(--app)}
   .n.t-ai{border-left:3px solid var(--ai)} .n.t-data{border-left:3px solid var(--data)}
   .n.t-ext{border-left:3px solid var(--ext)} .n.t-chan{border-left:3px solid var(--chan)}
   .n.t-obs{border-left:3px solid var(--obs)} .n.t-app{border-left:3px solid var(--app)}
@@ -65,20 +65,20 @@
     <div class="lr"><span class="sw d"></span> identity · secrets · telemetry</div>
   </div>
 
-  <!-- ZONES (grouped domains around the hub) -->
+  <!-- ZONES -->
   <div class="zone" style="left:404px;top:92px;width:316px;height:104px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Channels</div></div>
   <div class="zone" style="left:404px;top:238px;width:316px;height:300px;background:var(--appbg);border-color:var(--appedge)"><div class="zh" style="color:var(--app)">Application</div></div>
-  <div class="zone" style="left:28px;top:238px;width:210px;height:300px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Identity &amp; Edge</div></div>
-  <div class="zone" style="left:752px;top:92px;width:250px;height:418px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Azure AI Foundry</div></div>
+  <div class="zone" style="left:28px;top:270px;width:210px;height:236px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Identity</div></div>
+  <div class="zone" style="left:752px;top:92px;width:250px;height:414px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Azure AI Foundry</div></div>
   <div class="zone" style="left:238px;top:566px;width:764px;height:128px;background:var(--databg);border-color:var(--dataedge)"><div class="zh" style="color:var(--data)">Data &amp; Documents</div></div>
-  <div class="zone" style="left:1030px;top:92px;width:222px;height:206px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">External · M365</div></div>
+  <div class="zone" style="left:1030px;top:92px;width:222px;height:210px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">External · M365</div></div>
   <div class="zone" style="left:1030px;top:474px;width:222px;height:220px;background:var(--obsbg);border-color:var(--obsedge)"><div class="zh" style="color:var(--obs)">Observe</div></div>
 
   <svg id="wires"></svg>
 
   <!-- CHANNELS (top) -->
-  <div class="n t-chan" id="web"   style="left:420px;top:126px;width:140px"><img src="icons/web.svg"><b>Web App</b></div>
-  <div class="n t-chan" id="teams" style="left:568px;top:126px;width:140px"><img src="icons/teams.svg"><b>Teams</b></div>
+  <div class="n t-chan" id="web"   style="left:420px;top:126px;width:138px"><img src="icons/web.svg"><b>Web App</b></div>
+  <div class="n t-chan" id="teams" style="left:578px;top:126px;width:138px"><img src="icons/teams.svg"><b>Teams</b></div>
 
   <!-- APPLICATION HUB (center) -->
   <div class="n hub" id="ca" style="left:452px;top:296px;width:222px">
@@ -86,31 +86,31 @@
     <div class="eps"><i>API</i><i>SPA</i><i>MCP server</i></div>
   </div>
 
-  <!-- IDENTITY & EDGE (left) -->
-  <div class="n t-ext" id="entra" style="left:44px;top:300px;width:178px"><img src="icons/entra.svg"><b>Entra ID</b></div>
-  <div class="n t-ext" id="apim"  style="left:44px;top:372px;width:178px"><img src="icons/apim.svg"><b>API Mgmt</b></div>
-  <div class="n t-ext" id="mi"    style="left:44px;top:444px;width:178px"><img src="icons/managedidentity.svg"><b>Managed ID</b></div>
+  <!-- IDENTITY (left) -->
+  <div class="n t-ext" id="entra" style="left:44px;top:322px;width:178px"><img src="icons/entra.svg"><b>Entra ID</b></div>
+  <div class="n t-ext" id="mi"    style="left:44px;top:420px;width:178px"><img src="icons/managedidentity.svg"><b>Managed ID</b></div>
 
-  <!-- AI (right) -->
-  <div class="n t-ai" id="foundry"      style="left:768px;top:134px;width:218px"><img src="icons/cognitive.svg"><b>AI Foundry</b></div>
-  <div class="n t-ai stack" id="agents" style="left:768px;top:228px;width:218px"><img src="icons/cognitive.svg"><b>Persona Agents ×5</b></div>
-  <div class="n t-ai" id="bing"         style="left:768px;top:332px;width:218px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
-  <div class="n t-ai" id="aisvcs"       style="left:768px;top:430px;width:218px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
+  <!-- AI (right) — API Management fronts the AI tier as the LLM gateway -->
+  <div class="n gw t-app" id="apim"     style="left:768px;top:124px;width:218px"><img src="icons/apim.svg"><b>API Management</b></div>
+  <div class="n t-ai" id="foundry"      style="left:768px;top:198px;width:218px"><img src="icons/cognitive.svg"><b>AI Foundry</b></div>
+  <div class="n t-ai stack" id="agents" style="left:768px;top:272px;width:218px"><img src="icons/cognitive.svg"><b>Persona Agents ×5</b></div>
+  <div class="n t-ai" id="bing"         style="left:768px;top:372px;width:218px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
+  <div class="n t-ai" id="aisvcs"       style="left:768px;top:448px;width:218px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
 
   <!-- DATA & DOCUMENTS (bottom band) -->
-  <div class="n t-data" id="cosmos"  style="left:252px;top:600px;width:140px"><img src="icons/cosmos.svg"><b>Cosmos DB</b></div>
-  <div class="n t-data" id="search"  style="left:402px;top:600px;width:140px"><img src="icons/search.svg"><b>AI Search</b></div>
-  <div class="n t-data" id="fabric"  style="left:552px;top:600px;width:140px"><img src="icons/fabric.svg"><b>Fabric</b></div>
-  <div class="n t-data" id="storage" style="left:702px;top:600px;width:140px"><img src="icons/storage.svg"><b>Storage</b></div>
-  <div class="n t-data" id="msg"     style="left:852px;top:600px;width:140px"><img src="icons/servicebus.svg"><b>Bus · Grid</b></div>
+  <div class="n t-data" id="cosmos"  style="left:252px;top:600px;width:136px"><img src="icons/cosmos.svg"><b>Cosmos DB</b></div>
+  <div class="n t-data" id="search"  style="left:402px;top:600px;width:136px"><img src="icons/search.svg"><b>AI Search</b></div>
+  <div class="n t-data" id="fabric"  style="left:552px;top:600px;width:136px"><img src="icons/fabric.svg"><b>Fabric</b></div>
+  <div class="n t-data" id="storage" style="left:702px;top:600px;width:136px"><img src="icons/storage.svg"><b>Storage</b></div>
+  <div class="n t-data" id="msg"     style="left:852px;top:600px;width:136px"><img src="icons/servicebus.svg"><b>Bus · Grid</b></div>
 
   <!-- FUNCTIONS (event handler, above the Bus) -->
-  <div class="n t-app" id="func" style="left:836px;top:520px;width:172px"><img src="icons/function.svg"><b>Functions</b></div>
+  <div class="n t-app" id="func" style="left:820px;top:512px;width:172px"><img src="icons/function.svg"><b>Functions</b></div>
 
   <!-- EXTERNAL · M365 (top-right) -->
-  <div class="n t-ext" id="edgar" style="left:1048px;top:128px;width:186px"><img src="icons/edgar.svg"><b>SEC EDGAR</b></div>
-  <div class="n t-ext" id="kv"    style="left:1048px;top:196px;width:186px"><img src="icons/keyvault.svg"><b>Key Vault</b></div>
-  <div class="n t-ext" id="m365"  style="left:1048px;top:246px;width:186px"><img src="icons/sharepoint.svg"><b>Microsoft 365</b></div>
+  <div class="n t-ext" id="edgar" style="left:1048px;top:126px;width:186px"><img src="icons/edgar.svg"><b>SEC EDGAR</b></div>
+  <div class="n t-ext" id="kv"    style="left:1048px;top:188px;width:186px"><img src="icons/keyvault.svg"><b>Key Vault</b></div>
+  <div class="n t-ext" id="m365"  style="left:1048px;top:250px;width:186px"><img src="icons/sharepoint.svg"><b>Microsoft 365</b></div>
 
   <!-- OBSERVE (bottom-right) -->
   <div class="n t-obs" id="appins" style="left:1048px;top:512px;width:186px"><img src="icons/appinsights.svg"><b>App Insights</b></div>
@@ -153,43 +153,42 @@ function line(points,{ctrl=false,arrow=true}={}){
 function tag(x,y,text){const t=document.createElement('div');t.className='elabel';t.textContent=text;
   t.style.left=x+'px';t.style.top=y+'px';stage.appendChild(t);}
 function wire(points,opt={}){line(points,opt); if(opt.label){const i=Math.max(1,Math.floor(points.length/2));
-  const m=points[i-1],n=points[i]; tag((m.x+n.x)/2,(m.y+n.y)/2,opt.label);}}
+  const m=points[i-1],n=points[i]; tag(opt.lx!=null?opt.lx:(m.x+n.x)/2, opt.ly!=null?opt.ly:(m.y+n.y)/2, opt.label);}}
 
 requestAnimationFrame(()=>{
   // ===== NORTH: channels -> hub / agents =====
-  wire([pt('web','b',0.5),{x:pt('web','b').x,y:pt('ca','t',0.28).y-0},pt('ca','t',0.28)],{label:'HTTPS'});
-  // Teams -> Agents (channel into AI), routed up-right through the channels/AI gap
-  wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:214},{x:pt('agents','t').x,y:214},pt('agents','t',0.5)],{label:'invoke'});
+  wire([pt('web','b',0.5),{x:pt('web','b').x,y:270},{x:pt('ca','t',0.30).x,y:270},pt('ca','t',0.30)],{label:'HTTPS',lx:pt('web','b').x,ly:212});
+  // Teams -> Agents (channel into AI) via the App/AI gutter (x=738), into Agents' left
+  wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:222},{x:738,y:222},{x:738,y:pt('agents','l',0.34).y},pt('agents','l',0.34)],{label:'invoke',lx:670,ly:222});
 
-  // ===== WEST: identity & edge -> hub (dashed) =====
-  wire([pt('entra','r'),{x:pt('ca','l').x-24,y:pt('entra','r').y},{x:pt('ca','l').x-24,y:pt('ca','l',0.18).y},pt('ca','l',0.18)],{ctrl:true,label:'auth'});
-  wire([pt('apim','r'),{x:pt('ca','l').x-14,y:pt('apim','r').y},pt('ca','l',0.5)],{ctrl:true,label:'gateway'});
-  wire([pt('mi','r'),{x:pt('ca','l').x-24,y:pt('mi','r').y},{x:pt('ca','l').x-24,y:pt('ca','l',0.84).y},pt('ca','l',0.84)],{ctrl:true,label:'RBAC'});
+  // ===== WEST: identity -> hub (dashed) =====
+  wire([pt('entra','r'),{x:pt('ca','l').x-26,y:pt('entra','r').y},{x:pt('ca','l').x-26,y:pt('ca','l',0.24).y},pt('ca','l',0.24)],{ctrl:true,label:'auth',lx:300,ly:pt('entra','r').y});
+  wire([pt('mi','r'),{x:pt('ca','l').x-26,y:pt('mi','r').y},{x:pt('ca','l').x-26,y:pt('ca','l',0.80).y},pt('ca','l',0.80)],{ctrl:true,label:'RBAC',lx:300,ly:pt('mi','r').y});
 
-  // ===== EAST: hub <-> AI =====
-  wire([pt('ca','r',0.20),{x:740,y:pt('ca','r',0.20).y},{x:740,y:pt('foundry','l').y},pt('foundry','l')],{label:'reason · embed'});
-  wire([pt('agents','l'),{x:744,y:pt('agents','l').y},{x:744,y:pt('ca','r',0.80).y},pt('ca','r',0.80)],{label:'MCP tools'});
-  wire([pt('ca','r',0.5),{x:736,y:pt('ca','r',0.5).y},{x:736,y:pt('aisvcs','l').y},pt('aisvcs','l')],{label:'extract · safety'});
-  wire([pt('agents','b',0.5),pt('bing','t',0.5)],{label:'news'});
+  // ===== EAST: hub -> APIM (AI gateway) -> Foundry; agents -> hub (MCP); hub -> AI Services =====
+  wire([pt('ca','r',0.12),{x:730,y:pt('ca','r',0.12).y},{x:730,y:pt('apim','l').y},pt('apim','l')],{label:'AI gateway',lx:730,ly:212});
+  wire([pt('apim','b',0.5),pt('foundry','t',0.5)],{label:'route',lx:905,ly:186});
+  wire([pt('agents','l',0.66),{x:744,y:pt('agents','l',0.66).y},{x:744,y:pt('ca','r',0.84).y},pt('ca','r',0.84)],{label:'MCP tools',lx:710,ly:352});
+  wire([pt('ca','r',0.5),{x:724,y:pt('ca','r',0.5).y},{x:724,y:pt('aisvcs','l').y},pt('aisvcs','l')],{label:'extract · safety',lx:714,ly:432});
+  wire([pt('agents','b',0.5),pt('bing','t',0.5)],{label:'news',lx:877,ly:358});
 
   // ===== SOUTH: hub -> data (single feeder onto a bus, short taps) =====
   const busY=584;
-  line([pt('ca','b',0.5),{x:pt('ca','b').x,y:busY}]);       // feeder
-  tag(pt('ca','b').x,540,'reads · docs · events');
-  line([{x:322,y:busY},{x:922,y:busY}],{arrow:false});     // bus
+  line([pt('ca','b',0.5),{x:pt('ca','b').x,y:busY}]);
+  tag(pt('ca','b').x,548,'reads · docs · events');
+  line([{x:322,y:busY},{x:922,y:busY}],{arrow:false});
   ['cosmos','search','fabric','storage','msg'].forEach(id=>{const b=pt(id,'t',0.5);line([{x:b.x,y:busY},b]);});
 
   // ===== product-to-product =====
-  wire([pt('msg','t',0.5),pt('func','b',0.5)],{label:'trigger'});             // Bus -> Functions
-  // EDGAR -> Fabric (archive filings): down the right gutter, then along the data-zone base
-  wire([pt('edgar','l'),{x:1022,y:pt('edgar','l').y},{x:1022,y:678},{x:pt('fabric','b').x,y:678},pt('fabric','b',0.5)],{label:'archive'});
+  wire([pt('msg','t',0.5),pt('func','b',0.5)],{label:'trigger',lx:922,ly:582});
+  wire([pt('edgar','l'),{x:1020,y:pt('edgar','l').y},{x:1020,y:678},{x:pt('fabric','b').x,y:678},pt('fabric','b',0.5)],{label:'archive',lx:1004,ly:430});
 
-  // ===== NORTH-EAST: single spoke, app -> external systems (top channel) =====
-  wire([pt('ca','r',0.08),{x:730,y:pt('ca','r',0.08).y},{x:730,y:78},{x:1030,y:78},{x:1030,y:pt('edgar','l',0.5).y},pt('edgar','l')],{});
-  tag(884,70,'SEC filings · M365 Graph · secrets');
+  // ===== NORTH-EAST: single grouped spoke, app -> external systems (top channel) =====
+  wire([pt('ca','t',0.72),{x:728,y:pt('ca','t',0.72).y},{x:728,y:80},{x:1030,y:80},{x:1030,y:pt('edgar','l',0.5).y},pt('edgar','l')],{});
+  tag(884,72,'SEC filings · M365 Graph · secrets');
 
   // ===== SOUTH-EAST: observability (telemetry from data, then chain) =====
-  wire([pt('msg','r',0.5),{x:1022,y:pt('msg','r',0.5).y},{x:1022,y:pt('appins','l').y},pt('appins','l')],{ctrl:true,label:'telemetry'});
+  wire([pt('msg','r',0.5),{x:1020,y:pt('msg','r',0.5).y},{x:1020,y:pt('appins','l').y},pt('appins','l')],{ctrl:true,label:'telemetry',lx:1011,ly:582});
   wire([pt('appins','b',0.5),pt('law','t',0.5)],{ctrl:true});
   wire([pt('law','b',0.5),pt('mon','t',0.5)],{ctrl:true});
 });
