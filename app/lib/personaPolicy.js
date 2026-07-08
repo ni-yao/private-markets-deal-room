@@ -47,6 +47,8 @@ export const ACTIONS = {
   gate_candidate: { label: 'Record the Screening-Gate decision (O4: PURSUE / pass / park)', personas: ['partner'] },
   launch_deal: { label: 'Launch diligence — provision the workspace (screened → D1)', personas: ['analyst', 'partner'] },
   run_step: { label: 'Run a diligence step to produce its deliverable', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'] },
+  complete_lane: { label: 'Sign a diligence lane off as complete', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },
+  approve_memo: { label: 'Approve the IC memo (or a memo section)', personas: ['partner'] },
   record_finding: { label: 'Record a diligence finding into a workstream lane', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },
   record_contribution: { label: 'Contribute guidance, a value-add lever, or a diligence finding into a lane', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },
   record_issue: { label: 'Log a diligence issue (severity + owner + resolution path) into the issue log', personas: ['analyst', 'partner', 'retail-md', 'ai-md', 'supply-md'], laneScoped: true },

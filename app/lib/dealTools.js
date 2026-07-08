@@ -14,6 +14,7 @@ import {
   sendToScreening, screenCandidate, triageCandidate, gateCandidate,
   launchDeal, advanceDeal, runStep, assignSwimlane, recordFinding, recordContribution,
   getICReadiness, marketIntel, recordIssue, resolveIssue, setCondition, snapshotAssumptions,
+  approveMemo, completeLane,
   getCitationAudit, canonicalCompanies, canonicalCompany
 } from './store.js';
 import { can, nextActions, PERSONA_LANE } from './personaPolicy.js';
@@ -381,7 +382,7 @@ export async function dispatchAction(name, args = {}, { persona } = {}) {
   if (!persona) return { error: 'persona-required', detail: 'No persona resolved for this caller; an action needs a persona.' };
 
   // Lane matters for the lane-scoped contribution/issue actions; derive it for authz.
-  const lane = (name === 'record_finding' || name === 'record_contribution' || name === 'record_issue')
+  const lane = (name === 'record_finding' || name === 'record_contribution' || name === 'record_issue' || name === 'complete_lane')
     ? (args.lane || PERSONA_LANE[persona])
     : undefined;
   const verdict = can(persona, name, { lane });
@@ -419,6 +420,10 @@ export async function dispatchAction(name, args = {}, { persona } = {}) {
         return withAudit(await setCondition(args.deal_id, { text: args.text, owner: args.owner, status: args.status, by, persona }), { name, persona });
       case 'snapshot_assumptions':
         return withAudit(await snapshotAssumptions(args.deal_id, { label: args.label, by }), { name, persona });
+      case 'complete_lane':
+        return withAudit(await completeLane(args.deal_id, { lane, by, persona }), { name, persona });
+      case 'approve_memo':
+        return withAudit(await approveMemo(args.deal_id, { key: args.section, by, persona }), { name, persona });
       default:
         return { error: 'unknown-action', name };
     }
@@ -549,6 +554,14 @@ export const TOOL_DESCRIPTIONS = {
     'Surfaces in the cockpit as a condition the IC must clear. Analyst/Partner only.',
   snapshot_assumptions:
     "Snapshot the deal's current key assumptions (revenue, EBITDA, entry multiple, base-case IRR/MoIC, EV) as an IC-draft " +
-    'baseline, so the cockpit can show which assumptions changed since the last IC draft. Analyst/Partner only.'
+    'baseline, so the cockpit can show which assumptions changed since the last IC draft. Analyst/Partner only.',
+  complete_lane:
+    'Sign a diligence lane off as COMPLETE (sets it to 100% / status complete), clearing it from the IC-readiness blocking ' +
+    'list. A lane cannot be completed while it still has an open high-severity (risk/negative) issue. Sector MDs may only ' +
+    'complete their own lane; Analyst/Partner any lane.',
+  approve_memo:
+    'Approve the IC memo — pass an optional section key (thesis | market | value-creation | risks | recommendation) to ' +
+    'approve one section, or omit it to approve every drafted section. Only DRAFTED sections can be approved (draft them via ' +
+    'run_step D3 first). Required to clear the "IC memo sections approved" artifact gate. PARTNER only.'
 };
 

@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.37.0',
+    date: '2026-07-08',
+    image: 'dealroom-app:v59',
+    revision: 'ca-dealroom-orch-dev-swc--0000055',
+    title: 'Partner IC-memo workflow — approve the memo &amp; sign off diligence lanes',
+    tag: 'feature',
+    highlights: [
+      'Added the missing step a Partner needs to actually create an IC memo: approve_memo. The Partner approves the IC memo (all drafted sections, or one section at a time). Only drafted sections can be approved — an empty section must be drafted first — so the “all memo sections approved” IC-readiness gate is now genuinely satisfiable and defensible.',
+      'Added complete_lane so the owning MD (or the Analyst / Partner) can sign a diligence lane off as complete (100%). A lane cannot be completed while it still has an open high-severity (risk/negative) issue, so a “complete” lane truly means the workstream is done and unblocked.',
+      'Both actions are governed by the same persona policy as every other write (approve_memo is Partner-only; complete_lane is lane-scoped for sector MDs, any lane for Analyst/Partner) and are available in-app (new REST endpoints), over MCP, and to the five persona agents in Teams.',
+      'Used the new workflow to take National CineMedia from D2 to D4: completed all seven diligence lanes, resolved the advertiser-concentration risk, synthesized and Partner-approved the IC memo, cleared KYC/compliance, and advanced through the IC-readiness gate.'
+    ]
+  },
+  {
     version: 'v0.36.0',
     date: '2026-07-08',
     image: 'dealroom-app:v58',

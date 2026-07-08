@@ -1993,6 +1993,47 @@ export function updateCondition(id, condId, { status, text, owner, by } = {}) {
   });
 }
 
+// Approve IC-memo sections (partner IC-memo workflow). A section can only be
+// approved once it has been DRAFTED (has content / non-empty) — an empty section
+// cannot be approved, so the "all sections approved" IC gate is defensible. Pass a
+// `key` to approve one section, or omit it to approve every drafted section.
+export function approveMemo(id, { key, by, persona } = {}) {
+  return mutateDeal(id, (deal) => {
+    const memo = deal.memoSections || [];
+    const targets = key ? memo.filter((m) => m.key === key) : memo;
+    if (!targets.length) return { error: 'memo-section-not-found', detail: key ? `No memo section "${key}" on this deal.` : 'This deal has no memo sections.' };
+    const approved = [];
+    const skipped = [];
+    for (const s of targets) {
+      if (!s.content || s.status === 'empty') { skipped.push(s.key); continue; }
+      s.status = 'approved';
+      approved.push(s.key);
+    }
+    if (!approved.length) return { error: 'nothing-to-approve', detail: `No drafted sections to approve — draft the section(s) first (empty: ${skipped.join(', ') || 'none'}).` };
+    const at = new Date().toISOString();
+    deal.activity.unshift({ actor: by || 'Partner', action: `IC memo approved: ${approved.join(', ')}${skipped.length ? ` (skipped empty: ${skipped.join(', ')})` : ''}`, when: at });
+    return { approved, skipped, event: 'memo-approved', detail: { approved, skipped, persona: persona || null } };
+  });
+}
+
+// Sign a diligence lane off as COMPLETE (owning MD, or analyst/partner). Sets the
+// lane to 100% / status 'complete'. A lane cannot be completed while it still has an
+// open high-severity (risk/negative) issue — those must be resolved first, so a
+// "complete" lane genuinely means the workstream is done.
+export function completeLane(id, { lane, by, persona } = {}) {
+  return mutateDeal(id, (deal) => {
+    const ws = (deal.workstreams || []).find((w) => w.lane === lane);
+    if (!ws) return { error: 'lane-not-found', detail: `No "${lane}" diligence lane on this deal.` };
+    const openBlocking = (deal.issues || []).filter((i) => i.lane === lane && (i.status === 'open' || i.status === 'mitigating') && (i.severity === 'risk' || i.severity === 'negative'));
+    if (openBlocking.length) return { error: 'lane-has-open-risks', detail: `Cannot complete the ${lane} lane — ${openBlocking.length} open high-severity issue(s) must be resolved first.` };
+    ws.status = 'complete';
+    ws.progress = 100;
+    const at = new Date().toISOString();
+    deal.activity.unshift({ actor: by || ws.owner || 'MD', action: `${lane} diligence lane signed off as complete`, when: at });
+    return { lane, event: 'lane-completed', detail: { lane, persona: persona || null } };
+  });
+}
+
 export function snapshotAssumptions(id, { label, by } = {}) {
   return mutateDeal(id, (deal) => {
     const figures = currentAssumptions(deal);

@@ -69,6 +69,8 @@ import {
   recordIssue,
   resolveIssue,
   setCondition,
+  approveMemo,
+  completeLane,
   updateCondition,
   snapshotAssumptions,
   getICReadiness,
@@ -321,6 +323,24 @@ api.post('/deals/:id/assumption-snapshot', async (req, res) => {
   const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
   const r = await snapshotAssumptions(req.params.id, { label, by });
   if (r.error) return res.status(404).json(r);
+  res.json(r.deal);
+});
+
+// Complete a diligence lane (owning MD / analyst / partner sign-off).
+api.post('/deals/:id/lanes/:lane/complete', async (req, res) => {
+  const { md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await completeLane(req.params.id, { lane: req.params.lane, by, persona: md });
+  if (r.error) return res.status(r.error === 'not-found' || r.error === 'lane-not-found' ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+
+// Approve the IC memo (partner). Optional ?section= / body.section approves one section.
+api.post('/deals/:id/memo/approve', async (req, res) => {
+  const { section, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await approveMemo(req.params.id, { key: section || req.query.section, by, persona: md });
+  if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
   res.json(r.deal);
 });
 

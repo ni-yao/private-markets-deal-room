@@ -35,7 +35,7 @@ import { resolvePersona, PERSONAS, can } from '../personaPolicy.js';
 
 const SERVER_INFO = { name: 'deal-room-mcp', version: '2.3.0' };
 const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'search_documents', 'get_crm', 'get_next_actions'];
-const ACTION_TOOLS = ['send_to_screening', 'screen_candidate', 'triage_candidate', 'gate_candidate', 'launch_deal', 'advance_deal', 'approve_ic', 'run_step', 'assign_lane', 'record_finding', 'record_contribution', 'record_issue', 'resolve_issue', 'set_condition', 'snapshot_assumptions'];
+const ACTION_TOOLS = ['send_to_screening', 'screen_candidate', 'triage_candidate', 'gate_candidate', 'launch_deal', 'advance_deal', 'approve_ic', 'run_step', 'assign_lane', 'record_finding', 'record_contribution', 'record_issue', 'resolve_issue', 'set_condition', 'snapshot_assumptions', 'complete_lane', 'approve_memo'];
 const TOOL_NAMES = [...READ_TOOLS, ...ACTION_TOOLS];
 
 // Optional extra scope required for ACTION (write) tools, beyond the base /mcp auth.
@@ -239,6 +239,12 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
   action('snapshot_assumptions',
     { deal_id: z.string(), label: z.string().optional().describe('A label for the snapshot, e.g. "IC pre-read v1".') },
     (a) => ({ deal_id: a.deal_id, label: a.label }));
+  action('complete_lane',
+    { deal_id: z.string(), lane: laneEnum.optional().describe('Lane to complete; defaults to your own lane for sector MDs.') },
+    (a) => ({ deal_id: a.deal_id, lane: a.lane }));
+  action('approve_memo',
+    { deal_id: z.string(), section: z.enum(['thesis', 'market', 'value-creation', 'risks', 'recommendation']).optional().describe('Optional single section to approve; omit to approve all drafted sections.') },
+    (a) => ({ deal_id: a.deal_id, section: a.section }));
 
   return server;
 }

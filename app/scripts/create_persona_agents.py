@@ -137,15 +137,19 @@ ACTION_TOOLS = {
                          properties={"deal_id": {"type": "string"}, "text": {"type": "string"}, "owner": {"type": "string"}, "status": {"type": "string", "enum": ["proposed", "accepted", "satisfied"]}}, required=["deal_id", "text"]),
     "snapshot_assumptions": _fn("snapshot_assumptions", "Snapshot the deal's current key assumptions as an IC-draft baseline so the cockpit can show what changed since the last draft. Analyst/Partner only.",
                                 properties={"deal_id": {"type": "string"}, "label": {"type": "string"}}, required=["deal_id"]),
+    "complete_lane": _fn("complete_lane", "Sign a diligence lane off as COMPLETE (100% / status complete), clearing it from the IC-readiness blocking list. Blocked while the lane has an open high-severity issue. Sector MDs own-lane only.",
+                         properties={"deal_id": {"type": "string"}, "lane": LANE}, required=["deal_id"]),
+    "approve_memo": _fn("approve_memo", "Approve the IC memo — optional section (thesis|market|value-creation|risks|recommendation) to approve one, or omit to approve all drafted sections. Only drafted sections can be approved. Clears the memo-approval IC gate. PARTNER only.",
+                        properties={"deal_id": {"type": "string"}, "section": {"type": "string", "enum": ["thesis", "market", "value-creation", "risks", "recommendation"]}}, required=["deal_id"]),
 }
 
 # Which action tools each persona may call (mirrors lib/personaPolicy.js ACTIONS).
 PERSONA_ACTIONS = {
-    "analyst": ["send_to_screening", "screen_candidate", "triage_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "set_condition", "snapshot_assumptions", "assign_lane", "advance_deal"],
-    "partner": ["send_to_screening", "screen_candidate", "triage_candidate", "gate_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "set_condition", "snapshot_assumptions", "assign_lane", "advance_deal", "approve_ic"],
-    "retail-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue"],
-    "ai-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue"],
-    "supply-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue"],
+    "analyst": ["send_to_screening", "screen_candidate", "triage_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "set_condition", "snapshot_assumptions", "assign_lane", "advance_deal", "complete_lane"],
+    "partner": ["send_to_screening", "screen_candidate", "triage_candidate", "gate_candidate", "launch_deal", "run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "set_condition", "snapshot_assumptions", "assign_lane", "advance_deal", "approve_ic", "complete_lane", "approve_memo"],
+    "retail-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "complete_lane"],
+    "ai-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "complete_lane"],
+    "supply-md": ["run_step", "record_finding", "record_contribution", "record_issue", "resolve_issue", "complete_lane"],
 }
 
 COMMON = """You are a specialist copilot for a US mid-market private-equity fund's "Deal Room". You have NO
