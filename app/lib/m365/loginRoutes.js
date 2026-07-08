@@ -16,7 +16,7 @@
 
 import express from 'express';
 import crypto from 'node:crypto';
-import { pkcePair, saveTokens } from '../mcp/oauth.js';
+import { pkcePair, saveTokens, saveTokensDurable } from '../mcp/oauth.js';
 import { config } from '../config.js';
 
 const router = express.Router();
@@ -37,7 +37,11 @@ const TOKEN = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`;
 // the refresh token for headless reuse.
 const SCOPE = [
   'offline_access', 'openid', 'profile', 'email',
-  'User.Read', 'Team.ReadBasic.All', 'Team.Create'
+  'User.Read', 'Team.ReadBasic.All', 'Team.Create',
+  // ChannelSettings.ReadWrite.All lets us set the deal channel to the "chat"/threads
+  // layout; Sites/Files.ReadWrite.All provision the deal SharePoint VDR folders.
+  // All three need tenant-ADMIN consent — available now that a Global Admin connects.
+  'ChannelSettings.ReadWrite.All', 'Sites.ReadWrite.All', 'Files.ReadWrite.All'
 ].join(' ');
 
 // Pending authorizations keyed by state (short-lived).
@@ -120,7 +124,7 @@ router.get('/callback', async (req, res) => {
       return res.redirect(`${safeReturn(p.returnTo)}?connect_error=${encodeURIComponent(t.slice(0, 160))}`);
     }
     const tok = await resp.json();
-    saveTokens('m365', {
+    await saveTokensDurable('m365', {
       provider: 'm365',
       token_endpoint: TOKEN,
       client_id: CLIENT_ID,

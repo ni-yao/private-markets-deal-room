@@ -21,6 +21,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TOKEN_DIR = path.resolve(HERE, '..', '..', 'data', 'oauth');
 const ACCESS_TOKEN_SKEW_SECONDS = 60;
 
+// In-memory token cache. Authoritative for this process even when the container
+// filesystem is read-only / ephemeral (so a completed delegated login is usable
+// immediately and across the single pinned replica without relying on disk).
+const memTokens = Object.create(null);
+
 export class OAuthError extends Error {}
 export class NotLoggedInError extends OAuthError {}
 
@@ -195,7 +200,7 @@ function envTokenJson(provider) {
 }
 
 export function hasLogin(provider) {
-  return fs.existsSync(storePath(provider)) || !!envTokenJson(provider);
+  return !!memTokens[provider] || fs.existsSync(storePath(provider)) || !!envTokenJson(provider);
 }
 
 // Re-materialize any Cosmos-persisted connector tokens to local disk so the sync
@@ -205,6 +210,7 @@ export async function primeTokenCache() {
     const docs = await connRepo.list();
     for (const doc of docs) {
       if (!doc?.id || !doc.record) continue;
+      memTokens[doc.id] = doc.record; // in-memory is authoritative even on read-only FS
       if (fs.existsSync(storePath(doc.id))) continue; // don't clobber a fresher local login
       try {
         fs.mkdirSync(TOKEN_DIR, { recursive: true });
@@ -218,6 +224,7 @@ export async function primeTokenCache() {
 }
 
 function writeDisk(provider, record) {
+  memTokens[provider] = record; // cache in memory first (works even if disk is read-only)
   try {
     fs.mkdirSync(TOKEN_DIR, { recursive: true });
     fs.writeFileSync(storePath(provider), JSON.stringify(record, null, 2), 'utf8');
@@ -247,6 +254,7 @@ export async function saveTokensDurable(provider, record) {
 }
 
 export function loadTokens(provider) {
+  if (memTokens[provider]) return memTokens[provider];
   const p = storePath(provider);
   if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
   const env = envTokenJson(provider);
@@ -260,6 +268,7 @@ export function loadTokens(provider) {
 // (<PROVIDER>_TOKEN_JSON, injected as a container secret) CANNOT be removed at
 // runtime — reported via envTokenRemains so callers can surface that honestly.
 export async function clearTokens(provider) {
+  delete memTokens[provider];
   try { fs.rmSync(storePath(provider), { force: true }); } catch { /* ignore FS errors */ }
   try { await connRepo.remove(provider); } catch { /* best-effort durable delete */ }
   delete refreshInFlight[provider];

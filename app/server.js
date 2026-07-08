@@ -62,6 +62,7 @@ import {
   launchDeal,
   getDealArtifact,
   ensureDealTeamsChannel,
+  provisionAllDealChannels,
   getMdOptions,
   assignSwimlane,
   recordContribution,
@@ -234,6 +235,11 @@ api.post('/deals/:id/teams/ensure', async (req, res) => {
   if (r.error === 'not-found') return res.status(404).json(r);
   if (r.error === 'not-launched') return res.status(409).json(r);
   res.json(r);
+});
+// Ensure EVERY deal has its own Teams channel in the threads (chat) layout — the
+// backfill used to auto-create channels for all deals + force existing ones to threads.
+api.post('/deals/teams/ensure-all', async (_req, res) => {
+  res.json(await provisionAllDealChannels());
 });
 api.patch('/deals/:id/swimlanes/:lane', async (req, res) => {
   const r = await assignSwimlane(req.params.id, req.params.lane, req.body?.md);

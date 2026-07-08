@@ -89,6 +89,21 @@ async function getTeam(teamId) {
   return graph(`/teams/${teamId}?$select=id,displayName,webUrl`);
 }
 
+// Force the deal team's primary (General) channel into the "chat"/threads layout
+// (vs the traditional post-reply layout). Requires ChannelSettings.ReadWrite.All
+// (admin-consented). Non-fatal if the scope isn't granted — returns the channel id.
+async function setChannelThreads(teamId) {
+  try {
+    const pc = await graph(`/teams/${teamId}/primaryChannel?$select=id,layoutType`);
+    if (pc?.id && pc.layoutType !== 'chat') {
+      await graph(`/teams/${teamId}/channels/${pc.id}`, { method: 'PATCH', body: { layoutType: 'chat' } });
+    }
+    return pc?.id || null;
+  } catch {
+    return null;
+  }
+}
+
 // Idempotently ensure THIS deal has its own team; returns its live coordinates
 // (webUrl opens the team / its General channel). Reuses the team recorded on the
 // deal, or an existing joined team with the same name, before creating a new one.
@@ -99,7 +114,7 @@ export async function ensureDealChannel(deal, existing) {
   if (existing?.teamId) {
     try {
       const t = await getTeam(existing.teamId);
-      if (t?.id) return { teamId: t.id, channelId: existing.channelId || null, webUrl: t.webUrl, displayName: t.displayName, createdAt: existing.createdAt || new Date().toISOString() };
+      if (t?.id) { const channelId = await setChannelThreads(t.id); return { teamId: t.id, channelId: channelId || existing.channelId || null, webUrl: t.webUrl, displayName: t.displayName, createdAt: existing.createdAt || new Date().toISOString() }; }
     } catch { /* fall through to re-discover / recreate */ }
   }
 
@@ -108,7 +123,8 @@ export async function ensureDealChannel(deal, existing) {
   const found = (joined?.value || []).find((t) => (t.displayName || '').toLowerCase() === name.toLowerCase());
   if (found) {
     const t = await getTeam(found.id).catch(() => null);
-    return { teamId: found.id, channelId: null, webUrl: t?.webUrl || null, displayName: found.displayName, createdAt: new Date().toISOString() };
+    const channelId = await setChannelThreads(found.id);
+    return { teamId: found.id, channelId, webUrl: t?.webUrl || null, displayName: found.displayName, createdAt: new Date().toISOString() };
   }
 
   // 3) create the deal's team (202 Accepted; team id is in the Location header).
@@ -136,7 +152,7 @@ export async function ensureDealChannel(deal, existing) {
     if (teamId) {
       try {
         const t = await getTeam(teamId);
-        if (t?.id) return { teamId: t.id, channelId: null, webUrl: t.webUrl, displayName: t.displayName || name, createdAt: new Date().toISOString() };
+        if (t?.id) { const channelId = await setChannelThreads(t.id); return { teamId: t.id, channelId, webUrl: t.webUrl, displayName: t.displayName || name, createdAt: new Date().toISOString() }; }
       } catch { /* not ready yet */ }
     }
   }

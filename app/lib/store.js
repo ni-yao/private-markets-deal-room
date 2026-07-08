@@ -1632,6 +1632,11 @@ export function gateCandidate(id, action, reason, note) {
     persistCand(c);
     persistDeal(deal);
     logEvent(c.deskId || c.id, 'pursue', { deal: deal.id, company: c.company });
+    // Auto-provision this deal's Teams channel the moment it exists (best-effort,
+    // only when M365 is connected). Fire-and-forget so the gate response is instant.
+    if (m365Connected()) {
+      provisionDealChannel(deal).catch((err) => logEvent(deal.id, 'teams-provision-error', { error: String(err?.message || err).slice(0, 200) }));
+    }
     return { ok: true, candidate: publicCandidate(c), deal: getDeal(deal.id) };
   }
   transition(c, 'O4', action, reason, note);
@@ -1809,6 +1814,24 @@ export async function ensureDealTeamsChannel(id) {
   } catch (err) {
     return { ok: false, provisioned: false, connected: true, teamsUrl: deal.workspace.teamsUrl, sharePointProvisioned: !!deal.workspace.sharePointProvisioned, workspace: deal.workspace, error: String(err?.message || err).slice(0, 200) };
   }
+}
+
+// Backfill: ensure EVERY existing deal has its own Teams channel (threads layout),
+// best-effort. Used to auto-create channels for deals that existed before M365 was
+// connected, and to force existing channels into the threads (chat) layout.
+export async function provisionAllDealChannels() {
+  if (!m365Connected()) return { ok: false, connected: false, provisioned: 0, total: deals.length, deals: [] };
+  let provisioned = 0; const results = [];
+  for (const deal of deals) {
+    try {
+      const channel = await provisionDealChannel(deal);
+      provisioned++;
+      results.push({ id: deal.id, company: deal.company, webUrl: channel.webUrl, channelId: channel.channelId || null });
+    } catch (err) {
+      results.push({ id: deal.id, company: deal.company, error: String(err?.message || err).slice(0, 160) });
+    }
+  }
+  return { ok: true, connected: true, provisioned, total: deals.length, deals: results };
 }
 
 export function getMdOptions() {
