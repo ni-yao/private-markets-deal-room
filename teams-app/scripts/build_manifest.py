@@ -73,10 +73,10 @@ def build(host: str, sso_client_id=None, bot_id=None, copilot=False, oauth_ref_i
             "privacyUrl": f"{base}/privacy",
             "termsOfUseUrl": f"{base}/terms",
         },
-        "name": {"short": "Deal Room", "full": "The Deal Room"},
+        "name": {"short": "Deal Dashboard", "full": "Deal Dashboard"},
         "description": {
             "short": "AI-native private-equity deal flow in Teams.",
-            "full": "The Deal Room brings your fund's live deal flow into Teams: a channel dashboard and personal tab (Entra SSO) over the shared Deal Room backend (single data source), proactive Adaptive Card alerts as deals advance, and an M365 Copilot agent that answers deal questions through the Entra-secured MCP. The deal chat is grounded in live data and screened by Azure AI Content Safety; a Bing-grounded news scout surfaces fresh M&A catalysts.",
+            "full": "Deal Dashboard brings your fund's live deal flow into Teams: a channel dashboard and personal tab (Entra SSO) over the shared Deal Room backend (single data source), proactive Adaptive Card alerts as deals advance, and an M365 Copilot agent that answers deal questions through the Entra-secured MCP. The deal chat is grounded in live data and screened by Azure AI Content Safety; a Bing-grounded news scout surfaces fresh M&A catalysts.",
         },
         "icons": {"color": "color.png", "outline": "outline.png"},
         "accentColor": "#6264A7",

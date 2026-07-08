@@ -79,7 +79,7 @@ export default function App() {
         <div className="brand">
           <div className="logo">◆</div>
           <div>
-            <div className="brand-t">The Deal Room</div>
+            <div className="brand-t">Deal Dashboard</div>
             <div className="brand-s">Deal flow, market intel & your agents — in one place</div>
           </div>
         </div>
@@ -220,6 +220,9 @@ html, body, #root { margin: 0; height: 100%; }
 .drawer { width: min(560px, 96vw); height: 100%; background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,.3); }
 .drawer-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .drawer-title { font-weight: 700; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chbtn { border: 1px solid var(--accent); background: var(--chip); color: var(--accent); border-radius: 8px; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.chbtn:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); }
+.chbtn:disabled { opacity: .6; cursor: default; }
 .drawer-body { flex: 1; overflow-y: auto; padding: 16px; }
 .dd-sub { color: var(--muted); font-size: 13px; }
 .dd-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
@@ -253,4 +256,35 @@ html, body, #root { margin: 0; height: 100%; }
 .lane-bar { height: 5px; background: var(--hover); border-radius: 4px; overflow: hidden; margin: 6px 0; }
 .lane-bar span { display: block; height: 100%; background: var(--accent); }
 .lane-owner { color: var(--muted); font-size: 11px; }
+
+/* Deal workspace tabs / stages / orchestration */
+.dd-topmeta { padding: 12px 16px 0; }
+.dd-tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--border); overflow-x: auto; background: var(--surface); }
+.dd-tab { border: none; background: none; color: var(--muted); padding: 8px 12px; cursor: pointer; font: inherit; font-weight: 600; border-bottom: 2px solid transparent; white-space: nowrap; }
+.dd-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.dd-actionnote { background: var(--chip); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 12px; }
+.stage-group { margin-bottom: 14px; }
+.stage-name { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 6px; }
+.stage-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.fstep-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 62px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--fg); cursor: pointer; font: inherit; }
+.fstep-btn:hover { background: var(--hover); }
+.fstep-btn .fs-key { font-weight: 800; font-size: 12px; }
+.fstep-btn .fs-label { font-size: 10px; color: var(--muted); }
+.fstep-btn.done { border-color: #1b7f37; }
+.fstep-btn.done .fs-key { color: #1b7f37; }
+.fstep-btn.cur { border-color: var(--accent); background: var(--chip); }
+.fstep-btn.on { outline: 2px solid var(--accent); }
+.orch-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.btn { border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit; font-weight: 600; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.ghost { background: none; }
+.artifact-view { padding: 12px 14px; }
+.av-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin-bottom: 6px; }
+.av-list { margin: 0; padding-left: 18px; font-size: 13px; } .av-list li { margin: 3px 0; }
+.dd-empty-p { padding: 14px; color: var(--muted); font-size: 13px; }
+.ws-grid { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ws-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; border-bottom: 1px dashed var(--border); padding-bottom: 6px; }
+.ws-row a { color: var(--accent); }
 `;
