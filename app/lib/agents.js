@@ -261,7 +261,13 @@ function laneItems(deal, lane, kind) {
   return [...contribs, ...findings];
 }
 function firstText(items, fallback) {
-  const t = items.map((i) => i.text).filter(Boolean);
+  const seen = new Set();
+  const t = items.map((i) => i.text).filter(Boolean).filter((x) => {
+    const k = x.trim().toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   return t.length ? t.slice(0, 2).join(' ') : fallback;
 }
 
@@ -269,7 +275,6 @@ function buildGroundedMemo(deal) {
   const rev = fig(deal, 'Revenue');
   const ebitda = fig(deal, 'EBITDA');
   const margin = fig(deal, 'EBITDA margin');
-  const thesis0 = String(deal.thesis || '').split('.')[0].trim();
   const commGuide = laneItems(deal, 'commercial', 'guidance').concat(laneItems(deal, 'commercial', 'diligence'));
   const valueAdd = laneItems(deal, 'commercial', 'value_add').concat(laneItems(deal, 'techai', 'value_add'), laneItems(deal, 'techai', 'diligence'));
   const openIssues = (deal.issues || []).filter((i) => i.status === 'open' || i.status === 'mitigating');
@@ -279,9 +284,15 @@ function buildGroundedMemo(deal) {
     : 'No unresolved high-severity risks; residual risks are covered by the IC conditions.';
   const evText = deal.dealSize != null ? money(deal.dealSize) : '—';
 
+  // Thesis lede: prefer a grounded commercial contribution; else the deal thesis if it
+  // is substantive (not the "Company. Sector. Cleared the gate" stub); else a fallback.
+  const rawThesis = String(deal.thesis || '').trim();
+  const stub = !rawThesis || /cleared the screening gate|awaiting diligence/i.test(rawThesis) || new RegExp(`^${deal.company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.?\\s*(—|,)?\\s*${deal.sector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.?$`, 'i').test(rawThesis);
+  const thesisLede = firstText(commGuide, stub ? `${deal.sector} platform with validated demand drivers and pricing power.` : `${rawThesis.split('.')[0].trim()}.`);
+
   const drafts = {
     thesis: {
-      content: `${deal.company} — ${deal.sector}. ${thesis0}. Revenue ${rev}, EBITDA ${ebitda} (${margin}).`,
+      content: `${deal.company} — ${deal.sector}. ${thesisLede} Revenue ${rev}, EBITDA ${ebitda} (${margin}).`,
       citations: ['Screen', 'Commercial DD']
     },
     market: {
