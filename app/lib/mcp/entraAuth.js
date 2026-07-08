@@ -18,6 +18,7 @@
 // configured, the endpoint returns 503 rather than serving deals unauthenticated.
 
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { PERSONAS } from '../personaPolicy.js';
 
 const TENANT_ID = (process.env.ENTRA_TENANT_ID || '').trim();
 const AUDIENCES = (process.env.MCP_AUDIENCE || '')
@@ -33,6 +34,26 @@ const DISABLED = String(process.env.MCP_AUTH_DISABLED || '').toLowerCase() === '
 // the inert bicep placeholder (mirrors m365-client-secret), treated as no key.
 const READONLY_KEY_RAW = (process.env.MCP_READONLY_KEY || '').trim();
 const READONLY_KEY = READONLY_KEY_RAW === 'unset' ? '' : READONLY_KEY_RAW;
+
+// Per-persona static keys for the /mcp-persona surface. Each key BINDS a caller to
+// exactly one persona server-side, so a Foundry-hosted agent (published to Teams,
+// where writes execute server-side with no client) can take ONLY its own persona's
+// governed actions — the persona comes from the KEY, never from the model, so a
+// confused/adversarial agent can't claim another persona to escalate. Env var per
+// persona; the 'unset' sentinel is the inert bicep placeholder (treated as no key).
+const PERSONA_KEY_ENV = {
+  analyst: 'MCP_KEY_ANALYST',
+  partner: 'MCP_KEY_PARTNER',
+  'retail-md': 'MCP_KEY_RETAIL_MD',
+  'ai-md': 'MCP_KEY_AI_MD',
+  'supply-md': 'MCP_KEY_SUPPLY_MD'
+};
+const PERSONA_KEYS = {}; // persona -> key
+for (const [persona, envName] of Object.entries(PERSONA_KEY_ENV)) {
+  const raw = (process.env[envName] || '').trim();
+  const val = raw === 'unset' ? '' : raw;
+  if (val) PERSONA_KEYS[persona] = val;
+}
 
 const ISSUERS = TENANT_ID
   ? [
@@ -166,4 +187,55 @@ function timingSafeEqual(a, b) {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
+}
+
+export function mcpPersonaKeysConfigured() {
+  return Object.keys(PERSONA_KEYS).length > 0;
+}
+
+export function mcpPersonaKeyInfo() {
+  return {
+    configured: mcpPersonaKeysConfigured(),
+    // which personas have a key configured (never the key values)
+    personas: Object.fromEntries(PERSONAS.map((p) => [p, !!PERSONA_KEYS[p]]))
+  };
+}
+
+// Persona-scoped MCP auth for /mcp-persona. The presented key (header `x-mcp-key`
+// or `Authorization: Bearer <key>`) is matched against the per-persona keys; on a
+// match the request is flagged personaLocked with that fixed persona, so the MCP
+// server exposes ONLY that persona's read + governed-write tools. Fail-closed: an
+// unknown/missing key is rejected (no fallback to Entra or the read-only surface),
+// and if no persona keys are configured at all the endpoint returns 503.
+export async function mcpPersonaAuthMiddleware(req, res, next) {
+  if (DISABLED) {
+    // LOCAL DEV ONLY: no bound persona; the tool's persona arg flows through.
+    req.mcpAuth = { mode: 'disabled' };
+    return next();
+  }
+  const configured = Object.entries(PERSONA_KEYS);
+  if (!configured.length) {
+    return res.status(503).json({
+      jsonrpc: '2.0',
+      error: { code: -32002, message: 'Persona-scoped MCP not configured (set MCP_KEY_<PERSONA>).' },
+      id: null
+    });
+  }
+  const headerKey = (req.headers['x-mcp-key'] || '').trim();
+  const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+  const presented = headerKey || (bearer ? bearer[1].trim() : '');
+  if (presented) {
+    for (const [persona, key] of configured) {
+      if (timingSafeEqual(presented, key)) {
+        req.mcpAuth = { mode: 'personakey', persona, personaLocked: true };
+        return next();
+      }
+    }
+  }
+  res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
+  return res.status(401).json({
+    jsonrpc: '2.0',
+    error: { code: -32001, message: 'Unauthorized: a valid persona key is required for /mcp-persona.' },
+    id: null
+  });
 }

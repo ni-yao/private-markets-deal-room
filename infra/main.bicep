@@ -142,6 +142,26 @@ param m365ClientSecret string = ''
 @secure()
 param mcpReadonlyKey string = ''
 
+@description('Per-persona key for the analyst agent on the /mcp-persona surface. Empty disables this persona key.')
+@secure()
+param mcpKeyAnalyst string = ''
+
+@description('Per-persona key for the partner agent on the /mcp-persona surface. Empty disables this persona key.')
+@secure()
+param mcpKeyPartner string = ''
+
+@description('Per-persona key for the retail-md agent (commercial lane) on the /mcp-persona surface. Empty disables this persona key.')
+@secure()
+param mcpKeyRetailMd string = ''
+
+@description('Per-persona key for the ai-md agent (tech/AI lane) on the /mcp-persona surface. Empty disables this persona key.')
+@secure()
+param mcpKeyAiMd string = ''
+
+@description('Per-persona key for the supply-md agent (operations lane) on the /mcp-persona surface. Empty disables this persona key.')
+@secure()
+param mcpKeySupplyMd string = ''
+
 @description('Container Registry SKU.')
 @allowed([
   'Basic'
@@ -484,6 +504,13 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
         // Read-only MCP key for Foundry-hosted (Teams) agents; the app gates the key
         // path on a non-empty value, so the placeholder is inert until a key is set.
         { name: 'mcp-readonly-key', value: empty(mcpReadonlyKey) ? 'unset' : mcpReadonlyKey }
+        // Per-persona MCP keys for the /mcp-persona surface — each binds a Teams agent
+        // to one persona server-side. Inert 'unset' placeholders until real keys are set.
+        { name: 'mcp-key-analyst', value: empty(mcpKeyAnalyst) ? 'unset' : mcpKeyAnalyst }
+        { name: 'mcp-key-partner', value: empty(mcpKeyPartner) ? 'unset' : mcpKeyPartner }
+        { name: 'mcp-key-retail-md', value: empty(mcpKeyRetailMd) ? 'unset' : mcpKeyRetailMd }
+        { name: 'mcp-key-ai-md', value: empty(mcpKeyAiMd) ? 'unset' : mcpKeyAiMd }
+        { name: 'mcp-key-supply-md', value: empty(mcpKeySupplyMd) ? 'unset' : mcpKeySupplyMd }
       ]
       ingress: {
         external: true
@@ -525,6 +552,11 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'M365_TENANT_ID', value: empty(m365TenantId) ? entraTenantId : m365TenantId }
             { name: 'M365_CLIENT_SECRET', secretRef: 'm365-client-secret' }
             { name: 'MCP_READONLY_KEY', secretRef: 'mcp-readonly-key' }
+            { name: 'MCP_KEY_ANALYST', secretRef: 'mcp-key-analyst' }
+            { name: 'MCP_KEY_PARTNER', secretRef: 'mcp-key-partner' }
+            { name: 'MCP_KEY_RETAIL_MD', secretRef: 'mcp-key-retail-md' }
+            { name: 'MCP_KEY_AI_MD', secretRef: 'mcp-key-ai-md' }
+            { name: 'MCP_KEY_SUPPLY_MD', secretRef: 'mcp-key-supply-md' }
           ]
         }
       ]

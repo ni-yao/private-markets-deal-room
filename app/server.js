@@ -92,8 +92,8 @@ import { getModelInfo } from './lib/ai.js';
 import { newsAgentConfigured } from './lib/newsAgent.js';
 import { chatDealAgent, dealAgentInfo } from './lib/dealAgent.js';
 import { chatPersonaAgent, personaAgentsInfo } from './lib/personaAgent.js';
-import { dealMcpHandler, dealMcpReadonlyHandler, dealMcpMethodNotAllowed, dealMcpInfo, dealMcpReadonlyInfo } from './lib/mcp/dealServer.js';
-import { mcpAuthMiddleware, mcpReadonlyAuthMiddleware, mcpAuthInfo, mcpReadonlyKeyConfigured } from './lib/mcp/entraAuth.js';
+import { dealMcpHandler, dealMcpReadonlyHandler, dealMcpPersonaHandler, dealMcpMethodNotAllowed, dealMcpInfo, dealMcpReadonlyInfo, dealMcpPersonaInfo } from './lib/mcp/dealServer.js';
+import { mcpAuthMiddleware, mcpReadonlyAuthMiddleware, mcpPersonaAuthMiddleware, mcpAuthInfo, mcpReadonlyKeyConfigured, mcpPersonaKeyInfo } from './lib/mcp/entraAuth.js';
 import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
@@ -122,7 +122,12 @@ api.get('/config', (_req, res) => {
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
     dealAgent: dealAgentInfo().configured ? 'live' : 'demo',
     personaAgents: personaAgentsInfo(),
-    dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo(), readonly: { ...dealMcpReadonlyInfo(), keyConfigured: mcpReadonlyKeyConfigured() } },
+    dealMcp: {
+      ...dealMcpInfo(),
+      auth: mcpAuthInfo(),
+      readonly: { ...dealMcpReadonlyInfo(), keyConfigured: mcpReadonlyKeyConfigured() },
+      persona: { ...dealMcpPersonaInfo(), keys: mcpPersonaKeyInfo() }
+    },
     m365: { configured: m365Configured(), connected: m365Connected(), files: m365FilesScope() },
     morningstar: morningstarReady() ? 'live' : 'demo',
     fabric: fabricStatus(),
@@ -687,6 +692,16 @@ app.delete('/mcp', mcpAuthMiddleware, dealMcpMethodNotAllowed);
 app.post('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpReadonlyHandler);
 app.get('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpMethodNotAllowed);
 app.delete('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpMethodNotAllowed);
+
+// Persona-scoped MCP surface for Foundry-hosted agents (published to Teams). Each of
+// the five persona agents authenticates with its OWN key, which binds it server-side
+// to a fixed persona; the surface then exposes the read tools + only THAT persona's
+// governed action tools (analyst runs the funnel, partner gates/approves, each sector
+// MD writes only its own lane). The persona comes from the key, never the model, so a
+// Teams agent can act on the pipeline but never exceed its persona's powers.
+app.post('/mcp-persona', mcpPersonaAuthMiddleware, dealMcpPersonaHandler);
+app.get('/mcp-persona', mcpPersonaAuthMiddleware, dealMcpMethodNotAllowed);
+app.delete('/mcp-persona', mcpPersonaAuthMiddleware, dealMcpMethodNotAllowed);
 
 // ---- Static client ----
 const clientDist = join(__dirname, 'client', 'dist');

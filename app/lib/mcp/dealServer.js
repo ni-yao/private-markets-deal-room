@@ -30,7 +30,7 @@ import {
   icReadinessView, marketIntelView, citationAuditView, canonicalCompaniesView, canonicalCompanyView,
   dispatchAction, nextActionsFor
 } from '../dealTools.js';
-import { resolvePersona, PERSONAS } from '../personaPolicy.js';
+import { resolvePersona, PERSONAS, can } from '../personaPolicy.js';
 
 const SERVER_INFO = { name: 'deal-room-mcp', version: '2.3.0' };
 const READ_TOOLS = ['list_deals', 'get_deal', 'search_deals', 'list_pipeline', 'get_candidate', 'get_candidate_artifact', 'get_deal_artifact', 'get_ic_readiness', 'get_market_intel', 'get_citation_audit', 'get_companies', 'get_company', 'get_next_actions'];
@@ -61,13 +61,23 @@ function actionGuard(auth, argPersona) {
 }
 
 // Build a fresh MCP server with all read + action tools registered. `auth` is the
-// validated Entra context (req.mcpAuth) so action tools can enforce the write scope.
-// When auth.readOnly is set (the read-only surface used by Foundry-hosted / Teams
-// agents), only the READ tools are registered — the write/action tools are omitted
-// entirely, so a model-asserted persona can never drive a governed mutation there.
+// validated context (req.mcpAuth). Three surfaces share this builder:
+//   • /mcp        (Entra)     — all reads + all action tools; persona is a tool arg
+//                               (trusted first-party clients / Copilot Studio).
+//   • /mcp-ro     (readOnly)  — reads only; the write/action tools are omitted
+//                               entirely, so a model-asserted persona can never
+//                               drive a governed mutation there.
+//   • /mcp-persona (personaLocked) — reads + ONLY the bound persona's allowed
+//                               action tools. The persona comes from the caller's
+//                               KEY (server-trusted), not the model, and the persona
+//                               arg is dropped from the schema — a Foundry-hosted
+//                               Teams agent can act, but only within its own remit.
 export function buildDealMcpServer(auth = { mode: 'disabled' }) {
   const server = new McpServer(SERVER_INFO, { capabilities: { tools: {} } });
   const readOnly = !!auth.readOnly;
+  // When the persona is bound to the credential (per-persona key), it is authoritative
+  // and the tools take no persona arg — the model can't select or escalate a persona.
+  const boundPersona = auth.personaLocked && PERSONAS.includes(auth.persona) ? auth.persona : null;
 
   // ---- READ: Stage-2 deals (existing contracts) ---------------------------
   server.registerTool('list_deals',
@@ -131,7 +141,11 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
   server.registerTool('get_next_actions',
     {
       title: 'Get next actions', description: TOOL_DESCRIPTIONS.get_next_actions,
-      inputSchema: { persona: personaArg, deal_id: z.string().optional().describe('A deal id.'), candidate_id: z.string().optional().describe('A candidate id.') }
+      inputSchema: {
+        ...(boundPersona ? {} : { persona: personaArg }),
+        deal_id: z.string().optional().describe('A deal id.'),
+        candidate_id: z.string().optional().describe('A candidate id.')
+      }
     },
     async ({ persona, deal_id, candidate_id }) => {
       const { persona: p } = resolvePersona({ argPersona: persona, auth });
@@ -140,19 +154,28 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
     });
 
   // ---- ACTION tools (persona-governed writes) -----------------------------
-  // Omitted entirely on the read-only surface — a Foundry-hosted / Teams agent can
-  // research the pipeline but cannot mutate it there (writes stay Entra-guarded on /mcp).
+  // Omitted entirely on the read-only surface. On the persona-locked surface only the
+  // bound persona's allowed actions are registered (and the persona arg is dropped, as
+  // the persona is fixed by the caller's key); on /mcp all actions register with a
+  // persona arg. Either way, every call is authorization-checked server-side.
   const action = readOnly
     ? () => {}
-    : (name, extraSchema, mapArgs) => server.registerTool(
-      name,
-      { title: name, description: TOOL_DESCRIPTIONS[name], inputSchema: { persona: personaArg, ...extraSchema } },
-      async (args) => {
-        const guard = actionGuard(auth, args.persona);
-        if (guard.error) return toContent(guard);
-        return toContent(await dispatchAction(name, mapArgs(args), { persona: guard.persona }));
-      }
-    );
+    : (name, extraSchema, mapArgs) => {
+      if (boundPersona && !can(boundPersona, name).ok) return; // not in this persona's remit
+      return server.registerTool(
+        name,
+        {
+          title: name,
+          description: TOOL_DESCRIPTIONS[name],
+          inputSchema: { ...(boundPersona ? {} : { persona: personaArg }), ...extraSchema }
+        },
+        async (args) => {
+          const guard = actionGuard(auth, args.persona);
+          if (guard.error) return toContent(guard);
+          return toContent(await dispatchAction(name, mapArgs(args), { persona: guard.persona }));
+        }
+      );
+    };
 
   const dispositionArg = z.enum(['advance', 'pass', 'park']).describe('advance | pass | park.');
   const reasonArg = z.string().optional().describe('Reason code / note for a pass or park.');
@@ -215,6 +238,13 @@ export async function dealMcpReadonlyHandler(req, res) {
   return handleWith(req, res, { ...(req.mcpAuth || {}), readOnly: true });
 }
 
+// Express handler for POST /mcp-persona — the PERSONA-SCOPED surface. The middleware
+// has bound req.mcpAuth to a fixed persona (personaLocked) from the caller's key, so
+// the built server exposes reads + only that persona's governed action tools.
+export async function dealMcpPersonaHandler(req, res) {
+  return handleWith(req, res, req.mcpAuth || { mode: 'disabled' });
+}
+
 async function handleWith(req, res, auth) {
   const server = buildDealMcpServer(auth);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -252,4 +282,14 @@ export function dealMcpInfo() {
 // Info for the read-only surface (used by Foundry-hosted / Teams agents).
 export function dealMcpReadonlyInfo() {
   return { path: '/mcp-ro', readTools: READ_TOOLS, toolCount: READ_TOOLS.length };
+}
+
+// Info for the persona-scoped surface: the action tools each persona key unlocks
+// (reads are always available). Mirrors the in-app persona governance.
+export function dealMcpPersonaInfo() {
+  return {
+    path: '/mcp-persona',
+    readTools: READ_TOOLS,
+    actionsByPersona: Object.fromEntries(PERSONAS.map((p) => [p, ACTION_TOOLS.filter((a) => can(p, a).ok)]))
+  };
 }

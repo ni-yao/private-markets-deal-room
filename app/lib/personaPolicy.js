@@ -98,13 +98,16 @@ export function nextActions(persona, { kind, stage } = {}) {
 }
 
 // ---- Persona resolution seam ------------------------------------------------
-// Option 1 (current): the agent declares its persona as a validated tool arg (a
-// governance guardrail among trusted first-party agents). To harden later —
-// Option 2 (per-agent app registration → appid map) or Option 3 (delegated
-// user → persona map) — swap ONLY this function; no tool or policy changes.
-//
-// Precedence: an explicit, validated arg persona wins; else a mapping from the
-// authenticated caller (appId/sub) when configured; else a configured default.
+// The persona MUST come from something the model cannot forge. Precedence:
+//   0. a persona BOUND TO THE CALLER'S CREDENTIAL (auth.personaLocked) — e.g. a
+//      per-persona API key on the /mcp-persona surface, or (future) a per-agent
+//      Entra app registration. This is server-trusted and AUTHORITATIVE: it wins
+//      over any persona the model puts in the tool call, so an agent holding the
+//      retail-md key can never act as the partner by passing persona:"partner".
+//   1. an explicit, validated arg persona — only safe among trusted first-party
+//      callers (the in-app runtime, which injects the persona itself).
+//   2. a mapping from the authenticated caller (appId) when configured.
+//   3. a configured default.
 const APPID_PERSONA = parseMap(process.env.MCP_PERSONA_BY_APPID); // "appid1=partner,appid2=analyst"
 const DEFAULT_PERSONA = (process.env.MCP_DEFAULT_PERSONA || '').trim();
 
@@ -118,10 +121,21 @@ function parseMap(s) {
 }
 
 export function resolvePersona({ argPersona, auth } = {}) {
+  // 0. A persona bound to the caller's credential is authoritative (see above) —
+  //    the model cannot override it, so it can never escalate to another persona.
+  if (auth?.personaLocked && PERSONAS.includes(auth.persona)) {
+    return { persona: auth.persona, source: 'credential' };
+  }
   const arg = (argPersona || '').trim().toLowerCase();
   if (arg && PERSONAS.includes(arg)) return { persona: arg, source: 'arg' };
   const appId = (auth?.appId || '').toLowerCase();
   if (appId && APPID_PERSONA[appId]) return { persona: APPID_PERSONA[appId], source: 'appid' };
   if (DEFAULT_PERSONA && PERSONAS.includes(DEFAULT_PERSONA)) return { persona: DEFAULT_PERSONA, source: 'default' };
   return { persona: null, source: 'none' };
+}
+
+// The action names `persona` is allowed to invoke (mirrors ACTIONS, used to build
+// the persona-scoped tool surface and to report it via /api/config).
+export function allowedActions(persona) {
+  return Object.keys(ACTIONS).filter((a) => can(persona, a).ok);
 }

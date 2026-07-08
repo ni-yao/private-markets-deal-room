@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.35.0',
+    date: '2026-07-08',
+    image: 'dealroom-app:v57',
+    revision: 'ca-dealroom-orch-dev-swc--0000053',
+    title: 'Persona agents can ACT in Teams — persona-scoped write tools, bound to each agent’s key',
+    tag: 'feature',
+    highlights: [
+      'Restored the persona-scoped action tools for the Teams-published agents. Previously the Teams surface was read-only because a single shared key gave the server no trusted way to know which persona was calling — so it could not safely allow a write (any agent could have claimed any persona). Each of the five agents now authenticates with its OWN key, which binds it to a fixed persona server-side.',
+      'Added a persona-scoped MCP surface (/mcp-persona) that exposes the read tools plus ONLY the calling persona’s authorized actions: the analyst runs the funnel (screen/triage/launch/run steps/record/advance), the partner additionally gates at O4 and approves at IC (D4), and each sector MD writes only into its own lane (retail→commercial, AI→tech/AI, supply→operations). The persona comes from the key — never from the model — so an agent can act on the pipeline but can never exceed its persona’s powers or act as another persona.',
+      'The governed Deal Room record stays the single source of truth: every action from Teams runs through the same server-side authorization (personaPolicy.can) and optimistic-concurrency writes the in-app runtime uses, and appears immediately in the app. High-impact partner moves (gate/approve, and any override past a NOT-READY IC-readiness verdict) require explicit confirmation and a logged override reason.',
+      'Wired five per-persona keys as Container App secrets (bicep params + secretRefs) and re-provisioned all five persona agents to the persona-scoped surface — no re-publish needed in Teams (agent names unchanged).'
+    ]
+  },
+  {
     version: 'v0.34.0',
     date: '2026-07-08',
     image: 'dealroom-app:v56',
