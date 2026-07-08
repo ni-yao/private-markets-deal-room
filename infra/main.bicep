@@ -352,6 +352,8 @@ module app 'modules/app.bicep' = {
     appInsightsConnectionString: core.outputs.appInsightsConnectionString
     foundryEndpoint: ai.outputs.foundryEndpoint
     contentSafetyEndpoint: ai.outputs.contentSafetyEndpoint
+    cosmosEndpoint: data.outputs.cosmosEndpoint
+    cosmosDatabase: data.outputs.cosmosDatabaseName
     fabricLive: fabricLive
     fabricSqlEndpoint: fabricSqlEndpoint
     fabricSqlDatabase: fabricSqlDatabase

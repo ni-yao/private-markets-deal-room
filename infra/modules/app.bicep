@@ -48,6 +48,8 @@ param logAnalyticsName string
 param appInsightsConnectionString string
 param foundryEndpoint string
 param contentSafetyEndpoint string = ''
+param cosmosEndpoint string = ''
+param cosmosDatabase string = 'dealroom'
 
 // Fabric / OneLake market-intelligence binding (external workspace; not provisioned here).
 param fabricLive bool = false
@@ -164,6 +166,8 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'DEAL_ROOM_REGION', value: location }
             { name: 'WORKSPACE_TENANT', value: workspaceTenant }
             { name: 'CONTENT_SAFETY_ENDPOINT', value: contentSafetyEndpoint }
+            { name: 'COSMOS_ENDPOINT', value: cosmosEndpoint }
+            { name: 'COSMOS_DATABASE', value: cosmosDatabase }
             { name: 'FABRIC_LIVE', value: string(fabricLive) }
             { name: 'FABRIC_SQL_ENDPOINT', value: fabricSqlEndpoint }
             { name: 'FABRIC_SQL_DATABASE', value: fabricSqlDatabase }
