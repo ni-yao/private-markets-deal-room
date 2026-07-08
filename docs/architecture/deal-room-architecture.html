@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Deal Room — Azure Architecture</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111c30; --panel2:#0f1830; --edge:#25304a; --edge2:#1b2740;
+    --ink:#e8eefb; --dim:#9fb0cc; --faint:#6d7f9e;
+    --azure:#2f8fe0; --azure2:#5ea0ef; --green:#3fb7a8; --amber:#e6a63c; --violet:#7b83eb; --rose:#e06a8b;
+    --chip:#16233c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#132441 0,#0b1220 55%);color:var(--ink);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;padding:28px 30px 60px}
+  h1{font-size:26px;margin:0 0 2px;letter-spacing:.2px}
+  .sub{color:var(--dim);font-size:13.5px;margin:0 0 4px}
+  .meta{color:var(--faint);font-size:12px;margin:0 0 20px}
+  .canvas{max-width:1360px;margin:0 auto}
+
+  .zone{border:1px solid var(--edge);border-radius:14px;padding:14px 16px 16px;margin:0 0 16px;background:linear-gradient(180deg,rgba(23,35,60,.55),rgba(15,24,48,.35))}
+  .zone > .zt{display:flex;align-items:center;gap:9px;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim);margin:0 0 12px;font-weight:600}
+  .zt .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .zt .rg{margin-left:auto;text-transform:none;letter-spacing:.2px;color:var(--faint);font-size:11.5px;font-weight:500}
+
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 0;min-width:0}
+  .grid{display:grid;gap:12px}
+
+  .card{background:var(--panel);border:1px solid var(--edge2);border-radius:11px;padding:11px 12px;display:flex;gap:10px;align-items:flex-start;min-height:58px}
+  .card img{width:30px;height:30px;flex:0 0 auto;margin-top:1px}
+  .card .cx{min-width:0}
+  .card .pn{font-size:13px;font-weight:600;line-height:1.2}
+  .card .rn{font-size:11.5px;color:var(--dim);margin-top:3px;font-family:"Cascadia Code",Consolas,monospace;word-break:break-all}
+  .card .nn{font-size:11px;color:var(--faint);margin-top:4px;line-height:1.35}
+  .card.accent{border-color:#2b5c8f;box-shadow:0 0 0 1px rgba(94,160,239,.15) inset}
+  .card.green{border-color:#1f5f56}
+  .card.violet{border-color:#3a3f7a}
+  .card.amber{border-color:#6a5320}
+
+  .subhead{font-size:11px;letter-spacing:.6px;color:var(--faint);text-transform:uppercase;margin:2px 2px 8px;font-weight:600}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .chip{font-size:11px;background:var(--chip);border:1px solid var(--edge2);color:var(--dim);padding:3px 8px;border-radius:20px}
+
+  .flowbar{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--faint);font-size:11px;margin:2px 0 14px}
+  .flowbar .ar{color:var(--azure2);font-size:15px}
+
+  .legend{border:1px dashed var(--edge);border-radius:12px;padding:14px 16px;background:rgba(15,24,48,.4)}
+  .legend h3{margin:0 0 10px;font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
+  .flist{display:grid;grid-template-columns:1fr 1fr;gap:7px 26px}
+  .fitem{display:flex;gap:9px;font-size:12.5px;color:var(--ink);line-height:1.4}
+  .fitem b{color:var(--azure2);flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .fitem .k{color:var(--dim)}
+
+  .caption{color:var(--faint);font-size:11.5px;margin:16px 2px 0;line-height:1.5}
+  @media(max-width:900px){.flist{grid-template-columns:1fr}.row{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="canvas">
+  <h1>The Deal Room — Azure Architecture</h1>
+  <p class="sub">AI-native private-equity deal sourcing &amp; diligence platform · Azure AI Foundry + Container Apps + Cosmos DB, grounded on Microsoft Fabric &amp; Azure AI Search</p>
+  <p class="meta">Subscription <code>ME-MngEnvMCAP336646</code> · Region <b>Sweden Central</b> (data plane in West/Central/East US) · Resource groups <code>rg-dealroom-dev-swc</code> &amp; <code>rg-deal-room-data</code></p>
+
+  <!-- USERS & CHANNELS -->
+  <div class="zone">
+    <div class="zt"><span class="dot" style="background:var(--violet)"></span>Users &amp; Channels<span class="rg">how people reach the platform</span></div>
+    <div class="row">
+      <div class="col grid" style="grid-template-columns:1fr 1fr">
+        <div class="card violet">
+          <img src="icons/web.svg" alt="">
+          <div class="cx"><div class="pn">Deal Team — Web App (SPA)</div><div class="nn">Analyst · Partner · Retail / AI / Supply-Chain MDs · React single-page app served by the Container App</div></div>
+        </div>
+        <div class="card violet">
+          <img src="icons/teams.svg" alt="">
+          <div class="cx"><div class="pn">Microsoft Teams</div><div class="nn">5 persona agents published to Teams — 1:1, the PE Deals channel, and per-deal channels</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flowbar"><span class="ar">▼</span> HTTPS · OAuth (Entra) · per-persona MCP key <span class="ar">▼</span></div>
+
+  <!-- IDENTITY & EDGE -->
+  <div class="zone">
+    <div class="zt"><span class="dot" style="background:var(--azure2)"></span>Identity &amp; Edge</div>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card accent"><img src="icons/entra.svg" alt=""><div class="cx"><div class="pn">Microsoft Entra ID</div><div class="nn">Validates MCP bearer tokens (JWKS) &amp; delegated M365 sign-in</div></div></div>
+      <div class="card accent"><img src="icons/managedidentity.svg" alt=""><div class="cx"><div class="pn">Managed Identity</div><div class="rn">id-dealroom-dev-swc</div><div class="nn">User-assigned; RBAC to Cosmos, Search, Storage, Key Vault, Foundry, ACR, Service Bus</div></div></div>
+      <div class="card accent"><img src="icons/apim.svg" alt=""><div class="cx"><div class="pn">API Management</div><div class="rn">apim-dealroom-dev-7j3ok</div><div class="nn">AI gateway (token limits, routing, telemetry)</div></div></div>
+    </div>
+  </div>
+
+  <div class="flowbar"><span class="ar">▼</span> managed-identity RBAC <span class="ar">▼</span></div>
+
+  <div class="row">
+    <!-- APPLICATION TIER -->
+    <div class="col zone" style="flex:1.15">
+      <div class="zt"><span class="dot" style="background:var(--azure)"></span>Application Tier · Azure Container Apps Environment (VNet-integrated)<span class="rg">cae-dealroom-dev-swc</span></div>
+      <div class="grid" style="grid-template-columns:1fr">
+        <div class="card accent">
+          <img src="icons/containerapps.svg" alt="">
+          <div class="cx">
+            <div class="pn">Azure Container Apps — Orchestrator</div>
+            <div class="rn">ca-dealroom-orch-dev-swc</div>
+            <div class="nn">Node/Express API + React SPA + MCP server. Deal engine, persona-agent tool loop, IC-readiness cockpit, connectors.</div>
+            <div class="chips">
+              <span class="chip">/mcp · Entra (writes)</span>
+              <span class="chip">/mcp-ro · read-only key</span>
+              <span class="chip">/mcp-persona · 5 per-persona keys</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div class="card"><img src="icons/acr.svg" alt=""><div class="cx"><div class="pn">Container Registry</div><div class="rn">acrdealroomdev7j3ok</div><div class="nn">App container images (dealroom-app:vN)</div></div></div>
+          <div class="card"><img src="icons/function.svg" alt=""><div class="cx"><div class="pn">Function App</div><div class="rn">func-dealroom-events-dev-7j3ok</div><div class="nn">Event-driven deal handlers · Flex plan (asp-dealroom-dev-swc)</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI TIER -->
+    <div class="col zone" style="flex:1.15">
+      <div class="zt"><span class="dot" style="background:var(--azure2)"></span>AI Tier · Azure AI Foundry<span class="rg">aif-dealroom-dev-7j3ok / proj-dealroom-dev</span></div>
+      <div class="grid" style="grid-template-columns:1fr">
+        <div class="card accent">
+          <img src="icons/cognitive.svg" alt="">
+          <div class="cx">
+            <div class="pn">Azure AI Foundry — Project &amp; Models</div>
+            <div class="nn">Chat + reasoning &amp; embeddings for the app and agents.</div>
+            <div class="chips"><span class="chip">gpt-5-mini</span><span class="chip">gpt-5-nano</span><span class="chip">text-embedding-3-large</span></div>
+          </div>
+        </div>
+        <div class="card accent">
+          <img src="icons/cognitive.svg" alt="">
+          <div class="cx"><div class="pn">Foundry Hosted Agents ×5</div><div class="nn">deal-room-analyst · partner · retail-md · ai-md · supply-md — persona-scoped tools via hosted MCP, published to Teams</div></div>
+        </div>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div class="card"><img src="icons/web.svg" alt=""><div class="cx"><div class="pn">Grounding with Bing</div><div class="rn">bing-dealroom-dev</div><div class="nn">Live news / web for the sourcing agent</div></div></div>
+          <div class="card"><img src="icons/cognitive.svg" alt=""><div class="cx"><div class="pn">AI Document Intelligence</div><div class="rn">di-dealroom-dev-7j3ok</div><div class="nn">Filing / document extraction</div></div></div>
+          <div class="card"><img src="icons/cognitive.svg" alt=""><div class="cx"><div class="pn">AI Content Safety</div><div class="rn">cs-dealroom-dev-7j3ok</div><div class="nn">Guardrails on generated content</div></div></div>
+          <div class="card"><img src="icons/cognitive.svg" alt=""><div class="cx"><div class="pn">AI Speech</div><div class="rn">spch-dealroom-dev-7j3ok</div><div class="nn">Voice interface (STT / TTS)</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flowbar"><span class="ar">▼</span> deals &amp; agent-state · events · secrets · telemetry <span class="ar">▼</span></div>
+
+  <div class="row">
+    <!-- DATA & MESSAGING -->
+    <div class="col zone" style="flex:1.4">
+      <div class="zt"><span class="dot" style="background:var(--azure)"></span>Data, Messaging &amp; Secrets</div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div class="card accent"><img src="icons/cosmos.svg" alt=""><div class="cx"><div class="pn">Azure Cosmos DB</div><div class="rn">cosmos-dealroom-dev-7j3ok</div><div class="nn">System of record: deals, pipeline, artifacts, agent state. RBAC-only, <code>_etag</code> concurrency</div></div></div>
+        <div class="card"><img src="icons/keyvault.svg" alt=""><div class="cx"><div class="pn">Key Vault</div><div class="rn">kv-dealroom-dev-7j3ok</div><div class="nn">Secrets &amp; keys (Secrets User via MI)</div></div></div>
+        <div class="card"><img src="icons/servicebus.svg" alt=""><div class="cx"><div class="pn">Service Bus</div><div class="rn">sb-dealroom-dev-7j3ok</div><div class="nn">deal-events queue</div></div></div>
+        <div class="card"><img src="icons/eventgrid.svg" alt=""><div class="cx"><div class="pn">Event Grid</div><div class="rn">evgt-dealroom-dev-7j3ok</div><div class="nn">Deal lifecycle event routing</div></div></div>
+        <div class="card"><img src="icons/storage.svg" alt=""><div class="cx"><div class="pn">Storage — Data / Filings</div><div class="rn">stdealroomdatadev7j3ok</div><div class="nn">SEC filing blobs (filings container)</div></div></div>
+        <div class="card"><img src="icons/storage.svg" alt=""><div class="cx"><div class="pn">Storage — Functions</div><div class="rn">stdealroomfndev7j3ok</div><div class="nn">Function runtime &amp; deploy container</div></div></div>
+      </div>
+    </div>
+
+    <!-- OBSERVABILITY -->
+    <div class="col zone">
+      <div class="zt"><span class="dot" style="background:var(--amber)"></span>Observability</div>
+      <div class="grid" style="grid-template-columns:1fr">
+        <div class="card amber"><img src="icons/appinsights.svg" alt=""><div class="cx"><div class="pn">Application Insights</div><div class="rn">appi-dealroom-dev-swc</div><div class="nn">App traces, requests, agent-tool telemetry</div></div></div>
+        <div class="card amber"><img src="icons/loganalytics.svg" alt=""><div class="cx"><div class="pn">Log Analytics</div><div class="rn">log-dealroom-dev-swc</div><div class="nn">Central logs (Container Apps + Functions)</div></div></div>
+        <div class="card amber"><img src="icons/monitor.svg" alt=""><div class="cx"><div class="pn">Azure Monitor</div><div class="nn">Metrics, alerts &amp; dashboards</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NETWORKING -->
+  <div class="zone">
+    <div class="zt"><span class="dot" style="background:var(--faint)"></span>Networking &amp; Isolation</div>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card"><img src="icons/vnet.svg" alt=""><div class="cx"><div class="pn">Virtual Network</div><div class="rn">vnet-dealroom-dev-swc</div><div class="nn">Container Apps env delegated subnet + private-endpoint subnet</div></div></div>
+      <div class="card"><img src="icons/privatelink.svg" alt=""><div class="cx"><div class="pn">Private Endpoints</div><div class="nn">Private access to Cosmos, Storage, Key Vault, Foundry, Search (when isolation is enabled)</div></div></div>
+      <div class="card"><img src="icons/dns.svg" alt=""><div class="cx"><div class="pn">Private DNS Zones</div><div class="nn">Name resolution for private endpoints</div></div></div>
+    </div>
+  </div>
+
+  <div class="flowbar"><span class="ar">▼</span> grounded market intelligence · deal documents · CRM <span class="ar">▼</span></div>
+
+  <!-- DATA & DOCUMENT PLATFORM -->
+  <div class="zone" style="border-color:#1f5f56">
+    <div class="zt"><span class="dot" style="background:var(--green)"></span>Data &amp; Document Platform<span class="rg">rg-deal-room-data</span></div>
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card green"><img src="icons/fabric.svg" alt=""><div class="cx"><div class="pn">Microsoft Fabric · OneLake</div><div class="rn">dealroomfabric</div><div class="nn">Lakehouse: comparable &amp; historical deals, benchmark findings, IC precedents, financials + archived SEC filings (Files/Filings)</div></div></div>
+      <div class="card green"><img src="icons/search.svg" alt=""><div class="cx"><div class="pn">Azure AI Search</div><div class="rn">dealroomaisearch</div><div class="nn">Hybrid (semantic+vector) index of CIMs &amp; CRM communications — document intelligence + CRM system of record (PoC)</div></div></div>
+      <div class="card green"><img src="icons/cognitive.svg" alt=""><div class="cx"><div class="pn">Azure OpenAI (embeddings)</div><div class="rn">deal-room-data-agent-test</div><div class="nn">text-embedding-3-small — integrated vectorizer for the AI Search index</div></div></div>
+      <div class="card green"><img src="icons/storage.svg" alt=""><div class="cx"><div class="pn">Storage — Document Source</div><div class="rn">stdealhubdataaisearch</div><div class="nn">Source CIMs &amp; CRM docs ingested into the index</div></div></div>
+    </div>
+    <div class="subhead" style="margin-top:12px">Also in the app resource group</div>
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card"><img src="icons/search.svg" alt=""><div class="cx"><div class="pn">Azure AI Search</div><div class="rn">srch-dealroom-dev-7j3ok</div><div class="nn">App-side search service (RAG scaffolding)</div></div></div>
+    </div>
+  </div>
+
+  <div class="flowbar"><span class="ar">▲</span> external sources &amp; Microsoft 365 <span class="ar">▲</span></div>
+
+  <!-- EXTERNAL / SAAS -->
+  <div class="zone" style="border-style:dashed">
+    <div class="zt"><span class="dot" style="background:var(--rose)"></span>External Sources &amp; Microsoft 365</div>
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card"><img src="icons/edgar.svg" alt=""><div class="cx"><div class="pn">SEC EDGAR</div><div class="nn">Free official US filings API (10-K/10-Q/8-K) — fetched &amp; archived to OneLake</div></div></div>
+      <div class="card"><img src="icons/teams.svg" alt=""><div class="cx"><div class="pn">Microsoft 365 — Teams</div><div class="nn">Per-deal channels via Microsoft Graph (delegated)</div></div></div>
+      <div class="card"><img src="icons/sharepoint.svg" alt=""><div class="cx"><div class="pn">Microsoft 365 — SharePoint</div><div class="nn">Deal document workspaces (delegated Graph)</div></div></div>
+      <div class="card"><img src="icons/web.svg" alt=""><div class="cx"><div class="pn">Market-data MCP providers</div><div class="nn">Morningstar · LSEG · Moody's over OAuth MCP (optional connectors)</div></div></div>
+    </div>
+  </div>
+
+  <!-- FLOW LEGEND -->
+  <div class="legend">
+    <h3>Key data &amp; control flows</h3>
+    <div class="flist">
+      <div class="fitem"><b>1</b><span><span class="k">Deal team →</span> Container App SPA/API over HTTPS (Entra where required).</span></div>
+      <div class="fitem"><b>2</b><span><span class="k">Teams → Foundry agents →</span> <code>/mcp-persona</code> on the Container App; each agent's key binds it to one persona server-side.</span></div>
+      <div class="fitem"><b>3</b><span><span class="k">Container App ↔ Cosmos DB</span> for all deal reads/writes (managed-identity RBAC, <code>_etag</code> concurrency).</span></div>
+      <div class="fitem"><b>4</b><span><span class="k">Container App → Azure AI Foundry</span> for chat/reasoning + the in-app persona tool loop.</span></div>
+      <div class="fitem"><b>5</b><span><span class="k">Container App → Azure AI Search</span> (dealroomaisearch) for <code>search_documents</code> &amp; <code>get_crm</code> grounding.</span></div>
+      <div class="fitem"><b>6</b><span><span class="k">Container App → Microsoft Fabric / OneLake</span> for market intelligence &amp; to archive SEC filings.</span></div>
+      <div class="fitem"><b>7</b><span><span class="k">Container App → SEC EDGAR</span> to fetch filings, then persist to Storage &amp; OneLake.</span></div>
+      <div class="fitem"><b>8</b><span><span class="k">Container App → Service Bus / Event Grid → Function App</span> for deal-lifecycle events.</span></div>
+      <div class="fitem"><b>9</b><span><span class="k">Foundry sourcing agent → Grounding with Bing</span> for live news signals.</span></div>
+      <div class="fitem"><b>10</b><span><span class="k">AI Search index ← Azure OpenAI</span> integrated vectorizer (text-embedding-3-small).</span></div>
+      <div class="fitem"><b>11</b><span><span class="k">Container App → Key Vault</span> (secrets) &amp; <span class="k">→ Microsoft Graph</span> for Teams/SharePoint provisioning.</span></div>
+      <div class="fitem"><b>12</b><span><span class="k">All services → Application Insights / Log Analytics → Azure Monitor.</span></span></div>
+    </div>
+  </div>
+
+  <p class="caption">Product names and resource instance names reflect the live deployment. Icons are the official Microsoft Azure architecture icons; the AI services (Foundry, Document Intelligence, Content Safety, Speech, embeddings) are all <code>Microsoft.CognitiveServices</code> accounts and share that mark. Container Apps, Managed Identity and Microsoft Fabric use on-brand equivalents. Private endpoints / DNS render when network isolation is enabled in <code>infra/main.bicep</code>.</p>
+</div>
+</body>
+</html>
