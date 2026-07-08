@@ -38,10 +38,17 @@ import {
   saveFilingArchive,
   getSavedFilingManifest,
   getSavedFilingFile,
+  archiveDealFilingsToOneLake,
+  backfillOneLakeFilings,
+  oneLakeStatus,
+  oneLakeProbe,
+  listOneLakeFilings,
   getPipelineFunnel,
   getStage1Funnel,
   getCohort,
   getPipeline,
+  canonicalCompanies,
+  canonicalCompany,
   getPassReasons,
   assessCohort,
   assessCandidateById,
@@ -57,7 +64,22 @@ import {
   ensureDealTeamsChannel,
   getMdOptions,
   assignSwimlane,
+  recordContribution,
   cycleChecklistItem,
+  recordIssue,
+  resolveIssue,
+  setCondition,
+  updateCondition,
+  snapshotAssumptions,
+  getICReadiness,
+  getCitationAudit,
+  marketIntel,
+  fabricStatus,
+  refreshFabricData,
+  comparableDeals,
+  benchmarkFindings,
+  icPrecedents,
+  companyFinancials,
   advanceDeal,
   regressDeal,
   runStep,
@@ -69,12 +91,13 @@ import { runAction, chat } from './lib/agents.js';
 import { getModelInfo } from './lib/ai.js';
 import { newsAgentConfigured } from './lib/newsAgent.js';
 import { chatDealAgent, dealAgentInfo } from './lib/dealAgent.js';
-import { dealMcpHandler, dealMcpMethodNotAllowed, dealMcpInfo } from './lib/mcp/dealServer.js';
-import { mcpAuthMiddleware, mcpAuthInfo } from './lib/mcp/entraAuth.js';
-import { listConnectors, testConnector } from './lib/connectors.js';
+import { chatPersonaAgent, personaAgentsInfo } from './lib/personaAgent.js';
+import { dealMcpHandler, dealMcpReadonlyHandler, dealMcpMethodNotAllowed, dealMcpInfo, dealMcpReadonlyInfo } from './lib/mcp/dealServer.js';
+import { mcpAuthMiddleware, mcpReadonlyAuthMiddleware, mcpAuthInfo, mcpReadonlyKeyConfigured } from './lib/mcp/entraAuth.js';
+import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
-import { m365Configured, m365Connected } from './lib/m365/graph.js';
+import { m365Configured, m365Connected, m365FilesScope } from './lib/m365/graph.js';
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 import { config, validateConfig } from './lib/config.js';
@@ -101,9 +124,12 @@ api.get('/config', (_req, res) => {
     appName: 'The Deal Room',
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
     dealAgent: dealAgentInfo().configured ? 'live' : 'demo',
-    dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo() },
-    m365: { configured: m365Configured(), connected: m365Connected() },
+    personaAgents: personaAgentsInfo(),
+    dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo(), readonly: { ...dealMcpReadonlyInfo(), keyConfigured: mcpReadonlyKeyConfigured() } },
+    m365: { configured: m365Configured(), connected: m365Connected(), files: m365FilesScope() },
     morningstar: morningstarReady() ? 'live' : 'demo',
+    fabric: fabricStatus(),
+    onelake: oneLakeStatus(),
     datastore: repoMode()
   });
 });
@@ -209,15 +235,107 @@ api.post('/deals/:id/teams/ensure', async (req, res) => {
   if (r.error === 'not-launched') return res.status(409).json(r);
   res.json(r);
 });
-api.patch('/deals/:id/swimlanes/:lane', (req, res) => {
-  const r = assignSwimlane(req.params.id, req.params.lane, req.body?.md);
+api.patch('/deals/:id/swimlanes/:lane', async (req, res) => {
+  const r = await assignSwimlane(req.params.id, req.params.lane, req.body?.md);
   if (r.error) return res.status(r.error === 'invalid-md' ? 422 : 404).json(r);
   res.json(r.deal);
 });
-api.post('/deals/:id/checklist/:itemId/cycle', (req, res) => {
-  const r = cycleChecklistItem(req.params.id, req.params.itemId);
+// Record an MD contribution (guidance | value_add | diligence) into a lane. This
+// is the dashboard-side entrypoint mirroring the MCP record_contribution tool.
+// `md` is the contributing MD's persona id (defaults to the lane's assigned MD);
+// the display name is resolved from the MD options.
+api.post('/deals/:id/contributions', async (req, res) => {
+  const { lane, kind, text, severity, source, md } = req.body || {};
+  if (!lane || !text) return res.status(422).json({ error: 'lane-and-text-required' });
+  const mdName = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await recordContribution(req.params.id, lane, { kind, text, severity, source, by: mdName, persona: md });
+  if (r.error) {
+    const code = r.error === 'not-found' || r.error === 'lane-not-found' ? 404 : 422;
+    return res.status(code).json(r);
+  }
+  res.json(r.deal);
+});
+api.post('/deals/:id/checklist/:itemId/cycle', async (req, res) => {
+  const r = await cycleChecklistItem(req.params.id, req.params.itemId);
   if (r.error) return res.status(404).json(r);
   res.json(r.deal);
+});
+
+// IC Readiness Cockpit — the decision-grade board (7 questions + verdict),
+// grounded in real Fabric/OneLake market intelligence.
+api.get('/deals/:id/ic-readiness', (req, res) => {
+  const board = getICReadiness(req.params.id);
+  if (!board) return res.status(404).json({ error: 'not-found' });
+  res.json(board);
+});
+
+// Source-citation audit — numeric claims in IC materials mapped to source facts;
+// unsourced figures flagged (point 5).
+api.get('/deals/:id/citations', (req, res) => {
+  const audit = getCitationAudit(req.params.id);
+  if (!audit) return res.status(404).json({ error: 'not-found' });
+  res.json(audit);
+});
+
+// Operational diligence: issue log (severity + owner + resolution path + due date).
+api.post('/deals/:id/issues', async (req, res) => {
+  const { lane, title, severity, owner, resolutionPath, sources, dueDate, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await recordIssue(req.params.id, { lane, title, severity, owner, resolutionPath, sources, dueDate, by, persona: md });
+  if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+api.patch('/deals/:id/issues/:issueId', async (req, res) => {
+  const { status, resolutionPath, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await resolveIssue(req.params.id, req.params.issueId, { status, resolutionPath, by, persona: md });
+  if (r.error) return res.status(r.error.endsWith('not-found') ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+
+// IC conditions (partner-owned).
+api.post('/deals/:id/conditions', async (req, res) => {
+  const { text, owner, status, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await setCondition(req.params.id, { text, owner, status, by, persona: md });
+  if (r.error) return res.status(r.error === 'not-found' ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+api.patch('/deals/:id/conditions/:condId', async (req, res) => {
+  const { status, text, owner, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await updateCondition(req.params.id, req.params.condId, { status, text, owner, by });
+  if (r.error) return res.status(r.error.endsWith('not-found') ? 404 : 422).json(r);
+  res.json(r.deal);
+});
+
+// Assumption snapshot — records the current key assumptions as an IC-draft baseline
+// so the cockpit can show what changed since the last draft.
+api.post('/deals/:id/assumption-snapshot', async (req, res) => {
+  const { label, md } = req.body || {};
+  const by = (getMdOptions().find((m) => m.id === md) || {}).name || null;
+  const r = await snapshotAssumptions(req.params.id, { label, by });
+  if (r.error) return res.status(404).json(r);
+  res.json(r.deal);
+});
+
+// Fabric / OneLake market intelligence — comparable deals, benchmark diligence
+// findings, IC voting precedents and real company financials.
+api.get('/market-intel', (_req, res) => res.json(marketIntel() || { info: fabricStatus(), companies: [], comparableDeals: [], benchmarkFindings: [], icPrecedents: [], companyFinancials: {} }));
+api.get('/market-intel/comps', (req, res) => res.json(comparableDeals({ sector: req.query.sector })));
+api.get('/market-intel/benchmarks', (req, res) => res.json(benchmarkFindings(req.query.workstream)));
+api.get('/market-intel/ic-precedents', (_req, res) => res.json(icPrecedents()));
+api.get('/market-intel/financials/:ticker', (req, res) => {
+  const f = companyFinancials(req.params.ticker);
+  if (!f) return res.status(404).json({ error: 'no-coverage' });
+  res.json(f);
+});
+
+// Fabric status + data lineage; POST re-attempts a live lakehouse query.
+api.get('/fabric', (_req, res) => res.json(fabricStatus()));
+api.post('/fabric/refresh', async (_req, res) => {
+  const info = await refreshFabricData();
+  res.json(info);
 });
 
 // O1 · Deal Sourcing — CxO signals explorer
@@ -227,6 +345,18 @@ api.get('/signals/companies/:id/crm', (req, res) => {
   const crm = getCrm(req.params.id);
   if (!crm) return res.status(404).json({ error: 'company not found' });
   res.json(crm);
+});
+
+// Canonical Company model — the unified, entity-resolved governed record over the
+// three sourcing feeds (news desk + funnel candidates + CxO signals).
+api.get('/companies', (req, res) => {
+  const inFunnel = req.query.inFunnel === 'true' ? true : req.query.inFunnel === 'false' ? false : undefined;
+  res.json(canonicalCompanies({ inFunnel }));
+});
+api.get('/companies/:id', (req, res) => {
+  const c = canonicalCompany(req.params.id);
+  if (!c) return res.status(404).json({ error: 'company-not-found' });
+  res.json(c);
 });
 
 // Data-source connectivity (Home connectivity panel). Real tests for Web + MCP
@@ -239,6 +369,17 @@ api.post('/connectors/:id/test', async (req, res) => {
     res.json(out);
   } catch (err) {
     res.status(500).json({ error: 'connectivity test failed', detail: String(err?.message || err) });
+  }
+});
+// Disconnect an OAuth-backed connector (m365 / MCP provider): clears the stored
+// delegated token so the next use requires a fresh sign-in + consent.
+api.post('/connectors/:id/disconnect', async (req, res) => {
+  try {
+    const out = await disconnectConnector(req.params.id);
+    if (!out) return res.status(404).json({ error: 'unknown connector' });
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'disconnect failed', detail: String(err?.message || err) });
   }
 });
 // In-app OAuth sign-in for MCP connectors: /connectors/:provider/login|callback
@@ -357,6 +498,36 @@ api.get('/filings/download', async (req, res) => {
   }
 });
 
+// ---- Fabric OneLake filing archive (Files/Filings) --------------------------
+// Auto-download a sourced deal's SEC filings and write them into the Fabric
+// lakehouse's Files/Filings folder. Honest status + explicit errors (the app's
+// managed identity must hold a workspace role that permits OneLake writes).
+api.get('/onelake', async (_req, res) => res.json(await oneLakeProbe()));
+api.get('/onelake/filings', async (req, res) => {
+  const files = await listOneLakeFilings(String(req.query.subfolder || ''));
+  res.json({ path: oneLakeStatus().filingsPath, count: files.length, files });
+});
+api.post('/deals/:id/filings/onelake', async (req, res) => {
+  try {
+    const out = await archiveDealFilingsToOneLake(req.params.id, { limit: Number(req.body?.limit) || 4 });
+    if (out.error === 'not-found') return res.status(404).json(out);
+    if (out.error === 'onelake-not-configured') return res.status(503).json(out);
+    if (out.error) return res.status(502).json(out); // edgar/onelake write failure — surfaced, not hidden
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'onelake-archive-failed', detail: String(err?.message || err) });
+  }
+});
+api.post('/filings/onelake/backfill', async (req, res) => {
+  try {
+    const out = await backfillOneLakeFilings({ limit: Number(req.body?.limit) || 3 });
+    if (out.error) return res.status(503).json(out);
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'onelake-backfill-failed', detail: String(err?.message || err) });
+  }
+});
+
 api.post('/screens/:id/select', (req, res) => {
   const s = setScreenSelected(req.params.id, req.body?.selected);
   if (!s) return res.status(404).json({ error: 'screen not found' });
@@ -427,6 +598,25 @@ api.post('/deals/:id/chat', async (req, res) => {
 // Deal Room Analyst — the Foundry agent with access to ALL deals.
 api.get('/deal-agent', (_req, res) => res.json(dealAgentInfo()));
 
+// The 5 persona agents (analyst, partner, retail-md, ai-md, supply-md).
+api.get('/persona-agents', (_req, res) => res.json(personaAgentsInfo()));
+// Chat with a specific persona agent. It reads the pipeline and ACTS on it through
+// its persona-scoped tools (server-side persona authorization enforced on writes).
+// Body: { message, dealId?, previousResponseId? }.
+api.post('/persona-agents/:persona/chat', async (req, res) => {
+  const message = (req.body?.message || '').toString().slice(0, 2000);
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const dealId = req.body?.dealId ? String(req.body.dealId) : undefined;
+  const previousResponseId = req.body?.previousResponseId ? String(req.body.previousResponseId) : undefined;
+  try {
+    const out = await chatPersonaAgent({ persona: req.params.persona, message, dealId, previousResponseId });
+    if (out?.error) return res.status(400).json(out);
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: 'persona-agent chat failed', detail: String(err?.message || err) });
+  }
+});
+
 // Portfolio-wide or single-deal-scoped chat with the analyst agent.
 // Body: { message, dealId?, scope? ('portfolio'|'deal'), previousResponseId? }.
 // Pass a dealId (or scope:'deal') to LOCK the conversation to one deal.
@@ -455,10 +645,12 @@ api.post('/deals/:id/steps/:stepKey/run', async (req, res) => {
   }
 });
 
-api.post('/deals/:id/advance', (req, res) => {
-  const deal = advanceDeal(req.params.id);
-  if (!deal) return res.status(404).json({ error: 'deal not found' });
-  res.json(deal);
+api.post('/deals/:id/advance', async (req, res) => {
+  const { overrideReason } = req.body || {};
+  const r = await advanceDeal(req.params.id, { overrideReason });
+  if (r && r.error === 'not-found') return res.status(404).json({ error: 'deal not found' });
+  if (r && r.error) return res.status(409).json(r); // ic-not-ready / override-forbidden
+  res.json(r);
 });
 
 // Stage-2 deal artifact — the real PE deliverable for a diligence step:
@@ -474,8 +666,8 @@ api.post('/deals/:id/artifact/:step', async (req, res) => {
   }
 });
 
-api.post('/deals/:id/back', (req, res) => {
-  const deal = regressDeal(req.params.id);
+api.post('/deals/:id/back', async (req, res) => {
+  const deal = await regressDeal(req.params.id);
   if (!deal) return res.status(404).json({ error: 'deal not found' });
   res.json(deal);
 });
@@ -489,6 +681,15 @@ app.use('/api', api);
 app.post('/mcp', mcpAuthMiddleware, dealMcpHandler);
 app.get('/mcp', mcpAuthMiddleware, dealMcpMethodNotAllowed);
 app.delete('/mcp', mcpAuthMiddleware, dealMcpMethodNotAllowed);
+
+// Read-only MCP surface for Foundry-hosted agents (published to Teams). Authenticated
+// by a static read-only key (or a valid Entra token); exposes ONLY the read tools so
+// a hosted agent can research the pipeline but never mutate it. This is what lets the
+// persona agents work through the Teams channel, where Foundry executes the MCP tool
+// server-side and there is no client to run the app's function-tool loop.
+app.post('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpReadonlyHandler);
+app.get('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpMethodNotAllowed);
+app.delete('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpMethodNotAllowed);
 
 // ---- Static client ----
 const clientDist = join(__dirname, 'client', 'dist');

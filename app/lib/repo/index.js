@@ -27,26 +27,23 @@ export function repoReady() {
   return mode === 'cosmos';
 }
 
-// Lazily connect to Cosmos. Safe to call once at startup; on any failure the
-// repo silently stays in-memory so the app never hard-fails on a data issue.
+// Lazily connect to Cosmos. When COSMOS_ENDPOINT is unset the app runs on the
+// in-memory Map (local dev / demo). When it IS set, Cosmos is authoritative: a
+// connection failure throws so the app fails loudly on boot (and Container Apps
+// restarts it) rather than silently serving non-durable in-memory data.
 export async function initRepo() {
   if (!ENDPOINT) {
     mode = 'memory';
     return { mode, endpoint: null };
   }
-  try {
-    const { CosmosClient } = await import('@azure/cosmos');
-    const client = new CosmosClient({ endpoint: ENDPOINT, aadCredentials: new DefaultAzureCredential() });
-    const db = client.database(DATABASE);
-    for (const name of COLLECTIONS) containers[name] = db.container(name);
-    // Smoke the connection with a cheap read against one container.
-    await containers.companies.items.query('SELECT VALUE COUNT(1) FROM c').fetchAll();
-    mode = 'cosmos';
-    return { mode, endpoint: ENDPOINT, database: DATABASE };
-  } catch (err) {
-    mode = 'memory';
-    return { mode, endpoint: ENDPOINT, error: String(err?.message || err) };
-  }
+  const { CosmosClient } = await import('@azure/cosmos');
+  const client = new CosmosClient({ endpoint: ENDPOINT, aadCredentials: new DefaultAzureCredential() });
+  const db = client.database(DATABASE);
+  for (const name of COLLECTIONS) containers[name] = db.container(name);
+  // Smoke the connection with a cheap read against one container.
+  await containers.companies.items.query('SELECT VALUE COUNT(1) FROM c').fetchAll();
+  mode = 'cosmos';
+  return { mode, endpoint: ENDPOINT, database: DATABASE };
 }
 
 const clone = (x) => (x == null ? x : JSON.parse(JSON.stringify(x)));
@@ -79,6 +76,25 @@ export async function upsert(name, doc) {
   const record = { ...doc, updatedAt: now, createdAt: doc.createdAt || now };
   if (mode === 'cosmos') {
     const { resource } = await containers[name].items.upsert(record);
+    return resource;
+  }
+  mem[name].set(record.id, clone(record));
+  return clone(record);
+}
+
+// Optimistic-concurrency write: when the doc carries a Cosmos `_etag`, the upsert
+// is conditional (If-Match) and throws a 412 on a concurrent modification, so the
+// caller can re-read and retry (read-modify-write). New docs (no _etag) upsert
+// unconditionally. This is what makes Cosmos the authoritative writer under
+// multiple replicas — a stale in-memory copy can never silently clobber a newer one.
+export async function saveConcurrent(name, doc) {
+  coll(name);
+  if (!doc?.id) throw new Error(`saveConcurrent ${name}: doc.id required`);
+  const now = new Date().toISOString();
+  const record = { ...doc, updatedAt: now, createdAt: doc.createdAt || now };
+  if (mode === 'cosmos') {
+    const options = record._etag ? { accessCondition: { type: 'IfMatch', condition: record._etag } } : undefined;
+    const { resource } = await containers[name].items.upsert(record, options);
     return resource;
   }
   mem[name].set(record.id, clone(record));
@@ -133,18 +149,21 @@ export async function recordEvent(evt) {
 export const companies = {
   get: (id) => get('companies', id),
   upsert: (d) => upsert('companies', d),
+  saveConcurrent: (d) => saveConcurrent('companies', d),
   list: () => list('companies'),
   remove: (id) => remove('companies', id)
 };
 export const deals = {
   get: (id) => get('deals', id),
   upsert: (d) => upsert('deals', d),
+  saveConcurrent: (d) => saveConcurrent('deals', d),
   list: () => list('deals'),
   remove: (id) => remove('deals', id)
 };
 export const signals = {
   get: (id) => get('signals', id),
   upsert: (d) => upsert('signals', d),
+  saveConcurrent: (d) => saveConcurrent('signals', d),
   list: () => list('signals'),
   remove: (id) => remove('signals', id)
 };

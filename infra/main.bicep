@@ -157,6 +157,10 @@ param m365TenantId string = ''
 @secure()
 param m365ClientSecret string = ''
 
+@description('Static read-only key for the /mcp read-only surface, used by Foundry-hosted (Teams) agents. Empty disables the key path (Entra still works).')
+@secure()
+param mcpReadonlyKey string = ''
+
 @description('Optional pinned parent Teams team ID that holds one channel per deal. Empty = find/create "The Deal Room".')
 param m365TeamId string = ''
 
@@ -325,6 +329,7 @@ module app 'modules/app.bicep' = {
     m365ClientId: m365ClientId
     m365TenantId: m365TenantId
     m365ClientSecret: m365ClientSecret
+    mcpReadonlyKey: mcpReadonlyKey
     m365TeamId: m365TeamId
     workspaceTenant: workspaceTenant
     deployTeamsApp: deployTeamsApp

@@ -29,7 +29,15 @@ import type {
   Assessment,
   ChatMessage,
   CandidateChatLog,
-  MdOption
+  Workspace,
+  MdOption,
+  ICReadiness,
+  ICGateBlock,
+  MarketIntel,
+  DealIssue,
+  IssueSeverity,
+  IssueStatus,
+  ConditionStatus
 } from './types';
 
 async function get<T>(url: string): Promise<T> {
@@ -104,17 +112,47 @@ export const api = {
   mdOptions: () => get<MdOption[]>('/api/md-options'),
   launchDeal: (id: string) => post<Deal>(`/api/deals/${id}/launch`, {}),
   ensureDealTeams: (id: string) =>
-    post<{ ok?: boolean; provisioned: boolean; connected: boolean; teamsUrl: string; error?: string }>(`/api/deals/${id}/teams/ensure`, {}),
+    post<{ ok?: boolean; provisioned: boolean; connected: boolean; teamsUrl: string; sharePointProvisioned?: boolean; workspace?: Workspace; error?: string }>(`/api/deals/${id}/teams/ensure`, {}),
   assignSwimlane: (id: string, lane: string, md: string) =>
     patchReq<Deal>(`/api/deals/${id}/swimlanes/${lane}`, { md }),
+  recordContribution: (id: string, body: { lane: string; kind: string; text: string; severity?: string; source?: string; md?: string }) =>
+    post<Deal>(`/api/deals/${id}/contributions`, body),
   cycleChecklistItem: (id: string, itemId: string) =>
     post<Deal>(`/api/deals/${id}/checklist/${itemId}/cycle`, {}),
   deal: (id: string) => get<Deal>(`/api/deals/${id}`),
   dealArtifact: (id: string, step: string, force = false) =>
     post<DealArtifact>(`/api/deals/${id}/artifact/${step}`, { force }),
+  icReadiness: (id: string) => get<ICReadiness>(`/api/deals/${id}/ic-readiness`),
+  recordIssue: (
+    id: string,
+    body: { lane?: string; title: string; severity?: IssueSeverity; owner?: string; resolutionPath?: string; dueDate?: string; sources?: { kind?: string; label: string; ref?: string }[]; md?: string }
+  ) => post<Deal>(`/api/deals/${id}/issues`, body),
+  resolveIssue: (id: string, issueId: string, body: { status?: IssueStatus; resolutionPath?: string; md?: string }) =>
+    patchReq<Deal>(`/api/deals/${id}/issues/${issueId}`, body),
+  setCondition: (id: string, body: { text: string; owner?: string; status?: ConditionStatus; md?: string }) =>
+    post<Deal>(`/api/deals/${id}/conditions`, body),
+  updateCondition: (id: string, condId: string, body: { status?: ConditionStatus; text?: string; owner?: string; md?: string }) =>
+    patchReq<Deal>(`/api/deals/${id}/conditions/${condId}`, body),
+  snapshotAssumptions: (id: string, body: { label?: string; md?: string }) =>
+    post<Deal>(`/api/deals/${id}/assumption-snapshot`, body),
+  marketIntel: () => get<MarketIntel>('/api/market-intel'),
+  archiveOneLake: (id: string, limit = 4) =>
+    post<import('./types').OneLakeFilingManifest & { company: string; matched: boolean; saved: import('./types').OneLakeFilingSaved[]; errors: unknown[]; error?: string }>(`/api/deals/${id}/filings/onelake`, { limit }),
+  onelakeProbe: () => get<import('./types').OneLakeStatus>('/api/onelake'),
+  companies: (inFunnel?: boolean) => get<import('./types').CanonicalCompanies>(`/api/companies${inFunnel === undefined ? '' : `?inFunnel=${inFunnel}`}`),
   runStep: (id: string, stepKey: string) =>
     post<StepRunResult>(`/api/deals/${id}/steps/${stepKey}/run`, {}),
-  advance: (id: string) => post<Deal>(`/api/deals/${id}/advance`, {}),
+  advance: async (id: string, overrideReason?: string): Promise<{ ok: true; deal: Deal } | { ok: false; blocked: ICGateBlock }> => {
+    const r = await fetch(`/api/deals/${id}/advance`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(overrideReason ? { overrideReason } : {})
+    });
+    const payload = await r.json().catch(() => ({}));
+    if (r.ok) return { ok: true, deal: payload as Deal };
+    if (r.status === 409) return { ok: false, blocked: payload as ICGateBlock };
+    throw new Error(`${r.status} advance`);
+  },
   back: (id: string) => post<Deal>(`/api/deals/${id}/back`, {}),
   mailbox: () => get<Mailbox>('/api/signals/mailbox'),
   signalCompanies: () => get<SignalCompany[]>('/api/signals/companies'),
@@ -122,6 +160,8 @@ export const api = {
   newsDesk: () => get<SourcingDesk>('/api/news/desk'),
   connectors: () => get<Connector[]>('/api/connectors'),
   testConnector: (id: string) => post<ConnectorTest>(`/api/connectors/${id}/test`, {}),
+  disconnectConnector: (id: string) =>
+    post<{ id: string; name: string; disconnected: boolean; envTokenRemains?: boolean; error?: string }>(`/api/connectors/${id}/disconnect`, {}),
   findMoreNews: () => post<{ revealed: unknown; desk: SourcingDesk }>('/api/news/find-more', {}),
   setFindingCatalyst: (id: string, catalyst: string) =>
     post<{ findingId: string; catalyst: string; companyId: string }>(`/api/news/findings/${id}/catalyst`, { catalyst }),

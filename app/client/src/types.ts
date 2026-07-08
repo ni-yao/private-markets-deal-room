@@ -5,6 +5,9 @@ export interface AppConfig {
   auth: string | null;
   region: string;
   appName: string;
+  fabric?: FabricInfo;
+  onelake?: OneLakeStatus;
+  datastore?: string;
 }
 
 export interface DataGroup {
@@ -64,12 +67,25 @@ export interface Finding {
   source: string;
 }
 
+export type ContributionKind = 'guidance' | 'value_add' | 'diligence';
+
+export interface Contribution {
+  kind: ContributionKind;
+  text: string;
+  severity: 'positive' | 'neutral' | 'caution' | 'negative' | 'risk';
+  source: string;
+  by?: string | null;
+  persona?: string | null;
+  at: string;
+}
+
 export interface Workstream {
   lane: string;
   owner?: string;
   status: string;
   progress: number;
   findings: Finding[];
+  contributions?: Contribution[];
 }
 
 export interface DealDocument {
@@ -176,6 +192,9 @@ export interface Workspace {
   teamsProvisioned?: boolean;
   teamsChannelName?: string | null;
   sharePointUrl: string;
+  sharePointProvisioned?: boolean;
+  sharePointUrlResolved?: boolean;
+  channelsProvisioned?: boolean;
   channels: WorkspaceChannel[];
   folders: WorkspaceFolder[];
   templates: WorkspaceTemplate[];
@@ -421,6 +440,38 @@ export interface PassReasons {
   park: ReasonOption[];
 }
 
+export interface OneLakeFilingSaved {
+  form: string;
+  filed: string;
+  accession: string;
+  cik: string;
+  folder: string;
+  count: number;
+  bytes: number;
+  primaryDocument: string | null;
+}
+export interface OneLakeFilingManifest {
+  at: string;
+  company: string;
+  cik: string;
+  secName: string;
+  filingsPath: string;
+  saved: OneLakeFilingSaved[];
+  errors: { accession: string; form: string; error: string }[];
+}
+export interface OneLakeStatus {
+  configured: boolean;
+  host: string;
+  workspace: string | null;
+  lakehouse: string | null;
+  filingsPath: string;
+  fabricUrl?: string | null;
+  connected?: boolean | null;
+  lastWrite?: { at: string; folder: string; count: number; bytes: number } | null;
+  lastError?: { at: string; message: string } | null;
+  probeError?: string;
+}
+
 export interface Deal extends DealSummary {
   keyFigures: KeyFigure[];
   workstreams: Workstream[];
@@ -434,6 +485,229 @@ export interface Deal extends DealSummary {
   stepRuns: Record<string, StepRun>;
   workspace?: Workspace;
   checklistStats?: ChecklistStats | null;
+  issues?: DealIssue[];
+  conditions?: ICCondition[];
+  assumptionSnapshots?: AssumptionSnapshot[];
+  onelakeFilings?: OneLakeFilingManifest;
+}
+
+// ---- IC Readiness Cockpit + operational diligence --------------------------
+export type IssueSeverity = 'positive' | 'neutral' | 'caution' | 'negative' | 'risk';
+export type IssueStatus = 'open' | 'mitigating' | 'resolved';
+export type ConditionStatus = 'proposed' | 'accepted' | 'satisfied';
+
+export interface IssueSource { kind?: string; label: string; ref?: string | null }
+export interface DealIssue {
+  id: string;
+  lane: string | null;
+  title: string;
+  severity: IssueSeverity;
+  owner: string | null;
+  status: IssueStatus;
+  resolutionPath: string | null;
+  dueDate: string | null;
+  sources: IssueSource[];
+  by: string | null;
+  persona: string | null;
+  at: string;
+  resolvedAt: string | null;
+}
+
+export interface ICCondition {
+  id: string;
+  text: string;
+  owner: string | null;
+  status: ConditionStatus;
+  by?: string | null;
+  persona?: string | null;
+  at?: string;
+}
+
+export interface AssumptionSnapshot {
+  label: string;
+  at: string;
+  by: string | null;
+  figures: Record<string, number | null>;
+}
+
+export interface FabricComp {
+  company: string;
+  ticker?: string | null;
+  dealType: string;
+  dealValue?: number | null;
+  impliedValuation?: number | null;
+  stage?: string;
+  status: string;
+  thesis?: string;
+}
+
+export interface FabricBenchmark {
+  workstream: string;
+  total: number;
+  byRisk: Record<string, number>;
+  samples?: { type: string; description: string; risk: string; remediation?: string; status?: string; owner?: string }[];
+}
+
+export interface FabricPrecedent {
+  deal: string;
+  decision: string;
+  votesFor: number;
+  votesAgainst: number;
+  votesAbstain?: number;
+  conditions: string[];
+  closingStatus?: string;
+}
+
+export interface FabricInfo {
+  configured: boolean;
+  mode: 'live' | 'materialized' | 'unconfigured';
+  live?: boolean;
+  liveConfigured?: boolean;
+  liveError?: string | null;
+  workspace?: string;
+  lakehouse?: string;
+  source?: string | null;
+  sqlEndpoint?: string | null;
+  capacity?: string;
+  extractedAt?: string | null;
+  queriedAt?: string | null;
+  loadedAt?: string | null;
+  freshness?: { asOf: string; ageMinutes: number; label: string } | null;
+  lineage?: {
+    platform: string;
+    workspace: string;
+    lakehouse: string;
+    endpoint: string | null;
+    database: string;
+    tables: string[];
+    mode: string;
+  };
+  counts?: {
+    companies: number;
+    comparableDeals: number;
+    benchmarkFindingWorkstreams: number;
+    icPrecedents: number;
+    secTickers: number;
+  } | null;
+}
+
+export interface ICReadiness {
+  dealId: string;
+  company: string;
+  stage: string;
+  verdict: { state: 'READY' | 'CONDITIONAL' | 'NOT-READY'; headline: string; gating: string[]; openConditions: number };
+  progressReadiness: number | null;
+  requiredArtifacts: {
+    items: { key: string; label: string; complete: boolean; detail: string }[];
+    complete: number;
+    total: number;
+    allComplete: boolean;
+  };
+  blockingWorkstreams: {
+    lane: string;
+    label: string;
+    owner: string | null;
+    progress: number;
+    status: string;
+    openIssues: number;
+    blockingIssues: number;
+    reasons: string[];
+  }[];
+  changedAssumptions: {
+    baseline: { label: string; at: string } | null;
+    changes: { key: string; label: string; from: string | number; to: string | number }[];
+    note: string;
+  };
+  unresolvedRisks: {
+    id: string;
+    lane: string | null;
+    laneLabel: string;
+    title: string;
+    severity: IssueSeverity;
+    owner: string | null;
+    status: IssueStatus;
+    resolutionPath: string | null;
+    sources: number;
+  }[];
+  supportingSources: { kind: string; label: string; ref: string | null }[];
+  icAsk: {
+    enterpriseValue: string;
+    entryMultiple: string;
+    equityCheck: string;
+    structure: string;
+    hurdle: string;
+    baseCase: string;
+    source: string;
+  };
+  conditions: { id: string; text: string; owner: string | null; status: ConditionStatus }[];
+  overrides?: { stage: string; gate: string; verdict: string; reason: string; by: string; at: string }[];
+  citationAudit?: {
+    score: number;
+    clean: boolean;
+    summary: string;
+    totalClaims: number;
+    sourcedClaims: number;
+    unsourcedClaims: number;
+    unsourcedFigures: number;
+  };
+  counts: { openIssues: number; unresolvedRisks: number; blockingWorkstreams: number; conditions: number; sources: number };
+  marketIntel?: {
+    source: FabricInfo;
+    comparableDeals: FabricComp[];
+    icPrecedents: FabricPrecedent[];
+    benchmarkFindings: FabricBenchmark[];
+  };
+}
+
+export interface CanonicalCompanySummary {
+  id: string;
+  name: string;
+  aliases: string[];
+  domain: string | null;
+  ticker: string | null;
+  sector: string | null;
+  subSector: string | null;
+  region: string | null;
+  country: string | null;
+  hq: string | null;
+  ownership: string | null;
+  revenue: number | null;
+  ebitda: number | null;
+  ebitdaMargin: number | null;
+  growth: number | null;
+  dealSize: number | null;
+  estimated: boolean;
+  sources: string[];
+  discoveredVia: string;
+  newsCount: number;
+  hasSignals: boolean;
+  inFunnel: boolean;
+  funnel: { stage: string; disposition: string; passReason: string | null } | null;
+  feedIds: Record<string, string>;
+  firstSeen: string | null;
+}
+
+export interface CanonicalCompanies {
+  count: number;
+  fromFeeds: { desk: number; candidates: number; signals: number };
+  resolvedDuplicates: number;
+  companies: CanonicalCompanySummary[];
+}
+
+export interface ICGateBlock {
+  error: 'ic-not-ready' | 'override-forbidden';
+  gate: 'ic-entry' | 'ic-approval';
+  detail: string;
+  verdict: { state: 'READY' | 'CONDITIONAL' | 'NOT-READY'; headline: string; gating: string[]; openConditions: number };
+}
+
+export interface MarketIntel {
+  info: FabricInfo;
+  companies: { ticker: string; name: string; sector: string; industry: string; employees: number | null; marketCap: number | null; revenue: number | null }[];
+  comparableDeals: FabricComp[];
+  benchmarkFindings: FabricBenchmark[];
+  icPrecedents: FabricPrecedent[];
+  companyFinancials: Record<string, Record<string, { value: number | null; unit: string; form: string; filed: string }>>;
 }
 
 // Stage-1 origination funnel (real cohort counts — survivors through each step).

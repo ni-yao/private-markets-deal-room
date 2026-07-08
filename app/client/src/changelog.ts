@@ -13,6 +13,92 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.34.0',
+    date: '2026-07-08',
+    image: 'dealroom-app:v56',
+    revision: 'ca-dealroom-orch-dev-swc--0000052',
+    title: 'Persona agents work in Microsoft Teams — server-executed (MCP) research tools',
+    tag: 'improvement',
+    highlights: [
+      'Fixed the “No tool output found for function call” error when calling a persona agent published to Teams. The agents were prompt agents with client-side function tools, which only work when the app’s backend runs the tool loop — Foundry’s Teams channel invokes the agent directly with no client, so every tool call failed. The agents now use a single hosted MCP tool that Foundry executes server-side, so they work through Teams.',
+      'Added a read-only MCP surface (/mcp-ro) exposing only the research/read tools (list/get deals, pipeline, companies, IC readiness, market intelligence, citation audit) and authenticated by a static read-only key or a valid Entra token. The write/action tools stay Entra-guarded on /mcp — a Teams agent can research the pipeline but never mutate it.',
+      'Re-provisioned all five persona agents (analyst, partner, retail/AI/supply MDs) to research via the hosted tool and give lane-specific analysis and recommendations as text; formal actions (contributions, advancing, approvals) continue to be recorded in the Deal Room app. Verified end-to-end: Foundry executed the tools server-side (search_deals → get_deal → get_ic_readiness → get_market_intel) with zero errors and returned a grounded Allbirds briefing — the exact path the Teams channel uses.',
+      'Also restored Cosmos DB connectivity after its public network access had drifted to Disabled (with no private endpoint/VNet, that made the datastore unreachable and forced an in-memory fallback); re-enabled it to the deployed bicep’s intended state, keeping the data plane protected by managed-identity RBAC (local auth stays disabled).'
+    ]
+  },
+  {
+    version: 'v0.33.0',
+    date: '2026-07-07',
+    image: 'dealroom-app:v54',
+    revision: 'ca-dealroom-orch-dev-swc--0000050',
+    title: 'Auto-archive SEC filings into Fabric OneLake for sourced deals',
+    tag: 'feature',
+    highlights: [
+      'Sourced deals now have their SEC filings automatically pulled from EDGAR and written into the Fabric lakehouse’s Files/Filings folder — organized by company and filing (e.g. National CineMedia Inc / 10-Q_2026-05-12_.../ …), the complete document set per accession. Analysts see the real regulatory source documents in Fabric right next to the market-intelligence tables.',
+      'OneLake is written through its ADLS Gen2 DFS API using the app’s identity; a new panel on the deal workspace shows what was archived (form, date, doc count, size), a live connectivity status and an “Open in Fabric” link. Endpoints: POST /api/deals/:id/filings/onelake, POST /api/filings/onelake/backfill, GET /api/onelake, GET /api/onelake/filings, plus onelake status in /api/config.',
+      'Honest by design: writes use the managed identity at runtime and fail loudly with the real reason when it isn’t yet authorized — writing to this workspace needs a one-time Contributor/Member grant to the app identity, surfaced clearly in the panel until it lands. The current sourced deals were backfilled for real (National CineMedia and XBP Global; Sound United and Allbirds have no SEC coverage).',
+      'Fixed a company-resolution bug this surfaced: the EDGAR name matcher could resolve a company on a single generic shared word (it once matched “Sound United” to IBM on “business”). Resolution now requires a genuine multi-token overlap (or a distinctive single-token full-name match), so a weak match reports “no coverage” instead of archiving the wrong company’s filings.'
+    ]
+  },
+  {
+    version: 'v0.32.0',
+    date: '2026-07-07',
+    image: 'dealroom-app:v53',
+    revision: 'ca-dealroom-orch-dev-swc--0000049',
+    title: 'Production hardening — Cosmos-authoritative writes, IC gates, live Fabric, first-class lanes, citations & canonical company model',
+    tag: 'improvement',
+    highlights: [
+      'Cosmos is now the authoritative datastore. Deal writes use optimistic-concurrency read-modify-write on the document _etag, so with multiple replicas (the UI and the five persona agents all writing) a stale in-memory copy can never clobber a newer one — verified with 10 concurrent writes landing with zero lost updates. Writes are durable (retried, never silently swallowed), every replica re-reads from Cosmos on a short interval, and a mis-configured datastore now fails loudly instead of silently degrading. Container Apps max replicas raised from 1 to 3.',
+      'IC-readiness gates are enforced. Entering IC approval (D3→D4) and the IC approval itself (D4→D5) are blocked when the readiness verdict is NOT-READY — only the Partner may override, and only with a written reason that is recorded as an audit event and surfaced on the cockpit. The dashboard shows a partner-override modal; the agents get the same gate through the MCP tools.',
+      'Financial/QoE, Legal, Tax and ESG are now first-class diligence lanes — full workstreams and workspace swimlanes (each with its owner and typical advisor: EY QoE, Kirkland legal, PwC tax, ERM ESG), not just issue-log lanes. Existing deals are backfilled automatically, so every deal now runs all seven lanes through the cockpit.',
+      'Source-citation validation. Every numeric claim in the IC materials (key figures and memo sections) is mapped to a source fact or cited document; unsourced figures are flagged with a 0–100 citation score on the cockpit and a full audit at /api/deals/:id/citations and via a new agent tool.',
+      'Live Fabric mode. The app now queries the Fabric lakehouse SQL endpoint directly (live) in addition to the materialized OneLake snapshot, boots fast on the snapshot and upgrades to live in the background, and shows data freshness (as-of) and full table-level lineage in the cockpit — degrading honestly to the snapshot with an explicit reason when a live query is not available.',
+      'Canonical Company model. The news/filings desk, the screening-funnel candidates and the CxO signals are now unified into one entity-resolved governed record per real company (deduped by domain → registry → name), exposed at /api/companies, in the pipeline’s new “governed model” strip, and to the agents — resolving the duplicate feed records into a single company profile with merged provenance and funnel state.'
+    ]
+  },
+  {
+    version: 'v0.31.0',
+    date: '2026-07-07',
+    image: 'dealroom-app:v52',
+    revision: 'ca-dealroom-orch-dev-swc--0000048',
+    title: 'IC Readiness cockpit + real Fabric / OneLake market intelligence',
+    tag: 'feature',
+    highlights: [
+      'New IC Readiness cockpit on every diligence step (D2–D4) turns “readiness” from a completion percentage into a decision-grade board that answers the seven questions an Investment Committee actually asks: are the required artifacts complete, which workstreams are blocking, which assumptions changed since the last IC draft, which risks are unresolved, what supports the recommendation, what is the exact IC ask, and which conditions need approval — with an overall READY / CONDITIONAL / NOT-READY verdict derived from real gating facts, not an averaged progress bar.',
+      'Grounded in the fund’s real market data in Microsoft Fabric / OneLake (workspace “Deal Room”, lakehouse deal_room_starter). The cockpit and a new Market-intelligence panel surface real comparable & historical deals (deal type, implied valuation, outcome), IC voting precedents (decision, votes, conditions), benchmark diligence findings across all five workstreams (Commercial / Financial / Legal / Operational / Tax with severity mix), and real SEC filing financials — so valuation, diligence scoping and IC conditions are grounded in real data, and Fabric comparables count as supporting sources for the recommendation.',
+      'Operational diligence made real: an issue log with severity, owner, resolution path and due date (add / mitigate / resolve inline), IC conditions with an owner and a proposed → accepted → satisfied lifecycle, and assumption snapshots so the cockpit shows exactly what changed since the last IC draft. Every mutation persists to the governed deal record and writes an audit event.',
+      'Exposed to the agents too: the Deal MCP server grew from 19 to 25 tools — get_ic_readiness and get_market_intel (reads) plus record_issue, resolve_issue, set_condition and snapshot_assumptions (persona-governed writes) — and the five Foundry persona agents were re-provisioned so they can read the cockpit, ground answers in Fabric comparables/precedents, and log issues on their own lane (sector MDs) or set IC conditions (partner) under the same server-side authorization.'
+    ]
+  },
+  {
+    version: 'v0.30.0',
+    date: '2026-07-06',
+    image: 'dealroom-app:v43',
+    revision: 'ca-dealroom-orch-dev-swc--0000039',
+    title: 'Deal workspace links fixed — no more 404s on Teams channels or SharePoint folders',
+    tag: 'improvement',
+    highlights: [
+      'Fixed the Launch Orchestration workspace 404s. Every Teams and SharePoint link was previously a constructed placeholder deep-link; when the underlying resource wasn’t really provisioned yet, clicking it 404’d. Every link is now gated on real provisioning — the app never navigates to a placeholder URL.',
+      'Teams channels now open the real deal team. A team is created per deal at launch (the standard template provisions a single General channel), so every workstream chip — and each swimlane’s Teams button — opens that real deal team. Existing deals self-heal at boot: fabricated “&channel=…” links are repaired to the real team automatically.',
+      'Per-workstream Teams channels are honestly represented. Creating distinct channels per workstream (Commercial DD, Financial/QoE, Legal, Tech/AI, Operations, Tax, IC Prep) requires the admin-consent-gated Channel.Create permission, which this tenant restricts — so workstream discussion runs in the deal team and each workstream’s documents live in its own SharePoint folder. The UI states this clearly.',
+      'SharePoint folders provision on demand. If the data room isn’t live yet, clicking a folder (or “Provision SharePoint”) provisions it in place when Microsoft 365 is connected, then opens the real folder — otherwise it shows an actionable note to connect/reconnect M365 on the Home page (the folder taxonomy uses the user-consentable Files.ReadWrite.All scope).'
+    ]
+  },
+  {
+    version: 'v0.29.0',
+    date: '2026-07-06',
+    image: 'dealroom-app:v42',
+    revision: 'ca-dealroom-orch-dev-swc--0000038',
+    title: 'Real SharePoint data room — the deal’s VDR folders are now provisioned for real',
+    tag: 'feature',
+    highlights: [
+      'Launching a deal now provisions a real SharePoint data room, not just a link. Every Teams deal space is backed by a SharePoint document library; at launch the app resolves that library and creates the full standard VDR folder taxonomy inside it, so the “SharePoint” button opens an actual indexed data room.',
+      'Reviewed the folder taxonomy against standard M&A practice (Datasite/Ansarada-style indexes) and completed it: added a dedicated Insurance folder — the one standard section that was missing — for a clean 14-folder index (Administration, Corporate & Legal, Financials, Commercial & Sales, Tax, IP, Real Property & Assets, Contracts, Employment & HR, IT & Technology, Operations, Insurance, Environmental & Regulatory, IC Materials).',
+      'Provisioning is idempotent (existing folders are reused, never duplicated) and best-effort — it never blocks the Teams provisioning or the deal launch. The real folder URLs replace the previously-constructed deep links across the workspace map, the folder chips and each swimlane’s SharePoint folder.',
+      'Uses the user-consentable Files.ReadWrite.All delegated scope (no tenant-admin approval needed). Existing M365 connections should re-connect once on the Home page to grant the new scope; after that, launching (or the workspace Teams button) creates the folders live.'
+    ]
+  },
+  {
     version: 'v0.28.0',
     date: '2026-07-06',
     image: 'dealroom-app:v41',

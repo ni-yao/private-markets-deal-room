@@ -60,6 +60,9 @@ export const config = Object.freeze({
     audiences: list(env.MCP_AUDIENCE),
     requiredScope: str(env.MCP_REQUIRED_SCOPE, '').trim(),
     disabled: bool(env.MCP_AUTH_DISABLED, false),
+    // Static read-only MCP key for hosted callers that can't do Entra OAuth.
+    // 'unset' is the inert bicep placeholder and is treated as no key.
+    readonlyKey: str(env.MCP_READONLY_KEY, '').trim() === 'unset' ? '' : str(env.MCP_READONLY_KEY, '').trim(),
   },
   graph: {
     clientState: str(env.GRAPH_CLIENT_STATE, ''),

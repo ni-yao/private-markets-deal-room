@@ -13,7 +13,7 @@
 // Every M365-dependent step goes through this module, so the single delegated
 // connection is reused everywhere.
 
-import { getAccessToken, hasLogin, NotLoggedInError } from '../mcp/oauth.js';
+import { getAccessToken, hasLogin, loadTokens, NotLoggedInError } from '../mcp/oauth.js';
 import { config } from '../config.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -28,6 +28,19 @@ export function m365Configured() {
 // …and is CONNECTED once a user has signed in (delegated token stored).
 export function m365Connected() {
   return hasLogin('m365');
+}
+
+// Whether the stored delegated token carries the SharePoint/OneDrive file write
+// scope (Files.ReadWrite.All) — i.e. the deal SharePoint data room can actually
+// be provisioned. Surfaced in /config so the app (and the operator) can confirm,
+// after connecting M365, whether file access was granted without guesswork.
+export function m365FilesScope() {
+  try {
+    const rec = loadTokens('m365');
+    return /(^|\s)Files\.ReadWrite(\.All)?(\s|$)/i.test(rec?.scope || '');
+  } catch {
+    return false;
+  }
 }
 
 async function graph(path, { method = 'GET', body, headers = {}, expect } = {}) {
@@ -129,3 +142,53 @@ export async function ensureDealChannel(deal, existing) {
   }
   throw new GraphError('The deal team was created but did not finish provisioning in time — open it again shortly.');
 }
+
+// ---- SharePoint folder provisioning (the deal's VDR document library) -------
+// Every Team is backed by an M365 group whose SharePoint site has a default
+// document library ("Documents" / "Shared Documents"). We resolve that drive and
+// create the standard VDR folder taxonomy inside it, so the deal's SharePoint
+// isn't just a link — it opens a real, indexed data room. Idempotent: a folder
+// that already exists (409) is treated as success. Best-effort at the call site:
+// a failure here never blocks the Teams provisioning or the deal launch.
+
+// The team's default document library drive (the group id == the team id).
+async function getTeamDrive(teamId) {
+  return graph(`/groups/${teamId}/drive?$select=id,webUrl`);
+}
+
+// Create one folder at the drive root; treat an existing folder as success.
+async function ensureFolder(driveId, name) {
+  try {
+    const created = await graph(`/drives/${driveId}/root/children`, {
+      method: 'POST',
+      body: { name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }
+    });
+    return { name, url: created?.webUrl || null, created: true };
+  } catch (err) {
+    // 409 nameAlreadyExists → the folder is already there; look it up for its URL.
+    if (/→ 409/.test(String(err?.message || ''))) {
+      const seg = encodeURIComponent(name);
+      const existing = await graph(`/drives/${driveId}/root:/${seg}?$select=webUrl`).catch(() => null);
+      return { name, url: existing?.webUrl || null, created: false };
+    }
+    throw err;
+  }
+}
+
+// Provision the standard VDR folder taxonomy into the deal team's document library.
+// Returns { driveId, driveWebUrl, folders: [{ name, url, created }] }. Folders are
+// created sequentially (small, bounded list) to stay well within Graph throttling.
+export async function provisionDealFolders(teamId, folderNames) {
+  const drive = await getTeamDrive(teamId);
+  if (!drive?.id) throw new GraphError('Could not resolve the deal team document library.');
+  const folders = [];
+  for (const name of folderNames) {
+    try {
+      folders.push(await ensureFolder(drive.id, name));
+    } catch (err) {
+      folders.push({ name, url: null, created: false, error: String(err?.message || err).slice(0, 120) });
+    }
+  }
+  return { driveId: drive.id, driveWebUrl: drive.webUrl || null, folders };
+}
+

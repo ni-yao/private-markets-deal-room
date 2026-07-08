@@ -27,6 +27,8 @@ param m365ClientId string
 param m365TenantId string
 @secure()
 param m365ClientSecret string
+@secure()
+param mcpReadonlyKey string = ''
 param m365TeamId string
 param workspaceTenant string
 
@@ -104,6 +106,9 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
         // Non-empty placeholder keeps the template valid when M365 isn't configured;
         // the app gates the M365 connector on M365_CLIENT_ID, so the placeholder is inert.
         { name: 'm365-client-secret', value: empty(m365ClientSecret) ? 'unset' : m365ClientSecret }
+        // Read-only MCP key for Foundry-hosted (Teams) agents; the app gates the key
+        // path on a non-empty value, so the placeholder is inert until a key is set.
+        { name: 'mcp-readonly-key', value: empty(mcpReadonlyKey) ? 'unset' : mcpReadonlyKey }
       ]
       ingress: {
         external: true
@@ -160,6 +165,7 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'M365_TENANT_ID', value: empty(m365TenantId) ? entraTenantId : m365TenantId }
             { name: 'M365_TEAM_ID', value: m365TeamId }
             { name: 'M365_CLIENT_SECRET', secretRef: 'm365-client-secret' }
+            { name: 'MCP_READONLY_KEY', secretRef: 'mcp-readonly-key' }
           ]
         }
       ]

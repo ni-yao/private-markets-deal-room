@@ -36,7 +36,11 @@ const normName = (s) => String(s || '')
   .trim();
 
 // Resolve a company name/ticker to an EDGAR CIK (10-digit, zero-padded). Exact
-// ticker first, then a confident name-token match — else null (no coverage).
+// ticker first, then a CONFIDENT name-token match — else null (no coverage). The
+// confidence gate matters: a single shared generic token (e.g. "business") must
+// NOT resolve an unrelated company (a loose match once mapped "Sound United …" to
+// IBM on the word "business"). We require a real overlap, so a weak match returns
+// null (no coverage) rather than the wrong company's filings.
 async function resolveCik(name, ticker) {
   const map = await loadTickerMap();
   if (ticker) {
@@ -48,10 +52,29 @@ async function resolveCik(name, ticker) {
   let best = null;
   for (const x of map) {
     const words = normName(x.title).split(' ').filter(Boolean);
-    const shared = words.filter((w) => qWords.has(w)).length;
-    if (shared > 0 && (!best || shared > best.shared)) best = { x, shared };
+    if (!words.length) continue;
+    const titleSet = new Set(words);
+    const shared = [...qWords].filter((w) => titleSet.has(w));
+    const n = shared.length;
+    if (!n) continue;
+    // Coverage = how much of the shorter side the overlap explains.
+    const coverage = n / Math.min(qWords.size, titleSet.size);
+    const cand = { x, shared: n, coverage, titleSize: titleSet.size };
+    if (!best || n > best.shared || (n === best.shared && coverage > best.coverage)) best = cand;
   }
-  return best ? { cik: String(best.x.cik_str).padStart(10, '0'), title: best.x.title } : null;
+  if (!best) return null;
+  // Acceptance: >=2 shared tokens, OR a single shared token that IS the entire
+  // (short, distinctive) query AND a distinctive part of the title — never a lone
+  // generic word bridging two unrelated names.
+  const soleDistinctive =
+    best.shared === 1 &&
+    qWords.size === 1 &&
+    [...qWords][0].length >= 5 &&
+    best.coverage >= 0.5;
+  if (best.shared >= 2 || soleDistinctive) {
+    return { cik: String(best.x.cik_str).padStart(10, '0'), title: best.x.title };
+  }
+  return null; // too weak — report no coverage instead of a wrong company
 }
 
 // Forms we surface for deal diligence, mapped to a catalyst + human label.

@@ -6,6 +6,8 @@ import { ScreeningGate } from './ScreeningGate';
 import { CohortDesk } from './CohortDesk';
 import { Workspace } from './Workspace';
 import { DealArtifactPanel } from './DealArtifacts';
+import { ICCockpit } from './ICCockpit';
+import { OneLakeFilings } from './OneLakeFilings';
 import { CxoSummary, NewsSummary } from './SourcingSummaries';
 
 interface Props {
@@ -24,7 +26,9 @@ interface Props {
   onOpenNews: () => void;
   mdOptions: MdOption[];
   onAssignSwimlane: (lane: string, md: string) => void;
+  onContribute: (body: { lane: string; kind: string; text: string; severity?: string; source?: string; md?: string }) => void;
   onCycleChecklist: (itemId: string) => void;
+  onDealUpdate?: (d: Deal) => void;
   onLaunchDeal: () => void;
   launching: boolean;
   launchingId: string | null;
@@ -35,11 +39,16 @@ interface Props {
 
 const LANE_META: Record<string, { label: string; color: string }> = {
   commercial: { label: 'Commercial', color: '#0d9488' },
+  financial: { label: 'Financial / QoE', color: '#2563eb' },
+  legal: { label: 'Legal', color: '#9333ea' },
+  tax: { label: 'Tax', color: '#0891b2' },
   techai: { label: 'Tech / AI', color: '#7c3aed' },
-  operations: { label: 'Operations', color: '#ea580c' }
+  operations: { label: 'Operations', color: '#ea580c' },
+  esg: { label: 'ESG', color: '#16a34a' }
 };
+const LANE_FALLBACK = { label: 'Workstream', color: '#64748b' };
 
-export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onCycleChecklist, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
+export function Station({ flow, deal, deals, step, stage, relation, running, onRun, onAdvance, onBack, onJumpCurrent, onOpenSignals, onOpenNews, mdOptions, onAssignSwimlane, onContribute, onCycleChecklist, onDealUpdate, onLaunchDeal, launching, launchingId, onCohortChanged, onLaunchScreened, onOpenPipeline }: Props) {
   const run = deal?.stepRuns[step.key];
   const produced = relation === 'done' || !!run;
   const idx = flow.steps.findIndex((s) => s.key === step.key);
@@ -202,10 +211,27 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
               deal={deal!}
               mdOptions={mdOptions}
               onAssign={onAssignSwimlane}
+              onContribute={onContribute}
               onCycleChecklist={onCycleChecklist}
               onLaunch={onLaunchDeal}
               launching={launching}
             />
+          </div>
+        </div>
+      )}
+
+      {/* SEC filings → Fabric OneLake archive (launched deals) */}
+      {deal && deal.status !== 'screened' && step.stage === 'diligence' && step.key === 'D1' && (
+        <div className="panel" style={{ marginBottom: 18 }}>
+          <div className="ph">
+            <span className="ic">◆</span>
+            <h3>SEC filings · Fabric OneLake</h3>
+            <span className="sub" style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 11.5, textTransform: 'none', letterSpacing: 0 }}>
+              auto-archived to the lakehouse Files/Filings
+            </span>
+          </div>
+          <div className="pb" style={{ padding: 0 }}>
+            <OneLakeFilings deal={deal} onDealUpdate={onDealUpdate} />
           </div>
         </div>
       )}
@@ -222,6 +248,22 @@ export function Station({ flow, deal, deals, step, stage, relation, running, onR
           </div>
           <div className="pb" style={{ padding: 0 }}>
             <DealArtifactPanel dealId={deal.id} step={step.key} />
+          </div>
+        </div>
+      )}
+
+      {/* IC Readiness Cockpit — decision-grade board (D2 diligence → D4 approval) */}
+      {deal && ['D2', 'D3', 'D4'].includes(step.key) && (
+        <div className="panel" style={{ marginBottom: 18 }}>
+          <div className="ph">
+            <span className="ic">◎</span>
+            <h3>IC Readiness cockpit</h3>
+            <span className="sub" style={{ marginLeft: 'auto', color: 'var(--muted)', fontSize: 11.5, textTransform: 'none', letterSpacing: 0 }}>
+              decision-grade · grounded in Fabric market intelligence
+            </span>
+          </div>
+          <div className="pb" style={{ padding: 0 }}>
+            <ICCockpit dealId={deal.id} mdOptions={mdOptions} onDealUpdate={onDealUpdate} />
           </div>
         </div>
       )}
@@ -337,7 +379,7 @@ function DataPanel({ deal, panel }: { deal: Deal; panel: string }) {
       <div style={{ marginBottom: 18 }}>
         <div className="lanes3">
           {deal.workstreams.map((w) => {
-            const m = LANE_META[w.lane];
+            const m = LANE_META[w.lane] || LANE_FALLBACK;
             return (
               <div className="lane" key={w.lane}>
                 <div className="lh"><span className="nm" style={{ color: m.color }}>{m.label}</span><span className="ow">{w.progress}%</span></div>

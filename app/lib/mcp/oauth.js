@@ -254,6 +254,19 @@ export function loadTokens(provider) {
   throw new NotLoggedInError(`No stored login for '${provider}'. Run: node scripts/${provider}_login.mjs`);
 }
 
+// Disconnect: remove all stored tokens for a provider so hasLogin() and
+// getAccessToken() report "not connected". Clears the on-disk file, the durable
+// Cosmos mirror, and any in-flight refresh. An env-bootstrap token
+// (<PROVIDER>_TOKEN_JSON, injected as a container secret) CANNOT be removed at
+// runtime — reported via envTokenRemains so callers can surface that honestly.
+export async function clearTokens(provider) {
+  try { fs.rmSync(storePath(provider), { force: true }); } catch { /* ignore FS errors */ }
+  try { await connRepo.remove(provider); } catch { /* best-effort durable delete */ }
+  delete refreshInFlight[provider];
+  return { cleared: true, envTokenRemains: !!envTokenJson(provider) };
+}
+
+
 async function reloadRecord(provider) {
   try {
     const doc = await connRepo.get(provider);

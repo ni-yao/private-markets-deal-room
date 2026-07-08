@@ -26,10 +26,15 @@ const CLIENT_ID = config.m365.clientId;
 const CLIENT_SECRET = config.m365.clientSecret;
 const AUTHORIZE = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/authorize`;
 const TOKEN = `https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`;
-// Delegated Graph scopes: identity + a Teams SPACE (team) per deal. All scopes
-// here are USER-consentable (no admin approval needed): a deal gets its own Team
-// via Team.Create, and the button opens that team's channel. offline_access
-// yields the refresh token used for headless reuse by later steps.
+// Delegated Graph scopes: identity + a Teams SPACE (team) per deal. These are
+// the scopes user3 can actually consent to in this tenant (whose user-consent
+// policy is "recommended"). NOTE: SharePoint file scopes (Files.ReadWrite.All /
+// Sites.ReadWrite.All) require tenant-ADMIN consent here — they were tried and
+// produce a "Need admin approval" wall — so they are deliberately NOT requested;
+// including them blocks the entire sign-in (even Teams). Provisioning the deal
+// SharePoint data-room folders from the app therefore requires a one-time admin
+// consent that isn't available; see the workspace note. offline_access yields
+// the refresh token for headless reuse.
 const SCOPE = [
   'offline_access', 'openid', 'profile', 'email',
   'User.Read', 'Team.ReadBasic.All', 'Team.Create'
@@ -75,6 +80,10 @@ router.get('/login', (req, res) => {
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
+    // Let the user pick the account; do NOT force `prompt=consent`. All requested
+    // scopes are user-consentable, so a returning user is not re-prompted. (Forcing
+    // consent is only needed to add a new scope — and the only scope we'd want to
+    // add, Files.ReadWrite.All, is admin-gated in this tenant, so we don't request it.)
     prompt: 'select_account'
   });
   res.redirect(`${AUTHORIZE}?${params.toString()}`);
