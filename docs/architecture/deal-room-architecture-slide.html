@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The Deal Room — Architecture Map</title>
+<style>
+  :root{
+    --ink:#e9eefb; --dim:#aab8d4; --line:#5ea0ef; --line2:#3f6ea0;
+    --chip:#152238; --chipedge:#2a3a5a; --hub:#123a63; --hubedge:#3f86d6;
+    --band:#0e1930;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a1120;font-family:"Segoe UI",Roboto,Arial,sans-serif}
+  #stage{position:relative;width:1280px;height:720px;overflow:hidden;
+    background:radial-gradient(1100px 640px at 62% -8%,#14294a 0,#0a1120 58%);color:var(--ink)}
+
+  .title{position:absolute;left:34px;top:22px;font-size:22px;font-weight:700;letter-spacing:.2px}
+  .title small{display:block;font-size:12.5px;font-weight:500;color:var(--dim);margin-top:3px;letter-spacing:.2px}
+
+  /* zone bands */
+  .band{position:absolute;border:1px solid #1d2c48;border-radius:14px;
+    background:linear-gradient(180deg,rgba(20,32,56,.42),rgba(12,20,40,.24))}
+  .band .bl{position:absolute;top:8px;left:12px;font-size:10.5px;letter-spacing:1.4px;
+    text-transform:uppercase;color:#7f92b6;font-weight:700}
+
+  /* nodes */
+  .node{position:absolute;width:150px;height:56px;background:var(--chip);
+    border:1px solid var(--chipedge);border-radius:11px;display:flex;align-items:center;gap:9px;
+    padding:0 11px;z-index:3;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  .node img{width:26px;height:26px;flex:0 0 auto}
+  .node span{font-size:12.5px;font-weight:600;line-height:1.15}
+  .node.sm{height:48px}
+  .node.hub{width:172px;height:92px;
+    background:linear-gradient(180deg,#153f68,#0f2b4b);border-color:var(--hubedge);
+    box-shadow:0 0 0 1px rgba(94,160,239,.25) inset,0 4px 18px rgba(20,60,110,.5);flex-direction:column;
+    align-items:flex-start;justify-content:center;gap:6px;padding:10px 13px}
+  .node.hub .r1{display:flex;align-items:center;gap:9px}
+  .node.hub img{width:30px;height:30px}
+  .node.hub span{font-size:14px;font-weight:700}
+  .node.hub .tags{display:flex;gap:5px;flex-wrap:wrap}
+  .node.hub .tags i{font-style:normal;font-size:9.5px;color:#bcd2f2;background:rgba(63,134,214,.18);
+    border:1px solid rgba(94,160,239,.3);border-radius:10px;padding:1px 6px}
+  .node.stack::before,.node.stack::after{content:"";position:absolute;inset:0;border-radius:11px;
+    border:1px solid var(--chipedge);background:var(--chip);z-index:-1}
+  .node.stack::before{transform:translate(4px,4px)}
+  .node.stack::after{transform:translate(8px,8px)}
+
+  svg#wires{position:absolute;inset:0;width:1280px;height:720px;z-index:1;pointer-events:none}
+  .wire{fill:none;stroke:var(--line2);stroke-width:1.6}
+  .wire.solid{stroke:var(--line);stroke-width:1.8}
+  .wire.dash{stroke:#6f83a6;stroke-dasharray:4 4}
+  .wlabel{position:absolute;z-index:2;font-size:9.5px;color:#9db4d8;background:#0c1526;
+    border:1px solid #1d2c48;border-radius:9px;padding:1px 6px;transform:translate(-50%,-50%);white-space:nowrap}
+
+  .legend{position:absolute;right:20px;bottom:16px;z-index:4;display:flex;gap:16px;font-size:10.5px;color:var(--dim);
+    background:rgba(12,21,38,.7);border:1px solid #1d2c48;border-radius:10px;padding:7px 12px}
+  .legend b{display:inline-flex;align-items:center;gap:6px;font-weight:500}
+  .legend .sw{width:20px;height:0;border-top:2px solid var(--line)}
+  .legend .sw.d{border-top:2px dashed #6f83a6}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="title">The Deal Room — Solution Architecture
+    <small>AI Foundry agents · Container Apps · Cosmos DB · grounded on Fabric &amp; AI Search</small>
+  </div>
+
+  <!-- Zone bands -->
+  <div class="band" style="left:24px;top:120px;width:172px;height:470px"><div class="bl">Channels</div></div>
+  <div class="band" style="left:212px;top:120px;width:172px;height:470px"><div class="bl">Identity &amp; Edge</div></div>
+  <div class="band" style="left:400px;top:120px;width:210px;height:470px"><div class="bl">Application</div></div>
+  <div class="band" style="left:626px;top:120px;width:196px;height:470px"><div class="bl">AI · Foundry</div></div>
+  <div class="band" style="left:838px;top:120px;width:196px;height:470px"><div class="bl">Data &amp; Documents</div></div>
+  <div class="band" style="left:1050px;top:120px;width:190px;height:470px"><div class="bl">External · M365</div></div>
+  <div class="band" style="left:400px;top:604px;width:634px;height:92px"><div class="bl">Observability</div></div>
+
+  <!-- Wires drawn under nodes -->
+  <svg id="wires"></svg>
+
+  <!-- Channels -->
+  <div class="node" id="web"   style="left:35px;top:250px"><img src="icons/web.svg"><span>Web App (SPA)</span></div>
+  <div class="node" id="teams" style="left:35px;top:430px"><img src="icons/teams.svg"><span>Microsoft Teams</span></div>
+
+  <!-- Edge -->
+  <div class="node sm" id="entra" style="left:223px;top:170px"><img src="icons/entra.svg"><span>Entra ID</span></div>
+  <div class="node sm" id="apim"  style="left:223px;top:340px"><img src="icons/apim.svg"><span>API Management</span></div>
+  <div class="node sm" id="mi"    style="left:223px;top:500px"><img src="icons/managedidentity.svg"><span>Managed Identity</span></div>
+
+  <!-- Application -->
+  <div class="node hub" id="ca" style="left:420px;top:255px">
+    <div class="r1"><img src="icons/containerapps.svg"><span>Container Apps</span></div>
+    <div class="tags"><i>API</i><i>SPA</i><i>MCP</i></div>
+  </div>
+  <div class="node sm" id="func" style="left:430px;top:470px"><img src="icons/function.svg"><span>Functions</span></div>
+
+  <!-- AI -->
+  <div class="node sm" id="foundry" style="left:640px;top:158px"><img src="icons/cognitive.svg"><span>AI Foundry</span></div>
+  <div class="node sm stack" id="agents" style="left:640px;top:262px"><img src="icons/cognitive.svg"><span>Persona Agents ×5</span></div>
+  <div class="node sm" id="aisvcs" style="left:640px;top:378px"><img src="icons/cognitive.svg"><span>AI Services</span></div>
+  <div class="node sm" id="bing"   style="left:640px;top:482px"><img src="icons/web.svg"><span>Grounding · Bing</span></div>
+
+  <!-- Data & Documents -->
+  <div class="node sm" id="cosmos"  style="left:852px;top:150px"><img src="icons/cosmos.svg"><span>Cosmos DB</span></div>
+  <div class="node sm" id="search"  style="left:852px;top:236px"><img src="icons/search.svg"><span>AI Search</span></div>
+  <div class="node sm" id="fabric"  style="left:852px;top:322px"><img src="icons/fabric.svg"><span>Fabric · OneLake</span></div>
+  <div class="node sm" id="storage" style="left:852px;top:408px"><img src="icons/storage.svg"><span>Storage</span></div>
+  <div class="node sm" id="msg"     style="left:852px;top:494px"><img src="icons/servicebus.svg"><span>Bus · Event Grid</span></div>
+
+  <!-- External -->
+  <div class="node sm" id="edgar" style="left:1062px;top:200px"><img src="icons/edgar.svg"><span>SEC EDGAR</span></div>
+  <div class="node sm" id="kv"    style="left:1062px;top:322px"><img src="icons/keyvault.svg"><span>Key Vault</span></div>
+  <div class="node sm" id="m365"  style="left:1062px;top:444px"><img src="icons/sharepoint.svg"><span>Microsoft 365</span></div>
+
+  <!-- Observability -->
+  <div class="node sm" id="appins" style="left:452px;top:628px"><img src="icons/appinsights.svg"><span>App Insights</span></div>
+  <div class="node sm" id="law"    style="left:648px;top:628px"><img src="icons/loganalytics.svg"><span>Log Analytics</span></div>
+  <div class="node sm" id="mon"    style="left:844px;top:628px"><img src="icons/monitor.svg"><span>Azure Monitor</span></div>
+
+  <div class="legend">
+    <b><span class="sw"></span> data / call flow</b>
+    <b><span class="sw d"></span> identity · secrets · telemetry</b>
+  </div>
+</div>
+
+<script>
+  // Connector list: [from, to, style, optional label]
+  const WIRES = [
+    ['web','ca','solid'],
+    ['teams','agents','solid'],
+    ['agents','ca','solid','MCP'],
+    ['entra','ca','dash'],
+    ['mi','ca','dash'],
+    ['apim','foundry','dash'],
+    ['ca','foundry','solid'],
+    ['ca','cosmos','solid'],
+    ['ca','search','solid'],
+    ['ca','fabric','solid'],
+    ['ca','storage','solid'],
+    ['ca','msg','solid'],
+    ['msg','func','solid'],
+    ['ca','kv','dash'],
+    ['ca','edgar','solid'],
+    ['ca','m365','solid'],
+    ['agents','bing','solid'],
+    ['ca','aisvcs','solid'],
+    ['edgar','fabric','solid'],
+    ['ca','appins','dash'],
+    ['appins','law','dash'],
+    ['law','mon','dash']
+  ];
+  const stage = document.getElementById('stage');
+  const svg = document.getElementById('wires');
+  const SVGNS = 'http://www.w3.org/2000/svg';
+
+  // arrowhead marker
+  const defs = document.createElementNS(SVGNS,'defs');
+  defs.innerHTML = '<marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">'+
+    '<path d="M0,0 L6,3 L0,6 Z" fill="#5ea0ef"/></marker>'+
+    '<marker id="ahd" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto">'+
+    '<path d="M0,0 L6,3 L0,6 Z" fill="#6f83a6"/></marker>';
+  svg.appendChild(defs);
+
+  function rectOf(id){
+    const el=document.getElementById(id), s=stage.getBoundingClientRect(), r=el.getBoundingClientRect();
+    return {x:r.left-s.left, y:r.top-s.top, w:r.width, h:r.height, cx:r.left-s.left+r.width/2, cy:r.top-s.top+r.height/2};
+  }
+  // anchor on the border of rect facing the other point
+  function anchor(a,b){
+    const dx=b.cx-a.cx, dy=b.cy-a.cy;
+    if(Math.abs(dx) > Math.abs(dy)*1.1){
+      return {x: a.cx + (dx>0? a.w/2 : -a.w/2), y: a.cy + dy*0.12};
+    } else if(Math.abs(dy) > Math.abs(dx)*1.1){
+      return {x: a.cx + dx*0.12, y: a.cy + (dy>0? a.h/2 : -a.h/2)};
+    }
+    return {x: a.cx + (dx>0? a.w/2 : -a.w/2), y: a.cy + (dy>0? a.h/2 : -a.h/2)};
+  }
+  function draw(){
+    for(const [from,to,style,label] of WIRES){
+      const A=rectOf(from), B=rectOf(to);
+      const p1=anchor(A,B), p2=anchor(B,A);
+      const mx=(p1.x+p2.x)/2;
+      const d=`M ${p1.x} ${p1.y} C ${mx} ${p1.y}, ${mx} ${p2.y}, ${p2.x} ${p2.y}`;
+      const path=document.createElementNS(SVGNS,'path');
+      path.setAttribute('d',d);
+      path.setAttribute('class','wire '+style);
+      path.setAttribute('marker-end', style==='dash' ? 'url(#ahd)' : 'url(#ah)');
+      svg.appendChild(path);
+      if(label){
+        const t=document.createElement('div');
+        t.className='wlabel'; t.textContent=label;
+        t.style.left=((p1.x+p2.x)/2)+'px'; t.style.top=((p1.y+p2.y)/2)+'px';
+        stage.appendChild(t);
+      }
+    }
+  }
+  draw();
+</script>
+</body>
+</html>
