@@ -26,6 +26,13 @@ const AUDIENCES = (process.env.MCP_AUDIENCE || '')
   .filter(Boolean);
 const REQUIRED_SCOPE = (process.env.MCP_REQUIRED_SCOPE || '').trim();
 const DISABLED = String(process.env.MCP_AUTH_DISABLED || '').toLowerCase() === 'true';
+// A static, read-only API key that lets a hosted caller (e.g. an Azure AI Foundry
+// agent published to Teams, which executes MCP tools server-side and can't perform
+// a rotating Entra OAuth flow) reach ONLY the read-only MCP surface. It never grants
+// the write/action tools — those stay Entra-guarded on /mcp. The 'unset' sentinel is
+// the inert bicep placeholder (mirrors m365-client-secret), treated as no key.
+const READONLY_KEY_RAW = (process.env.MCP_READONLY_KEY || '').trim();
+const READONLY_KEY = READONLY_KEY_RAW === 'unset' ? '' : READONLY_KEY_RAW;
 
 const ISSUERS = TENANT_ID
   ? [
@@ -119,4 +126,44 @@ export async function mcpAuthMiddleware(req, res, next) {
     roles: Array.isArray(payload.roles) ? payload.roles : []
   };
   return next();
+}
+
+export function mcpReadonlyKeyConfigured() {
+  return !!READONLY_KEY;
+}
+
+// Read-only MCP auth: accept EITHER the static read-only API key (header `x-mcp-key`
+// or `Authorization: Bearer <key>`) OR a valid Entra token. On key match the request
+// is flagged read-only, so the read-only MCP server exposes reads only — never writes.
+// This is the credential a Foundry-hosted agent (Teams) uses to call the MCP tool
+// server-side, since it can't run a rotating OAuth flow the way Copilot Studio does.
+export async function mcpReadonlyAuthMiddleware(req, res, next) {
+  if (DISABLED) {
+    req.mcpAuth = { mode: 'disabled', readOnly: true };
+    return next();
+  }
+  if (READONLY_KEY) {
+    const headerKey = (req.headers['x-mcp-key'] || '').trim();
+    const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+    const presented = headerKey || (bearer ? bearer[1].trim() : '');
+    if (presented && timingSafeEqual(presented, READONLY_KEY)) {
+      req.mcpAuth = { mode: 'apikey', readOnly: true };
+      return next();
+    }
+  }
+  // Fall back to Entra validation (a valid token also grants read-only access here).
+  if (mcpAuthConfigured()) return mcpAuthMiddleware(req, res, next);
+  return res.status(503).json({
+    jsonrpc: '2.0',
+    error: { code: -32002, message: 'Read-only MCP not configured (set MCP_READONLY_KEY or Entra auth).' },
+    id: null
+  });
+}
+
+// Constant-time string comparison to avoid leaking the key via timing.
+function timingSafeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }

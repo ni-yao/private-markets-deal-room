@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v0.34.0',
+    date: '2026-07-08',
+    image: 'dealroom-app:v56',
+    revision: 'ca-dealroom-orch-dev-swc--0000052',
+    title: 'Persona agents work in Microsoft Teams — server-executed (MCP) research tools',
+    tag: 'improvement',
+    highlights: [
+      'Fixed the “No tool output found for function call” error when calling a persona agent published to Teams. The agents were prompt agents with client-side function tools, which only work when the app’s backend runs the tool loop — Foundry’s Teams channel invokes the agent directly with no client, so every tool call failed. The agents now use a single hosted MCP tool that Foundry executes server-side, so they work through Teams.',
+      'Added a read-only MCP surface (/mcp-ro) exposing only the research/read tools (list/get deals, pipeline, companies, IC readiness, market intelligence, citation audit) and authenticated by a static read-only key or a valid Entra token. The write/action tools stay Entra-guarded on /mcp — a Teams agent can research the pipeline but never mutate it.',
+      'Re-provisioned all five persona agents (analyst, partner, retail/AI/supply MDs) to research via the hosted tool and give lane-specific analysis and recommendations as text; formal actions (contributions, advancing, approvals) continue to be recorded in the Deal Room app. Verified end-to-end: Foundry executed the tools server-side (search_deals → get_deal → get_ic_readiness → get_market_intel) with zero errors and returned a grounded Allbirds briefing — the exact path the Teams channel uses.',
+      'Also restored Cosmos DB connectivity after its public network access had drifted to Disabled (with no private endpoint/VNet, that made the datastore unreachable and forced an in-memory fallback); re-enabled it to the deployed bicep’s intended state, keeping the data plane protected by managed-identity RBAC (local auth stays disabled).'
+    ]
+  },
+  {
     version: 'v0.33.0',
     date: '2026-07-07',
     image: 'dealroom-app:v54',

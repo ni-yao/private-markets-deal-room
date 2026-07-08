@@ -92,8 +92,8 @@ import { getModelInfo } from './lib/ai.js';
 import { newsAgentConfigured } from './lib/newsAgent.js';
 import { chatDealAgent, dealAgentInfo } from './lib/dealAgent.js';
 import { chatPersonaAgent, personaAgentsInfo } from './lib/personaAgent.js';
-import { dealMcpHandler, dealMcpMethodNotAllowed, dealMcpInfo } from './lib/mcp/dealServer.js';
-import { mcpAuthMiddleware, mcpAuthInfo } from './lib/mcp/entraAuth.js';
+import { dealMcpHandler, dealMcpReadonlyHandler, dealMcpMethodNotAllowed, dealMcpInfo, dealMcpReadonlyInfo } from './lib/mcp/dealServer.js';
+import { mcpAuthMiddleware, mcpReadonlyAuthMiddleware, mcpAuthInfo, mcpReadonlyKeyConfigured } from './lib/mcp/entraAuth.js';
 import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
@@ -122,7 +122,7 @@ api.get('/config', (_req, res) => {
     newsAgent: newsAgentConfigured() ? 'live' : 'demo',
     dealAgent: dealAgentInfo().configured ? 'live' : 'demo',
     personaAgents: personaAgentsInfo(),
-    dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo() },
+    dealMcp: { ...dealMcpInfo(), auth: mcpAuthInfo(), readonly: { ...dealMcpReadonlyInfo(), keyConfigured: mcpReadonlyKeyConfigured() } },
     m365: { configured: m365Configured(), connected: m365Connected(), files: m365FilesScope() },
     morningstar: morningstarReady() ? 'live' : 'demo',
     fabric: fabricStatus(),
@@ -678,6 +678,15 @@ app.use('/api', api);
 app.post('/mcp', mcpAuthMiddleware, dealMcpHandler);
 app.get('/mcp', mcpAuthMiddleware, dealMcpMethodNotAllowed);
 app.delete('/mcp', mcpAuthMiddleware, dealMcpMethodNotAllowed);
+
+// Read-only MCP surface for Foundry-hosted agents (published to Teams). Authenticated
+// by a static read-only key (or a valid Entra token); exposes ONLY the read tools so
+// a hosted agent can research the pipeline but never mutate it. This is what lets the
+// persona agents work through the Teams channel, where Foundry executes the MCP tool
+// server-side and there is no client to run the app's function-tool loop.
+app.post('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpReadonlyHandler);
+app.get('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpMethodNotAllowed);
+app.delete('/mcp-ro', mcpReadonlyAuthMiddleware, dealMcpMethodNotAllowed);
 
 // ---- Static client ----
 const clientDist = join(__dirname, 'client', 'dist');

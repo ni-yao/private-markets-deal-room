@@ -62,8 +62,12 @@ function actionGuard(auth, argPersona) {
 
 // Build a fresh MCP server with all read + action tools registered. `auth` is the
 // validated Entra context (req.mcpAuth) so action tools can enforce the write scope.
+// When auth.readOnly is set (the read-only surface used by Foundry-hosted / Teams
+// agents), only the READ tools are registered — the write/action tools are omitted
+// entirely, so a model-asserted persona can never drive a governed mutation there.
 export function buildDealMcpServer(auth = { mode: 'disabled' }) {
   const server = new McpServer(SERVER_INFO, { capabilities: { tools: {} } });
+  const readOnly = !!auth.readOnly;
 
   // ---- READ: Stage-2 deals (existing contracts) ---------------------------
   server.registerTool('list_deals',
@@ -136,15 +140,19 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
     });
 
   // ---- ACTION tools (persona-governed writes) -----------------------------
-  const action = (name, extraSchema, mapArgs) => server.registerTool(
-    name,
-    { title: name, description: TOOL_DESCRIPTIONS[name], inputSchema: { persona: personaArg, ...extraSchema } },
-    async (args) => {
-      const guard = actionGuard(auth, args.persona);
-      if (guard.error) return toContent(guard);
-      return toContent(await dispatchAction(name, mapArgs(args), { persona: guard.persona }));
-    }
-  );
+  // Omitted entirely on the read-only surface — a Foundry-hosted / Teams agent can
+  // research the pipeline but cannot mutate it there (writes stay Entra-guarded on /mcp).
+  const action = readOnly
+    ? () => {}
+    : (name, extraSchema, mapArgs) => server.registerTool(
+      name,
+      { title: name, description: TOOL_DESCRIPTIONS[name], inputSchema: { persona: personaArg, ...extraSchema } },
+      async (args) => {
+        const guard = actionGuard(auth, args.persona);
+        if (guard.error) return toContent(guard);
+        return toContent(await dispatchAction(name, mapArgs(args), { persona: guard.persona }));
+      }
+    );
 
   const dispositionArg = z.enum(['advance', 'pass', 'park']).describe('advance | pass | park.');
   const reasonArg = z.string().optional().describe('Reason code / note for a pass or park.');
@@ -198,7 +206,17 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
 // Express handler for POST /mcp — stateless Streamable HTTP. Passes the validated
 // Entra context so action tools can enforce persona + write scope.
 export async function dealMcpHandler(req, res) {
-  const server = buildDealMcpServer(req.mcpAuth || { mode: 'disabled' });
+  return handleWith(req, res, req.mcpAuth || { mode: 'disabled' });
+}
+
+// Express handler for POST /mcp-ro — the READ-ONLY surface. Forces readOnly regardless
+// of how the caller authenticated, so only the read tools are ever registered here.
+export async function dealMcpReadonlyHandler(req, res) {
+  return handleWith(req, res, { ...(req.mcpAuth || {}), readOnly: true });
+}
+
+async function handleWith(req, res, auth) {
+  const server = buildDealMcpServer(auth);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   res.on('close', () => {
     transport.close();
@@ -229,4 +247,9 @@ export function dealMcpMethodNotAllowed(_req, res) {
 
 export function dealMcpInfo() {
   return { server: SERVER_INFO.name, version: SERVER_INFO.version, readTools: READ_TOOLS, actionTools: ACTION_TOOLS, writeScope: WRITE_SCOPE || null, toolCount: TOOL_NAMES.length };
+}
+
+// Info for the read-only surface (used by Foundry-hosted / Teams agents).
+export function dealMcpReadonlyInfo() {
+  return { path: '/mcp-ro', readTools: READ_TOOLS, toolCount: READ_TOOLS.length };
 }
