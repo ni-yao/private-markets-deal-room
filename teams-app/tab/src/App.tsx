@@ -3,6 +3,8 @@ import { initTeams, getSsoToken, type TeamsInfo } from './teams';
 import Dashboard from './Dashboard';
 import ChatPanel from './ChatPanel';
 import DealDetail from './DealDetail';
+import Stage1 from './Stage1';
+import Stage2 from './Stage2';
 import type { Agent, Analytics, BackendConfig, Deal, MarketIntel, Persona, Pipeline } from './types';
 
 type TeamsConfig = { demoMode: boolean; backend: string; sso: boolean; bot: boolean; backendUrl?: string };
@@ -40,6 +42,7 @@ export default function App() {
   const [canViewStage2, setCanViewStage2] = useState(true);
   const [demoUsers, setDemoUsers] = useState<{ id: string; upn: string; label: string }[]>([]);
   const [viewAs, setViewAs] = useState('user1');
+  const [mainTab, setMainTab] = useState<'overview' | 'stage1' | 'stage2'>('overview');
 
   useEffect(() => {
     (async () => {
@@ -79,6 +82,12 @@ export default function App() {
     })();
   }, [viewAs]);
 
+  async function refreshData() {
+    fetch('/api/deals').then((r) => (r.ok ? r.json() : [])).then((d) => { if (Array.isArray(d)) setDeals(d); }).catch(() => {});
+    fetch('/api/analytics').then((r) => r.json()).then(setAnalytics).catch(() => {});
+    fetch('/api/pipeline').then((r) => r.json()).then(setPipeline).catch(() => {});
+  }
+
   function askAbout(dealId: string) {
     setChatFocusDealId(dealId);
     setChatOpen(true);
@@ -109,9 +118,21 @@ export default function App() {
         </div>
       </header>
 
+      <nav className="maintabs">
+        {([['overview', 'Deals Overview'], ['stage1', 'Stage 1 — Origination'], ['stage2', 'Stage 2 — Diligence']] as const).map(([k, label]) => (
+          <button key={k} className={`maintab${mainTab === k ? ' on' : ''}`} onClick={() => setMainTab(k)}>{label}</button>
+        ))}
+      </nav>
+
       <div className="layout">
         <main className="main">
-          <Dashboard analytics={analytics} pipeline={pipeline} deals={deals} market={market} config={config} agentCount={agents.length} onAsk={askAbout} onOpen={setOpenDealId} />
+          {mainTab === 'overview' ? (
+            <Dashboard analytics={analytics} pipeline={pipeline} deals={deals} market={market} config={config} agentCount={agents.length} onAsk={askAbout} onOpen={setOpenDealId} />
+          ) : mainTab === 'stage1' ? (
+            <Stage1 onChanged={refreshData} onOpenDeal={setOpenDealId} />
+          ) : (
+            <Stage2 deals={deals} onOpen={setOpenDealId} onAsk={askAbout} />
+          )}
         </main>
         {chatOpen ? <ChatPanel agents={agents} deals={deals} focusDealId={chatFocusDealId} onClose={() => setChatOpen(false)} /> : null}
       </div>
@@ -142,6 +163,26 @@ html, body, #root { margin: 0; height: 100%; }
 .asktoggle.on { background: transparent; color: var(--accent); }
 .layout { flex: 1; display: flex; min-height: 0; }
 .main { flex: 1; overflow-y: auto; min-width: 0; }
+.maintabs { display: flex; gap: 4px; padding: 8px 16px 0; background: var(--surface); border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+.maintab { border: none; background: none; color: var(--muted); padding: 9px 14px; cursor: pointer; font: inherit; font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; }
+.maintab:hover { color: var(--fg); }
+.maintab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.stage1, .stage2 { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.stage1 .fstep { border: none; cursor: pointer; }
+.stage1 .fstep.on { outline: 2px solid var(--accent); }
+.cand-list { display: flex; flex-direction: column; }
+.cand { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cand:last-child { border-bottom: none; }
+.cand-main { flex: 1; min-width: 0; }
+.cand-top { display: flex; align-items: center; gap: 8px; }
+.cand-co { font-weight: 700; }
+.cand-meta { color: var(--muted); font-size: 12px; margin: 2px 0 6px; }
+.cand-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.cand-assess { font-size: 12px; background: var(--hover); border-radius: 8px; padding: 6px 9px; }
+.cand-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 0 0 auto; max-width: 240px; justify-content: flex-end; }
+.pill.ok { background: #1b7f37; color: #fff; }
+.pill.warn { background: #b8860b; color: #fff; }
+.pill.bad { background: #b23b3b; color: #fff; }
 
 /* Dashboard */
 .dash { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
