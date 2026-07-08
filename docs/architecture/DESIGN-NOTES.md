@@ -6,8 +6,8 @@ The slide diagram ([`deal-room-architecture-slide.html`](./deal-room-architectur
 
 | # | Principle applied in the diagram | Source(s) |
 |---|---|---|
-| 1 | **Strict left→right flow** — Channels → Identity/Edge → Application → AI → Data → External → Observe | Azure WAF Design Diagrams; draw.io Azure guide |
-| 2 | **Common-region zones** — each tier is a shaded, labeled bounding box so membership is unambiguous | NNG *Common Region*; NNG *Proximity*; draw.io "logical blocks" |
+| 1 | **Hub-and-spoke / centered-containment layout** — the Container Apps core sits center-stage with domains radiating out (channels above, identity left, AI right, data below, external &amp; observe in the corners). Flow is **multi-directional**, as most real architecture diagrams are — not a single-direction pipeline | Azure WAF Design Diagrams; draw.io "logical blocks"; NNG *Common Region* |
+| 2 | **Common-region zones** — each domain is a shaded, labeled bounding box so membership is unambiguous | NNG *Common Region*; NNG *Proximity*; draw.io "logical blocks" |
 | 3 | **One consistent shape/size per node type**; colour rail encodes tier, not decoration | NNG *Similarity*; Azure WAF ("consistent colours/icon sizes") |
 | 4 | **Orthogonal, single-ended, labeled connectors**; no bidirectional arrows | C4 Notation; Azure WAF; Structurizr |
 | 5 | **Minimise line crossings** — a vertical *data bus* with short taps replaces a 5-line "curtain" | IDF *Law of Continuity*; graph-drawing practice |
@@ -44,6 +44,8 @@ The slide diagram ([`deal-room-architecture-slide.html`](./deal-room-architectur
 18. Edward Tufte — Chartjunk / data-ink — https://en.wikipedia.org/wiki/Chartjunk — remove decorative fills, 3-D, gradients; maximise data-ink.
 19. NNG — Low Contrast — https://www.nngroup.com/articles/low-contrast/ — insufficient text/background contrast degrades legibility; shaded regions must still allow readable labels.
 
-## What changed from the first attempt
+## What changed across iterations
 
-The first slide draft failed several of the rules above: curved bezier connectors crossed each other (a "confused mess of boxes and lines" — #4, and violating the Law of Continuity — #17), tiers had large empty areas (poor use of structural whitespace — #12), edges were unlabeled (#6) and there was no legend (#7), and the flow had no consistent direction (#1). The rebuild applies strict left→right flow, common-region zones, orthogonal labeled connectors with a data-bus to eliminate crossings, a legend, a three-size type scale, and a single focal hub.
+- **v1 (rejected)** — curved bezier connectors crossed each other (a "confused mess of boxes and lines" — violating the Law of Continuity), tiers had dead whitespace, edges were unlabeled and there was no legend.
+- **v2 (rejected)** — fixed the connectors, zones and legend, but used a **strict left→right column pipeline**. That reads like a flowchart, not an architecture map; real architecture diagrams are rarely a single-direction pipeline.
+- **v3 (current)** — a **hub-and-spoke / centered-containment** layout: the Container Apps core is central, with domains grouped around it and connectors radiating in all directions (north to channels, west to identity, east to AI, south to a data bus, and to the external/observability corners). A single grouped spoke to the External · M365 zone and a short telemetry chain in the Observe corner keep the periphery clean. This matches how Azure reference architectures are actually drawn, while still honoring the notation/visual rules above (grouping, labeled single-ended connectors, a legend, a 3-size type scale, one focal hub, minimal crossings, flat cards).
