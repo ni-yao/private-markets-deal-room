@@ -21,6 +21,15 @@ type ICReadiness = { verdict?: Verdict; requiredArtifacts?: { items?: Artifact[]
 type Step = { key: string; stage: string };
 type Flow = { stages?: { id: string; name: string }[]; steps?: Step[] };
 
+// Deep-dive market research shapes.
+type Comp = { company: string; ticker?: string; dealType?: string; impliedValuation?: number; status?: string };
+type Precedent = { deal: string; decision?: string; votesFor?: number; votesAgainst?: number; votesAbstain?: number };
+type Benchmark = { workstream: string; total: number; byRisk?: Record<string, number>; samples?: { description?: string }[] };
+type MarketIntel = { info?: { mode?: string; source?: string | null; freshness?: { label?: string } | null }; comparableDeals?: Comp[]; icPrecedents?: Precedent[]; benchmarkFindings?: Benchmark[] };
+type CitationFig = { label: string; value: string; source?: string | null; sourced?: boolean };
+type CitationClaim = { section: string; figure: string; sourced?: boolean; via?: string | null };
+type Citations = { score?: number; totalClaims?: number; sourcedClaims?: number; unsourcedClaims?: CitationClaim[]; keyFigures?: CitationFig[]; unsourcedFigures?: CitationFig[]; clean?: boolean; summary?: string };
+
 const STEP_LABEL: Record<string, string> = {
   O1: 'Sourcing', O2: 'Screen', O3: 'Prioritize', O4: 'Gate',
   D1: 'Plan', D2: 'Diligence', D3: 'Synthesis', D4: 'IC Approval', D5: 'Archive',
@@ -42,12 +51,14 @@ function sourceHint(src?: string): string {
   return `Source: ${src}.`;
 }
 
-type Tab = 'stages' | 'overview' | 'workspace' | 'ic';
+type Tab = 'stages' | 'overview' | 'workspace' | 'research' | 'ic';
 
 export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { dealId: string; canViewStage2: boolean; onClose: () => void; onAsk: (id: string) => void }) {
   const [deal, setDeal] = useState<DealFull | null>(null);
   const [ic, setIc] = useState<ICReadiness | null>(null);
   const [flow, setFlow] = useState<Flow | null>(null);
+  const [market, setMarket] = useState<MarketIntel | null>(null);
+  const [citations, setCitations] = useState<Citations | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('overview');
   const [selStep, setSelStep] = useState<string>('');
@@ -71,6 +82,21 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
     fetch('/api/config').then((r) => r.json()).then(setCfg).catch(() => {});
     load(true).finally(() => setLoading(false));
   }, [dealId]);
+
+  // Lazily pull the deal's market-research deep dive (Fabric/OneLake comps,
+  // IC precedents, benchmark findings) + the source-citation audit.
+  useEffect(() => {
+    if (tab !== 'research') return;
+    if (!market) {
+      const sector = encodeURIComponent(String(deal?.sector || ''));
+      Promise.all([
+        fetch('/api/market-intel').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        sector ? fetch(`/api/market-intel/comps?sector=${sector}`).then((r) => (r.ok ? r.json() : null)).catch(() => null) : Promise.resolve(null),
+      ]).then(([mi, comps]) => setMarket({ ...(mi || {}), comparableDeals: (comps && comps.length ? comps : mi?.comparableDeals) || [] }));
+    }
+    if (!citations) fetch(`/api/deals/${dealId}/citations`).then((r) => (r.ok ? r.json() : null)).then(setCitations).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, dealId]);
 
   async function act(label: string, url: string, body: unknown = {}) {
     setBusy(label); setNote('');
@@ -144,9 +170,9 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
 
             {!stage2Locked && (
             <div className="dd-tabs">
-              {(['overview', 'stages', 'workspace', 'ic'] as Tab[]).map((t) => (
+              {(['overview', 'stages', 'workspace', 'research', 'ic'] as Tab[]).map((t) => (
                 <button key={t} className={`dd-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>
-                  {t === 'stages' ? 'Stages & orchestration' : t === 'overview' ? 'Overview' : t === 'workspace' ? 'Workspace' : 'IC readiness'}
+                  {t === 'stages' ? 'Stages & orchestration' : t === 'overview' ? 'Overview' : t === 'workspace' ? 'Workspace' : t === 'research' ? 'Market research' : 'IC readiness'}
                 </button>
               ))}
             </div>
@@ -291,6 +317,79 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
                     </div>
                   ) : null}
                 </section>
+              )}
+
+              {tab === 'research' && (
+                <>
+                  <section className="dd-panel">
+                    <div className="dd-panel-h">Comparable &amp; historical deals<span className="muted">{market?.info?.source ? `${market.info.source}${market.info.freshness?.label ? ` · ${market.info.freshness.label}` : ''}` : 'Fabric · OneLake'}</span></div>
+                    {!market ? <div className="dd-empty-p">Loading market intelligence…</div> : !(market.comparableDeals || []).length ? <div className="dd-empty-p">No comparables for this sector.</div> : (
+                      <div className="mr-list">
+                        {(market.comparableDeals || []).slice(0, 8).map((c, i) => (
+                          <div className="mr-row" key={i}>
+                            <span className="mr-name">{c.company}{c.ticker ? <span className="chip">{c.ticker}</span> : null}</span>
+                            <span className="mr-val">{c.dealType || '—'} · {money(c.impliedValuation)}</span>
+                            {c.status ? <span className={`chip ${String(c.status).toLowerCase().replace(/\s+/g, '-')}`}>{c.status}</span> : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="dd-panel">
+                    <div className="dd-panel-h">IC voting precedents</div>
+                    {!(market?.icPrecedents || []).length ? <div className="dd-empty-p">No precedents loaded.</div> : (
+                      <div className="mr-list">
+                        {(market!.icPrecedents || []).slice(0, 8).map((p, i) => (
+                          <div className="mr-row" key={i}>
+                            <span className="mr-name">{p.deal}</span>
+                            <span className="mr-val">{p.decision} · {(p.votesFor ?? 0)}–{(p.votesAgainst ?? 0)}{typeof p.votesAbstain === 'number' ? `–${p.votesAbstain}` : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(market?.benchmarkFindings || []).length ? (
+                      <div style={{ padding: '4px 14px 14px' }}>
+                        <div className="dd-panel-h" style={{ padding: '8px 0', border: 'none' }}>Benchmark findings by workstream</div>
+                        <div className="cand-tags">
+                          {(market!.benchmarkFindings || []).map((w) => (
+                            <span className="chip" key={w.workstream} title={(w.samples || []).map((s) => s.description).filter(Boolean).join(' · ')}>
+                              {w.workstream} · {w.total}{(w.byRisk?.Critical || w.byRisk?.High) ? ` · ${(w.byRisk?.Critical || 0) + (w.byRisk?.High || 0)} hi-risk` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </section>
+
+                  <section className="dd-panel">
+                    <div className="dd-panel-h">Source-citation audit<span className={`chip ${citations?.clean ? 'ok' : 'warn'}`}>{citations ? `${citations.score ?? 0}% traceable` : '…'}</span></div>
+                    {!citations ? <div className="dd-empty-p">Auditing numeric claims…</div> : (
+                      <div style={{ padding: '10px 14px 14px' }}>
+                        <div className="muted" style={{ marginBottom: 8 }}>{citations.summary}</div>
+                        {(citations.keyFigures || []).length ? (
+                          <div className="dd-figs">
+                            {(citations.keyFigures || []).map((f, i) => (
+                              <div className="dd-fig" key={i} title={f.source || 'no source'}>
+                                <div className="fig-v">{f.value}</div>
+                                <div className="fig-l">{f.label}</div>
+                                <div className="fig-src">{f.sourced ? `source: ${f.source}` : '⚠ unsourced'}</div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                        {(citations.unsourcedClaims || []).length ? (
+                          <div style={{ marginTop: 10 }}>
+                            <div className="mr-name" style={{ marginBottom: 6 }}>Unsourced memo figures</div>
+                            <div className="cand-tags">
+                              {(citations.unsourcedClaims || []).slice(0, 12).map((c, i) => (<span className="chip warn" key={i} title={c.section}>{c.figure}</span>))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </section>
+                </>
               )}
 
               {tab === 'ic' && (

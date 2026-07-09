@@ -33,7 +33,25 @@ type DeskNews = { id: string; source?: string; when?: string; headline?: string;
 type DeskCompany = { id: string; name: string; ticker?: string; sector?: string; region?: string; dealSize?: number; news?: DeskNews[] };
 type NewsDesk = { sources?: { id: string; name: string; role?: string }[]; catalysts?: { id: string; label: string; icon?: string }[]; companies?: DeskCompany[] };
 
+// Deep-dive research shapes (analyst reports + expandable target detail).
+type ResearchView = { firm?: string; kind?: string; rating?: string; valuation?: string; view?: string; when?: string };
+type ResearchPeer = { name: string; note?: string; listed?: boolean };
+type CompanyResearch = {
+  coverage?: string; thesis?: string;
+  sector?: { name?: string; market?: string; growth?: string; horizon?: string; outlook?: string; summary?: string; sources?: string[] };
+  competitive?: { rank?: number; of?: number; label?: string; moat?: string; peers?: ResearchPeer[] };
+  views?: ResearchView[];
+};
+type ResearchCompany = { id: string; name: string; sector?: string; region?: string; country?: string; dealSize?: number; ownership?: string; justDiscovered?: boolean; research: CompanyResearch };
+type AnalystResearch = { companies?: ResearchCompany[] };
+type DeskFiling = { id: string; filingType?: string; headline?: string; detail?: string; url?: string };
+type GeneratedReport = { generated?: boolean; summary?: string; sectorOutlook?: { stance?: string; text?: string }; competitivePosition?: string; keyRisks?: string[]; recommendation?: string; sources?: string[] };
+type TargetQuality = { public?: boolean; configured?: boolean; rating?: string; score?: number; trend?: string; flags?: string[]; note?: string; error?: string };
+type TargetDetail = { id: string; name: string; ticker?: string | null; isPublic?: boolean; filings?: DeskFiling[]; filingsKind?: string; quality?: TargetQuality; report?: GeneratedReport };
+
 const BAND_CLASS: Record<string, string> = { strong: 'ok', moderate: 'warn', weak: 'bad', excluded: 'bad' };
+const OUTLOOK_CLASS: Record<string, string> = { positive: 'ok', neutral: 'warn', caution: 'bad', stable: 'warn' };
+const STANCE_CLASS: Record<string, string> = { positive: 'ok', neutral: 'warn', caution: 'bad' };
 const STAGE_LABEL: Record<string, string> = { O1: 'Sourced', O2: 'Screen', O3: 'Prioritize', O4: 'Gate', pursued: 'Pursued' };
 const INTENT_CLASS: Record<string, string> = { high: 'ok', medium: 'warn', low: 'bad' };
 const STAGE_ACTIONS: Record<string, { endpoint: string; actions: { k: string; label: string; cls: string }[] }> = {
@@ -43,7 +61,7 @@ const STAGE_ACTIONS: Record<string, { endpoint: string; actions: { k: string; la
 };
 
 const money = (n?: number) => (n == null ? '—' : n >= 1000 ? `$${(n / 1000).toFixed(1)}B` : `$${n}M`);
-type SubTab = 'pipeline' | 'framework' | 'signals';
+type SubTab = 'pipeline' | 'framework' | 'research' | 'signals';
 
 export default function Stage1({ onChanged, onOpenDeal }: { onChanged: () => void; onOpenDeal: (id: string) => void }) {
   const [sub, setSub] = useState<SubTab>('pipeline');
@@ -53,6 +71,7 @@ export default function Stage1({ onChanged, onOpenDeal }: { onChanged: () => voi
   const [targets, setTargets] = useState<ScoredTargets | null>(null);
   const [mailbox, setMailbox] = useState<Mailbox | null>(null);
   const [desk, setDesk] = useState<NewsDesk | null>(null);
+  const [research, setResearch] = useState<AnalystResearch | null>(null);
   const [loading, setLoading] = useState(true);
   const [stageFilter, setStageFilter] = useState<string>('active');
   const [busy, setBusy] = useState<string>('');
@@ -77,7 +96,11 @@ export default function Stage1({ onChanged, onOpenDeal }: { onChanged: () => voi
       fetch('/api/signals/mailbox').then((r) => (r.ok ? r.json() : null)).then(setMailbox).catch(() => {});
       fetch('/api/news/desk').then((r) => (r.ok ? r.json() : null)).then(setDesk).catch(() => {});
     }
-  }, [sub, framework, mailbox]);
+    if (sub === 'research' && !research) {
+      fetch('/api/research').then((r) => (r.ok ? r.json() : null)).then(setResearch).catch(() => {});
+      if (!targets) fetch('/api/targets/scored').then((r) => (r.ok ? r.json() : null)).then(setTargets).catch(() => {});
+    }
+  }, [sub, framework, mailbox, research, targets]);
 
   async function decide(cand: Candidate, action: string) {
     const cfg = STAGE_ACTIONS[cand.stage || ''];
@@ -123,9 +146,9 @@ export default function Stage1({ onChanged, onOpenDeal }: { onChanged: () => voi
   return (
     <div className="stage1">
       <div className="dd-tabs" style={{ margin: 0 }}>
-        {(['pipeline', 'framework', 'signals'] as SubTab[]).map((t) => (
+        {(['pipeline', 'framework', 'research', 'signals'] as SubTab[]).map((t) => (
           <button key={t} className={`dd-tab${sub === t ? ' on' : ''}`} onClick={() => setSub(t)}>
-            {t === 'pipeline' ? 'Pipeline' : t === 'framework' ? 'Sourcing framework' : 'Signals'}
+            {t === 'pipeline' ? 'Pipeline' : t === 'framework' ? 'Sourcing framework' : t === 'research' ? 'Market research' : 'Signals'}
           </button>
         ))}
       </div>
@@ -251,31 +274,29 @@ export default function Stage1({ onChanged, onOpenDeal }: { onChanged: () => voi
             {!(targets?.targets || []).length ? <div className="empty-panel">Loading ranked targets…</div> : (
               <div className="cand-list">
                 {(targets!.targets || []).slice(0, 25).map((t) => (
-                  <div className="cand" key={t.id}>
-                    <div className="cand-main">
-                      <div className="cand-top">
-                        <span className="cand-co">{t.name}</span>
-                        <span className={`pill ${BAND_CLASS[t.band || ''] || ''}`}>{t.score ?? 0} · {t.band || '—'}</span>
-                      </div>
-                      <div className="cand-meta">{[t.sector, t.region, t.country].filter(Boolean).join(' · ')} · {money(t.dealSize)}{t.ownership ? ` · ${t.ownership}` : ''}</div>
-                      <div className="cand-tags">
-                        {t.matchedScreen ? <span className="chip" title="Matched screen">🎯 {t.matchedScreen.name}</span> : null}
-                        {t.gated ? <span className="chip" title="Blocked by the fund gate">⛔ gated</span> : null}
-                        {t.inFunnel ? <span className="chip">in funnel</span> : null}
-                        {(t.sources || []).slice(0, 2).map((s, i) => <span className="chip" key={i}>{s}</span>)}
-                      </div>
-                    </div>
-                    <div className="cand-actions">
-                      {t.inFunnel ? <span className="muted">in funnel</span> : (
-                        <button className="btn" disabled={!!busy || t.gated} title={t.gated ? 'Blocked by the fund gate' : 'Send to the screening funnel'} onClick={() => sendToScreening(t.id, t.name)}>{busy === 'send' + t.id ? '…' : 'Screen →'}</button>
-                      )}
-                    </div>
-                  </div>
+                  <TargetRow key={t.id} t={t} busy={busy} onScreen={() => sendToScreening(t.id, t.name)} />
                 ))}
               </div>
             )}
           </section>
         </>
+      )}
+
+      {sub === 'research' && (
+        <section className="panel">
+          <div className="panel-h">Analyst research<span className="muted">thesis context — is this a good business in a good market?</span></div>
+          {(research?.companies || []).length ? (
+            <div className="rc-list">
+              {(research!.companies || []).map((c) => <ResearchCard key={c.id} c={c} />)}
+            </div>
+          ) : !targets ? (
+            <div className="empty-panel">Loading analyst research…</div>
+          ) : (
+            <div className="rc-list">
+              {(targets.targets || []).filter((t) => !t.gated).slice(0, 12).map((t) => <GeneratedResearchCard key={t.id} t={t} />)}
+            </div>
+          )}
+        </section>
       )}
 
       {sub === 'signals' && (
@@ -321,6 +342,198 @@ export default function Stage1({ onChanged, onOpenDeal }: { onChanged: () => voi
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+// Generated-research card — for live pipeline targets that have no static analyst
+// seed, lazily generate the analyst report (sector outlook · competitive position
+// · key risks · recommendation) + filings + Morningstar on first expand.
+function GeneratedResearchCard({ t }: { t: ScoredTarget }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<TargetDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!open || detail || loading) return;
+    setLoading(true);
+    fetch(`/api/targets/${t.id}/detail`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      .then((r) => (r.ok ? r.json() : null)).then(setDetail).catch(() => {}).finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  return (
+    <div className={`rc${open ? ' open' : ''}`}>
+      <button className="rc-hd" onClick={() => setOpen((v) => !v)}>
+        <span className="rc-caret">{open ? '▾' : '▸'}</span>
+        <div className="rc-main">
+          <div className="cand-co">{t.name} <span className={`pill ${BAND_CLASS[t.band || ''] || ''}`}>{t.score ?? 0} · {t.band || '—'}</span></div>
+          <div className="cand-meta">{[t.sector, t.region, t.country].filter(Boolean).join(' · ')} · {money(t.dealSize)}{t.ownership ? ` · ${t.ownership}` : ''}</div>
+        </div>
+        <span className="chip">SEC filings · Morningstar · AI analyst report</span>
+      </button>
+      {open ? (
+        <div className="rc-body">
+          {loading && !detail ? <div className="muted">Pulling filings, Morningstar &amp; generating the analyst report…</div> : null}
+          {detail ? <TargetDetailBody d={detail} /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// Expandable ranked-target row — on open, lazily pulls the target's SEC filings,
+// Morningstar quality read and generated analyst report (/api/targets/:id/detail).
+function TargetRow({ t, busy, onScreen }: { t: ScoredTarget; busy: string; onScreen: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<TargetDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!open || detail || loading) return;
+    setLoading(true);
+    fetch(`/api/targets/${t.id}/detail`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      .then((r) => (r.ok ? r.json() : null)).then(setDetail).catch(() => {}).finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  return (
+    <div className={`cand${open ? ' open' : ''}`} style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', width: '100%' }}>
+        <div className="cand-main">
+          <div className="cand-top">
+            <span className="cand-co">{t.name}</span>
+            <span className={`pill ${BAND_CLASS[t.band || ''] || ''}`}>{t.score ?? 0} · {t.band || '—'}</span>
+          </div>
+          <div className="cand-meta">{[t.sector, t.region, t.country].filter(Boolean).join(' · ')} · {money(t.dealSize)}{t.ownership ? ` · ${t.ownership}` : ''}</div>
+          <div className="cand-tags">
+            {t.matchedScreen ? <span className="chip" title="Matched screen">🎯 {t.matchedScreen.name}</span> : null}
+            {t.gated ? <span className="chip" title="Blocked by the fund gate">⛔ gated</span> : null}
+            {t.inFunnel ? <span className="chip">in funnel</span> : null}
+            {(t.sources || []).slice(0, 2).map((s, i) => <span className="chip" key={i}>{s}</span>)}
+          </div>
+          {!t.gated ? (
+            <button className="td-toggle" onClick={() => setOpen((v) => !v)}>{open ? '▾' : '▸'} Filings · Morningstar rating · generated analyst report</button>
+          ) : null}
+        </div>
+        <div className="cand-actions">
+          {t.inFunnel ? <span className="muted">in funnel</span> : (
+            <button className="btn" disabled={!!busy || t.gated} title={t.gated ? 'Blocked by the fund gate' : 'Send to the screening funnel'} onClick={onScreen}>{busy === 'send' + t.id ? '…' : 'Screen →'}</button>
+          )}
+        </div>
+      </div>
+      {open ? (
+        <div className="td-wrap">
+          {loading && !detail ? <div className="muted" style={{ padding: '8px 0' }}>Pulling filings, Morningstar &amp; generating the analyst report…</div> : null}
+          {detail ? <TargetDetailBody d={detail} /> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TargetDetailBody({ d }: { d: TargetDetail }) {
+  const r = d.report || {};
+  const q = d.quality || {};
+  const qBand = (q.score ?? 0) >= 7 ? 'ok' : (q.score ?? 0) >= 5 ? 'warn' : 'bad';
+  const failed = !q.rating || q.rating === 'Pending';
+  return (
+    <div className="td-grid">
+      <div className="td-panel">
+        <div className="td-panel-h">📄 Filings<span className="chip">{d.filingsKind === 'formd' ? 'SEC Form D' : d.filingsKind === 'public' ? 'SEC EDGAR' : 'none'}</span></div>
+        {!(d.filings || []).length ? <div className="muted">No SEC filings — no public 10-K/10-Q/8-K and no recent Reg D (Form D) on EDGAR.</div> : (
+          <div className="td-filings">
+            {(d.filings || []).slice(0, 6).map((f) => (
+              <div className="td-filing" key={f.id}>
+                <div><span className="chip">{f.filingType}</span></div>
+                <div className="td-filing-head">{f.headline}</div>
+                {f.detail ? <div className="muted">{f.detail}</div> : null}
+                {f.url ? <a className="td-link" href={f.url} target="_blank" rel="noreferrer">🔗 View on SEC.gov</a> : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="td-panel">
+        <div className="td-panel-h">★ Morningstar rating<span className="chip">{d.isPublic ? (d.ticker || 'public') : 'private'}</span></div>
+        {!d.isPublic ? <div className="muted">Private company — no public Morningstar coverage.</div>
+          : q.configured === false ? <div className="muted">{q.note || 'Morningstar not connected.'}</div>
+          : failed ? <div className="muted">{q.error ? `Morningstar read failed: ${q.error}.` : 'Morningstar quality read pending.'}</div>
+          : (
+            <div className="q-card">
+              <div className="q-top">
+                <span className={`q-score ${qBand}`}>{(q.score ?? 0).toFixed(1)}</span>
+                <div><div className="q-rating">{q.rating}</div><div className="muted">{q.trend === 'improving' ? '↑' : q.trend === 'weakening' ? '↓' : '→'} {q.trend}</div></div>
+              </div>
+              {(q.flags || []).length ? <div className="cand-tags" style={{ marginTop: 6 }}>{(q.flags || []).map((f) => <span className="chip" key={f}>⚑ {f}</span>)}</div> : null}
+              {q.note ? <div className="muted" style={{ marginTop: 6 }}>{q.note}</div> : null}
+            </div>
+          )}
+      </div>
+
+      <div className="td-panel td-wide">
+        <div className="td-panel-h">📝 Analyst report<span className={`chip ${r.generated ? 'ai' : ''}`}>{r.generated ? '✦ AI-generated' : 'grounded'}</span>{(r.sources || []).length ? <span className="muted">{(r.sources || []).join(' · ')}</span> : null}</div>
+        {r.summary ? <div className="td-summary">💡 {r.summary}</div> : null}
+        {r.sectorOutlook ? (
+          <div className="td-row"><span className="td-k">Sector outlook</span><span className="td-v"><span className={`pill ${STANCE_CLASS[r.sectorOutlook.stance || ''] || 'warn'}`}>{r.sectorOutlook.stance}</span> {r.sectorOutlook.text}</span></div>
+        ) : null}
+        {r.competitivePosition ? <div className="td-row"><span className="td-k">Competitive position</span><span className="td-v">{r.competitivePosition}</span></div> : null}
+        {(r.keyRisks || []).length ? <div className="td-row"><span className="td-k">Key risks</span><span className="td-v"><ul className="td-risks">{(r.keyRisks || []).map((k, i) => <li key={i}>{k}</li>)}</ul></span></div> : null}
+        {r.recommendation ? <div className="td-row rec"><span className="td-k">Recommendation</span><span className="td-v">{r.recommendation}</span></div> : null}
+      </div>
+    </div>
+  );
+}
+
+// Analyst research card — sector outlook · competitive rank · sell-side/expert views.
+function ResearchCard({ c }: { c: ResearchCompany }) {
+  const [open, setOpen] = useState(false);
+  const r = c.research || {};
+  const outlook = r.sector?.outlook || 'neutral';
+  return (
+    <div className={`rc${open ? ' open' : ''}`}>
+      <button className="rc-hd" onClick={() => setOpen((v) => !v)}>
+        <span className="rc-caret">{open ? '▾' : '▸'}</span>
+        <div className="rc-main">
+          <div className="cand-co">{c.name}{c.justDiscovered ? <span className="chip" style={{ marginLeft: 6 }}>✦ new</span> : null} <span className="chip">{r.coverage === 'direct' ? 'Direct coverage' : 'Read-across'}</span></div>
+          <div className="cand-meta">{[c.sector, c.region].filter(Boolean).join(' · ')}{c.dealSize ? ` · ${money(c.dealSize)}` : ''}{c.ownership ? ` · ${c.ownership}` : ''}</div>
+        </div>
+        <span className={`pill ${OUTLOOK_CLASS[outlook] || 'warn'}`}>Sector · {outlook}</span>
+      </button>
+      {open ? (
+        <div className="rc-body">
+          {r.thesis ? <div className="td-summary">💡 {r.thesis}</div> : null}
+          <div className="td-grid">
+            <div className="td-panel">
+              <div className="td-panel-h">🌍 Sector outlook</div>
+              <div className="cand-co">{r.sector?.name}</div>
+              <div className="cand-tags" style={{ marginTop: 6 }}>
+                {r.sector?.market ? <span className="chip">Market {r.sector.market}</span> : null}
+                {r.sector?.growth ? <span className="chip">Growth {r.sector.growth}</span> : null}
+                {r.sector?.horizon ? <span className="chip">Horizon {r.sector.horizon}</span> : null}
+              </div>
+              {r.sector?.summary ? <div className="muted" style={{ marginTop: 6 }}>{r.sector.summary}</div> : null}
+              {(r.sector?.sources || []).length ? <div className="cand-tags" style={{ marginTop: 6 }}>{(r.sector!.sources || []).map((s) => <span className="chip" key={s}>{s}</span>)}</div> : null}
+            </div>
+            <div className="td-panel">
+              <div className="td-panel-h">🏆 Competitive rank</div>
+              <div className="rc-rank"><span className="rc-rank-badge">#{r.competitive?.rank}</span><span className="muted">of {r.competitive?.of}</span> <b>{r.competitive?.label}</b></div>
+              {r.competitive?.moat ? <div className="muted" style={{ margin: '4px 0' }}><b>Moat:</b> {r.competitive.moat}</div> : null}
+              {(r.competitive?.peers || []).map((p) => (
+                <div className="rc-peer" key={p.name}><span className={`peer-dot ${p.listed ? 'listed' : 'private'}`} /><b>{p.name}</b> <span className="muted">{p.note}</span></div>
+              ))}
+            </div>
+          </div>
+          <div className="td-panel td-wide">
+            <div className="td-panel-h">📑 Sell-side &amp; expert view</div>
+            {(r.views || []).map((v, i) => (
+              <div className="rc-view" key={i}>
+                <div className="rc-view-top"><b>{v.firm}</b> <span className="chip">{v.kind}</span>{v.rating ? <span className="chip">{v.rating}</span> : null}{v.when ? <span className="muted">{v.when}</span> : null}</div>
+                <div>{v.view}</div>
+                {v.valuation ? <div className="muted">📊 {v.valuation}</div> : null}
+              </div>
+            ))}
+            {r.coverage === 'read-across' ? <div className="muted" style={{ marginTop: 6 }}>Private target — context is read-across from listed comps, sector research and expert-network calls.</div> : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
