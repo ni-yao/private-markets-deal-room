@@ -156,6 +156,19 @@ them once, then pass their IDs as parameters (secrets at deploy time, never in g
 | **M365 connector (delegated)** | `m365ClientId` + `m365ClientSecret` | Delegated Microsoft Graph for **channel + SharePoint VDR provisioning** — admin-consent scopes: `Channel.Create`, `ChannelSettings.ReadWrite.All`, `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `GroupMember.Read.All`, `TeamMember.ReadWrite.All`, `TeamsAppInstallation.ReadWriteForTeam`. |
 | **Deal MCP (optional)** | `mcpAudience` + `mcpRequiredScope` | Secures `/mcp` for M365 Copilot / hosted agents. |
 
+> **⚠ Bot service principal (required for `botAppType='SingleTenant'`).** An app
+> *registration* alone is not enough — the bot app must also have a **service
+> principal (enterprise app)** in the tenant, or the bot receives messages but
+> every reply fails token acquisition with `AADSTS7000229` ("missing service
+> principal") and the bot is **silent**. Bicep can't create the SP (it's a
+> directory object, and the app registration itself lives outside this template),
+> so create it once alongside the app registration:
+>
+> ```bash
+> az ad sp create --id <botAppId>          # idempotent; safe to re-run
+> az ad sp show   --id <botAppId> -o table  # verify it resolves
+> ```
+
 `m365TeamId` (optional) pins the parent Teams team that holds **one channel per deal**;
 leave empty to find/create "The Deal Room" team on first provisioning.
 

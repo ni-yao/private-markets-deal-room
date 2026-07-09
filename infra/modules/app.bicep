@@ -314,6 +314,12 @@ resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp)
 // Azure Bot registration for the in-channel conversational bot. Global resource;
 // its messaging endpoint targets the Teams app /api/messages. Optional — gated on
 // deployBot + a bot app id + the Teams app (which hosts the messaging endpoint).
+//
+// PREREQUISITE (SingleTenant): the botAppId app registration MUST also have a
+// service principal in the tenant (`az ad sp create --id <botAppId>`). Without it
+// the bot receives messages but every reply fails token acquisition with
+// AADSTS7000229 ("missing service principal") and the bot stays silent. The SP is
+// a directory object created outside this template — see infra/README.md runbook.
 resource bot 'Microsoft.BotService/botServices@2022-09-15' = if (deployBot && !empty(botAppId) && deployTeamsApp) {
   name: 'bot-${workload}-${environmentName}-${suffix}'
   location: 'global'
