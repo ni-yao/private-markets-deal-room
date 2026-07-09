@@ -1,0 +1,22 @@
+{
+  "name": "deal-room-teams-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Teams interface for The Deal Room — Channel Tab dashboard, Adaptive Card notifications, and an M365 Copilot declarative agent. Thin interface over the shared Deal Room backend (single data source).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node server/index.js",
+    "start": "node server/index.js",
+    "build:tab": "npm --prefix tab install && npm --prefix tab run build",
+    "build": "npm run build:tab"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.2",
+    "botbuilder": "^4.23.1",
+    "express": "^4.21.2",
+    "jose": "^6.2.3"
+  }
+}

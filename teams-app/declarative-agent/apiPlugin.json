@@ -1,0 +1,26 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/copilot/plugin/v2.1/schema.json",
+  "schema_version": "v2.1",
+  "name_for_human": "Deal Room",
+  "description_for_human": "Read the fund's deals from the Deal Room MCP server.",
+  "description_for_model": "Retrieves the fund's deals (list_deals, get_deal, search_deals) from the Deal Room's Entra-secured MCP endpoint.",
+  "namespace": "dealroom",
+  "functions": [
+    { "name": "list_deals", "description": "Every deal as a compact summary (id, company, sector, stage, status, size, IC readiness, days-to-IC, thesis)." },
+    { "name": "get_deal", "description": "One deal as a bounded analyst view (key figures, diligence workstreams, memo/compliance status, top risks)." },
+    { "name": "search_deals", "description": "Keyword search across company / sector / thesis." }
+  ],
+  "runtimes": [
+    {
+      "type": "OpenApi",
+      "auth": {
+        "type": "OAuthPluginVault",
+        "reference_id": "<OAUTH_REGISTRATION_ID>"
+      },
+      "spec": {
+        "url": "deal-mcp-openapi.yaml"
+      },
+      "run_for_functions": ["list_deals", "get_deal", "search_deals"]
+    }
+  ]
+}
