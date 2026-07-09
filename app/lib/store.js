@@ -1812,6 +1812,26 @@ async function provisionDealChannel(deal) {
   }
 
   persistDeal(deal);
+  // Also persist the channel + workspace links through the etag-safe path so a
+  // concurrent mutateDeal (persona agents / UI / background sync) can't clobber
+  // them — this is what makes the channel→deal mapping (used by the in-channel
+  // bot) survive concurrent writes AND orchestrator redeploys.
+  try {
+    await mutateDeal(deal.id, (fresh) => {
+      fresh.teamsChannel = deal.teamsChannel;
+      if (deal.workspace) {
+        fresh.workspace = fresh.workspace || {};
+        const w = deal.workspace, fw = fresh.workspace;
+        fw.teamsUrl = w.teamsUrl; fw.teamsProvisioned = w.teamsProvisioned; fw.teamsChannelName = w.teamsChannelName;
+        fw.channels = w.channels; fw.channelsProvisioned = w.channelsProvisioned;
+        fw.sharePointUrl = w.sharePointUrl; fw.sharePointUrlResolved = w.sharePointUrlResolved; fw.sharePointProvisioned = w.sharePointProvisioned;
+        fw.folders = w.folders; fw.swimlanes = w.swimlanes;
+      }
+      return { event: 'teams-channel-persisted', detail: { channelId: channel.channelId, teamId: channel.teamId } };
+    });
+  } catch (err) {
+    logEvent(deal.id, 'teams-channel-persist-error', { error: String(err?.message || err).slice(0, 160) });
+  }
   logEvent(deal.id, 'teams-provisioned', { channel: channel.displayName, webUrl: channel.webUrl });
   return channel;
 }
@@ -1858,10 +1878,15 @@ export function dealForTeam(teamOrChannelId) {
   if (!teamOrChannelId) return null;
   const t = String(teamOrChannelId);
   const enc = encodeURIComponent(t);
-  // Channel id is unique per deal (deals now share one parent team), so match it
-  // first; then the workspace URL; then an UNAMBIGUOUS team id (team-per-deal fallback).
+  // A channel id (19:…@thread.tacv2) is unique per deal; a plain team/group GUID is
+  // NOT (all deals now share one parent team, and every deal's teamsUrl carries the
+  // same ?groupId=). So: match the per-deal channel id first, then the workspace URL
+  // BUT ONLY when the token is a channel-like id (never the shared group id — it
+  // appears in every deal's URL and would mis-resolve all channels to one deal),
+  // then an UNAMBIGUOUS team id (team-per-deal fallback).
+  const looksLikeChannel = /@thread|^19:/i.test(t);
   let d = deals.find((x) => (x.teamsChannel || {}).channelId === t);
-  if (!d) d = deals.find((x) => { const u = (x.workspace && x.workspace.teamsUrl) || ''; return u.includes(t) || u.includes(enc); });
+  if (!d && looksLikeChannel) d = deals.find((x) => { const u = (x.workspace && x.workspace.teamsUrl) || ''; return u.includes(t) || u.includes(enc); });
   if (!d) { const byTeam = deals.filter((x) => (x.teamsChannel || {}).teamId === t); if (byTeam.length === 1) d = byTeam[0]; }
   return d ? { dealId: d.id, company: d.company } : null;
 }

@@ -63,13 +63,16 @@ export function getConversationReferences() {
 }
 
 // ---- In-channel conversational agent ---------------------------------------
-// A deal channel ("Deal - <company>") maps to exactly one deal. The bot works out
-// WHICH deal from the channel's team, then relays messages to the shared deal
-// agent — which calls Microsoft Foundry with the APP'S MANAGED IDENTITY (SPN), so
-// there is NO user sign-in. The bot holds no data; it forwards to /api/deal-agent/chat.
+// A deal channel maps to exactly one deal. Because all deal channels now live in ONE
+// parent team, the CHANNEL id (19:…@thread.tacv2) is the only reliable discriminator —
+// the team/group id is shared by every deal. So we resolve by channel id FIRST and
+// never rely on the shared team/group id.
 function teamIdsFromActivity(activity) {
   const cd = activity.channelData || {};
-  const ids = [cd.team?.aadGroupId, cd.team?.id, cd.channel?.id, activity.conversation?.id];
+  // conversation.id for a channel message is "19:<thread>@thread.tacv2;messageid=…";
+  // strip the messageid suffix so it matches the stored channel id.
+  const convBase = String(activity.conversation?.id || '').split(';')[0] || '';
+  const ids = [cd.channel?.id, convBase, activity.conversation?.id, cd.team?.aadGroupId, cd.team?.id];
   return [...new Set(ids.filter(Boolean))];
 }
 
@@ -87,9 +90,35 @@ async function resolveDeal(activity) {
 }
 
 // Ask the deal agent (grounded in the deal, authenticated by the app's managed
-// identity — no user sign-in) and return its reply text.
+// identity — no user sign-in) and return its reply text. If the message names a
+// persona (AI MD, Retail MD, Supply Chain MD, Partner), route to that persona
+// agent WITH the resolved deal context so it answers for THIS channel's deal;
+// otherwise use the portfolio/deal analyst.
+const PERSONA_MATCHERS = [
+  { persona: 'ai-md', re: /\bai[\s-]?md\b|\btech(nology)?\b|\bai\s*(risk|readiness|dd|diligence|lever)/i },
+  { persona: 'retail-md', re: /\bretail[\s-]?md\b|\bcommercial\b/i },
+  { persona: 'supply-md', re: /\bsupply[\s-]?(chain)?[\s-]?md\b|\boperations?\b|\bsupply\s*chain\b/i },
+  { persona: 'partner', re: /\bpartner\b|\binvestment committee\b|\bgo\/?no[\s-]?go\b/i },
+];
+function personaFor(text) {
+  for (const m of PERSONA_MATCHERS) if (m.re.test(text)) return m.persona;
+  return null;
+}
+
 async function askAgent(message, deal) {
   const base = config.backend.url;
+  const persona = personaFor(message);
+  // Persona-scoped answer for this channel's deal (managed identity — no sign-in).
+  if (persona) {
+    try {
+      const r = await fetch(`${base}/api/persona-agents/${persona}/chat`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message, dealId: deal?.dealId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data?.reply) return data.reply;
+    } catch { /* fall through to the analyst */ }
+  }
   const body = deal?.dealId ? { message, dealId: deal.dealId, scope: 'deal' } : { message, scope: 'portfolio' };
   const r = await fetch(`${base}/api/deal-agent/chat`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
