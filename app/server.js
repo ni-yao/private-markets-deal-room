@@ -103,12 +103,24 @@ import { m365Configured, m365Connected, m365FilesScope } from './lib/m365/graph.
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 import { config, validateConfig } from './lib/config.js';
+import { accessFor, authorizePersona, authorizeDealAccess } from './lib/userPolicy.js';
 
 validateConfig({ strict: false });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+
+// RBAC trust seam: only honour a supplied requesting identity when the caller
+// proves it is the Teams bot (shared BOT_BACKEND_KEY). Otherwise the request is
+// treated as unidentified (DEFAULT_AGENT_ROLE) so a client can't spoof a role.
+const BOT_BACKEND_KEY = (process.env.BOT_BACKEND_KEY || '').trim();
+function requestingIdentity(req) {
+  const ru = req.body?.requestingUser;
+  if (!ru) return null;
+  if (BOT_BACKEND_KEY && req.headers['x-bot-key'] !== BOT_BACKEND_KEY) return null;
+  return { oid: ru.oid, upn: ru.upn, name: ru.name };
+}
 
 // ---- API ----
 const api = express.Router();
@@ -622,10 +634,38 @@ api.post('/persona-agents/:persona/chat', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'message required' });
   const dealId = req.body?.dealId ? String(req.body.dealId) : undefined;
   const previousResponseId = req.body?.previousResponseId ? String(req.body.previousResponseId) : undefined;
+  // ---- RBAC (requesting user) ----
+  const identity = requestingIdentity(req);
+  const access = accessFor(identity);
+  if (dealId) {
+    const d = getDeal(dealId);
+    const gate = authorizeDealAccess(identity, d?.stage || d?.stageName);
+    if (!gate.ok) return res.status(403).json({ reply: gate.reason, denied: true, role: access.role });
+  }
+  // Read-only users (analyst / member roles) never reach the write-capable persona
+  // agents — answer via the read-only deal analyst instead.
+  if (!access.canWrite) {
+    try {
+      const out = await chatDealAgent({ message, dealId, scope: dealId ? 'deal' : 'portfolio' });
+      return res.json({ ...out, role: access.role, readOnly: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'chat failed', detail: String(err?.message || err) });
+    }
+  }
+  // Authorise the requested persona for this user (downgrade to analyst if not).
+  const authz = authorizePersona(identity, req.params.persona);
+  if (!authz.ok) {
+    try {
+      const out = await chatDealAgent({ message, dealId, scope: dealId ? 'deal' : 'portfolio' });
+      return res.json({ reply: `${authz.reason}\n\n${out.reply || ''}`.trim(), downgraded: true, role: access.role });
+    } catch (err) {
+      return res.status(500).json({ error: 'chat failed', detail: String(err?.message || err) });
+    }
+  }
   try {
-    const out = await chatPersonaAgent({ persona: req.params.persona, message, dealId, previousResponseId });
+    const out = await chatPersonaAgent({ persona: authz.persona, message, dealId, previousResponseId });
     if (out?.error) return res.status(400).json(out);
-    res.json(out);
+    res.json({ ...out, role: access.role });
   } catch (err) {
     res.status(500).json({ error: 'persona-agent chat failed', detail: String(err?.message || err) });
   }
@@ -640,6 +680,13 @@ api.post('/deal-agent/chat', async (req, res) => {
   const dealId = req.body?.dealId ? String(req.body.dealId) : undefined;
   const scope = req.body?.scope === 'deal' || req.body?.scope === 'portfolio' ? req.body.scope : undefined;
   const previousResponseId = req.body?.previousResponseId ? String(req.body.previousResponseId) : undefined;
+  // ---- RBAC: gate Stage-2 deal access by the requesting user's role ----
+  const identity = requestingIdentity(req);
+  if (dealId) {
+    const d = getDeal(dealId);
+    const gate = authorizeDealAccess(identity, d?.stage || d?.stageName);
+    if (!gate.ok) return res.status(403).json({ reply: gate.reason, denied: true, role: gate.access.role });
+  }
   try {
     const out = await chatDealAgent({ message, dealId, scope, previousResponseId });
     if (out?.error) return res.status(400).json(out);

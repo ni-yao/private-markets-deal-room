@@ -143,38 +143,44 @@ const PERSONA_FRAMING = {
   partner: 'You are the Deal Partner / IC sponsor. Give a crisp go/no-go read and the IC conditions you would require.',
 };
 
-async function askAgent(message, deal) {
+// Shared trust key so the backend can trust the requesting user's identity we pass
+// (the Bot-Framework-authenticated activity.from). Without it the backend treats
+// the request as unidentified and applies the default (least) role.
+const BOT_BACKEND_KEY = process.env.BOT_BACKEND_KEY || '';
+async function callBackend(path, payload, user) {
   const base = config.backend.url;
+  const headers = { 'content-type': 'application/json' };
+  if (BOT_BACKEND_KEY) headers['x-bot-key'] = BOT_BACKEND_KEY;
+  const body = { ...payload };
+  if (user && (user.oid || user.name)) body.requestingUser = user;
+  const r = await fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  return { r, data };
+}
+
+async function askAgent(message, deal, user) {
   const persona = personaFor(message);
-  // Orchestration: route a persona-intent request (AI MD / Retail MD / Supply MD /
-  // Partner) to the MATCHING persona agent — which performs reads AND its lane's
-  // governed WRITE actions (record findings/contributions, gate, IC) — scoped to
-  // this channel's deal. Everything else goes to the deal analyst. The Deal Room
-  // bot stays the single interface; the specialised agents still do the work.
+  // Orchestration: route a persona-intent request to the MATCHING persona agent,
+  // which the backend gates by the REQUESTING USER's role (RBAC) before doing any
+  // lane-scoped write; everything else goes to the deal analyst. The Deal Room bot
+  // stays the single interface; the specialised agents still do the work.
   if (persona) {
     try {
-      const r = await fetch(`${base}/api/persona-agents/${persona}/chat`, {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ message, dealId: deal?.dealId }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (r.ok && data?.reply) { console.log(`[bot] routed to persona ${persona}`); return data.reply; }
+      const { r, data } = await callBackend(`/api/persona-agents/${persona}/chat`, { message, dealId: deal?.dealId }, user);
+      if (data?.denied) return data.reply;                       // RBAC blocked (e.g. Stage-2 access)
+      if (r.ok && data?.reply) { console.log(`[bot] persona ${persona} (role ${data.role || '?'}${data.downgraded ? ', downgraded' : ''}${data.readOnly ? ', read-only' : ''})`); return data.reply; }
       console.log(`[bot] persona ${persona} unavailable (HTTP ${r.status}) — falling back to analyst`);
     } catch (e) { console.log(`[bot] persona ${persona} call failed — falling back to analyst`); }
-    // Resilient fallback: the analyst with the persona's framing (deal-grounded read).
+    // Resilient fallback: the analyst with the persona's framing (still RBAC-gated).
     const framing = PERSONA_FRAMING[persona] || '';
     const fmsg = framing ? `${framing}\n\nQuestion: ${message}` : message;
-    const fbody = deal?.dealId ? { message: fmsg, dealId: deal.dealId, scope: 'deal' } : { message: fmsg, scope: 'portfolio' };
-    const fr = await fetch(`${base}/api/deal-agent/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fbody) });
-    const fd = await fr.json().catch(() => ({}));
-    return fd?.reply || fd?.error || 'I don’t have an answer right now.';
+    const { data } = await callBackend('/api/deal-agent/chat', deal?.dealId ? { message: fmsg, dealId: deal.dealId, scope: 'deal' } : { message: fmsg, scope: 'portfolio' }, user);
+    if (data?.denied) return data.reply;
+    return data?.reply || data?.error || 'I don’t have an answer right now.';
   }
-  // No persona intent — the deal analyst answers, grounded in this channel's deal.
-  const body = deal?.dealId ? { message, dealId: deal.dealId, scope: 'deal' } : { message, scope: 'portfolio' };
-  const r = await fetch(`${base}/api/deal-agent/chat`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-  });
-  const data = await r.json().catch(() => ({}));
+  // No persona intent — the deal analyst answers, RBAC-gated for Stage-2 access.
+  const { data } = await callBackend('/api/deal-agent/chat', deal?.dealId ? { message, dealId: deal.dealId, scope: 'deal' } : { message, scope: 'portfolio' }, user);
+  if (data?.denied) return data.reply;
   return data?.reply || data?.error || 'I don’t have an answer right now.';
 }
 
@@ -201,9 +207,11 @@ async function handleDealMessage(context, TurnContext) {
       : 'Ask me about this deal — e.g. “What are the top risks?”');
     return;
   }
+  // The requesting user's Bot-Framework-authenticated identity drives RBAC server-side.
+  const user = { oid: context.activity.from?.aadObjectId, name: context.activity.from?.name };
   try {
     await context.sendActivities([{ type: 'typing' }]);
-    const reply = await askAgent(text, deal);
+    const reply = await askAgent(text, deal, user);
     await context.sendActivity(reply);
   } catch (err) {
     await context.sendActivity(`The deal agent hit an error — ${String(err?.message || err).slice(0, 140)}`);
