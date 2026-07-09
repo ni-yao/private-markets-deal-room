@@ -62,6 +62,7 @@ import {
   launchDeal,
   getDealArtifact,
   ensureDealTeamsChannel,
+  dealForTeam,
   getMdOptions,
   assignSwimlane,
   recordContribution,
@@ -240,6 +241,13 @@ api.post('/deals/:id/teams/ensure', async (req, res) => {
   const r = await ensureDealTeamsChannel(req.params.id);
   if (r.error === 'not-found') return res.status(404).json(r);
   if (r.error === 'not-launched') return res.status(409).json(r);
+  res.json(r);
+});
+// Resolve the deal that owns a given Teams team/channel id — used by the
+// in-channel conversational bot to map a message to its deal.
+api.get('/deals/resolve-team/:teamId', (req, res) => {
+  const r = dealForTeam(req.params.teamId);
+  if (!r) return res.status(404).json({ error: 'no-deal-for-team' });
   res.json(r);
 });
 api.patch('/deals/:id/swimlanes/:lane', async (req, res) => {

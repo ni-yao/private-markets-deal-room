@@ -1836,6 +1836,22 @@ export async function ensureDealTeamsChannel(id) {
   }
 }
 
+// Resolve the deal whose provisioned Teams team matches the given id (AAD group
+// id, team id or channel/thread id) — used by the in-channel Teams bot to map a
+// conversation to its deal. A channel id (19:…@thread.tacv2) is unique per deal;
+// a plain team/group GUID may be shared across deals, so only match the workspace
+// URL for channel-like tokens and require an unambiguous team match otherwise.
+export function dealForTeam(teamOrChannelId) {
+  if (!teamOrChannelId) return null;
+  const t = String(teamOrChannelId);
+  const enc = encodeURIComponent(t);
+  const looksLikeChannel = /@thread|^19:/i.test(t);
+  let d = deals.find((x) => (x.teamsChannel || {}).channelId === t);
+  if (!d && looksLikeChannel) d = deals.find((x) => { const u = (x.workspace && x.workspace.teamsUrl) || ''; return u.includes(t) || u.includes(enc); });
+  if (!d) { const byTeam = deals.filter((x) => (x.teamsChannel || {}).teamId === t); if (byTeam.length === 1) d = byTeam[0]; }
+  return d ? { dealId: d.id, company: d.company } : null;
+}
+
 export function getMdOptions() {
   return MD_OPTIONS;
 }

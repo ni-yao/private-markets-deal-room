@@ -1,0 +1,6 @@
+node_modules
+tab/node_modules
+tab/dist
+.env
+*.log
+.git

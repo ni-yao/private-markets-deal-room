@@ -1,0 +1,6 @@
+node_modules/
+tab/dist/
+tab/node_modules/
+.env
+*.log
+package/
