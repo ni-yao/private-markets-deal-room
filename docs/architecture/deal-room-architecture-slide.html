@@ -70,7 +70,7 @@
   <div class="zone" style="left:28px;top:92px;width:214px;height:140px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Identity</div></div>
   <div class="zone" style="left:28px;top:244px;width:214px;height:140px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">External · M365</div></div>
   <div class="zone" style="left:28px;top:396px;width:214px;height:272px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Market data · MCP</div></div>
-  <div class="zone" style="left:300px;top:92px;width:300px;height:104px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Channels</div></div>
+  <div class="zone" style="left:300px;top:92px;width:300px;height:104px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Frontend</div></div>
   <div class="zone" style="left:300px;top:236px;width:300px;height:300px;background:var(--appbg);border-color:var(--appedge)"><div class="zh" style="color:var(--app)">Application</div></div>
   <div class="zone" style="left:828px;top:92px;width:244px;height:258px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Microsoft Foundry</div></div>
   <div class="zone" style="left:258px;top:566px;width:632px;height:126px;background:var(--databg);border-color:var(--dataedge)"><div class="zh" style="color:var(--data)">Data &amp; Documents</div></div>
@@ -169,11 +169,11 @@ requestAnimationFrame(()=>{
   wire([pt('web','b',0.5),{x:pt('web','b').x,y:268},{x:pt('ca','t',0.35).x,y:268},pt('ca','t',0.35)],{label:'HTTPS',lx:pt('web','b').x,ly:236});
   wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:236},{x:800,y:236},{x:800,y:pt('agents','l',0.5).y},pt('agents','l',0.5)],{label:'invoke',lx:660,ly:236});
 
-  // ===== WEST: identity + external -> hub (short L inputs, distinct lanes/entries) =====
-  wire([pt('entra','r'),{x:300,y:pt('entra','r').y},{x:300,y:pt('ca','l',0.13).y},pt('ca','l',0.13)],{ctrl:true,label:'auth',lx:264,ly:pt('entra','r').y});
-  wire([pt('mi','r'),{x:288,y:pt('mi','r').y},{x:288,y:pt('ca','l',0.79).y},pt('ca','l',0.79)],{ctrl:true,label:'RBAC',lx:257,ly:pt('mi','r').y});
-  wire([pt('edgar','r'),{x:312,y:pt('edgar','r').y},{x:312,y:pt('ca','l',0.52).y},pt('ca','l',0.52)],{label:'filings',lx:270,ly:pt('edgar','r').y});
-  wire([pt('m365','r'),{x:324,y:pt('m365','r').y},{x:324,y:pt('ca','l',0.33).y},pt('ca','l',0.33)],{label:'Graph',lx:280,ly:pt('m365','r').y});
+  // ===== WEST: identity + external -> hub (nested inputs, ordered top->bottom, no crossings) =====
+  wire([pt('entra','r'),{x:298,y:pt('entra','r').y},{x:298,y:pt('ca','l',0.14).y},pt('ca','l',0.14)],{ctrl:true,label:'auth',lx:252,ly:pt('entra','r').y});
+  wire([pt('mi','r'),{x:290,y:pt('mi','r').y},{x:290,y:pt('ca','l',0.32).y},pt('ca','l',0.32)],{ctrl:true,label:'RBAC',lx:252,ly:pt('mi','r').y});
+  wire([pt('edgar','r'),{x:284,y:pt('edgar','r').y},{x:284,y:pt('ca','l',0.54).y},pt('ca','l',0.54)],{label:'filings',lx:252,ly:pt('edgar','r').y});
+  wire([pt('m365','r'),{x:278,y:pt('m365','r').y},{x:278,y:pt('ca','l',0.72).y},pt('ca','l',0.72)],{label:'Graph',lx:252,ly:pt('m365','r').y});
 
   // ===== WEST-BOTTOM: app <-> market-data MCP providers (compact OAuth MCP rail) =====
   const mcpX=252;
