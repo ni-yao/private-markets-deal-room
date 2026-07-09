@@ -41,6 +41,7 @@
     border:1px solid #a9c8f2;border-radius:9px;padding:1px 7px;font-family:Consolas,monospace}
   .n.stack{box-shadow:3px 3px 0 -1px var(--card),3px 3px 0 0 var(--cardedge),6px 6px 0 -1px var(--card),6px 6px 0 0 var(--cardedge)}
   .n.gw{background:#eef3fb;border-color:var(--app)}
+  .n.sm{height:38px;padding:0 9px} .n.sm img{width:19px;height:19px} .n.sm b{font-size:11px}
   .n.t-ai{border-left:3px solid var(--ai)} .n.t-data{border-left:3px solid var(--data)}
   .n.t-ext{border-left:3px solid var(--ext)} .n.t-chan{border-left:3px solid var(--chan)}
   .n.t-obs{border-left:3px solid var(--obs)} .n.t-app{border-left:3px solid var(--app)}
@@ -66,64 +67,64 @@
   </div>
 
   <!-- ZONES -->
-  <div class="zone" style="left:404px;top:92px;width:316px;height:104px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Channels</div></div>
-  <div class="zone" style="left:404px;top:238px;width:316px;height:300px;background:var(--appbg);border-color:var(--appedge)"><div class="zh" style="color:var(--app)">Application</div></div>
-  <div class="zone" style="left:28px;top:92px;width:210px;height:158px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Identity</div></div>
-  <div class="zone" style="left:28px;top:274px;width:210px;height:420px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Market data · MCP</div></div>
-  <div class="zone" style="left:752px;top:168px;width:250px;height:340px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Microsoft Foundry</div></div>
-  <div class="zone" style="left:238px;top:566px;width:764px;height:128px;background:var(--databg);border-color:var(--dataedge)"><div class="zh" style="color:var(--data)">Data &amp; Documents</div></div>
-  <div class="zone" style="left:1030px;top:92px;width:222px;height:158px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">External · M365</div></div>
-  <div class="zone" style="left:1030px;top:474px;width:222px;height:220px;background:var(--obsbg);border-color:var(--obsedge)"><div class="zh" style="color:var(--obs)">Observe</div></div>
+  <div class="zone" style="left:28px;top:92px;width:214px;height:140px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Identity</div></div>
+  <div class="zone" style="left:28px;top:244px;width:214px;height:140px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">External · M365</div></div>
+  <div class="zone" style="left:28px;top:396px;width:214px;height:272px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Market data · MCP</div></div>
+  <div class="zone" style="left:300px;top:92px;width:300px;height:104px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Channels</div></div>
+  <div class="zone" style="left:300px;top:236px;width:300px;height:300px;background:var(--appbg);border-color:var(--appedge)"><div class="zh" style="color:var(--app)">Application</div></div>
+  <div class="zone" style="left:800px;top:296px;width:244px;height:252px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Microsoft Foundry</div></div>
+  <div class="zone" style="left:258px;top:566px;width:632px;height:126px;background:var(--databg);border-color:var(--dataedge)"><div class="zh" style="color:var(--data)">Data &amp; Documents</div></div>
+  <div class="zone" style="left:1064px;top:398px;width:196px;height:240px;background:var(--obsbg);border-color:var(--obsedge)"><div class="zh" style="color:var(--obs)">Observe</div></div>
 
   <svg id="wires"></svg>
 
-  <!-- CHANNELS (top) -->
-  <div class="n t-chan" id="web"   style="left:420px;top:126px;width:138px"><img src="icons/web.svg"><b>Web App</b></div>
-  <div class="n t-chan" id="teams" style="left:578px;top:126px;width:138px"><img src="icons/teams.svg"><b>Teams</b></div>
+  <!-- IDENTITY (left, top) -->
+  <div class="n t-ext" id="entra" style="left:44px;top:116px;width:182px"><img src="icons/entra.svg"><b>Entra ID</b></div>
+  <div class="n t-ext" id="mi"    style="left:44px;top:174px;width:182px"><img src="icons/managedidentity.svg"><b>Managed ID</b></div>
+
+  <!-- EXTERNAL · M365 (left, middle) -->
+  <div class="n t-ext" id="edgar" style="left:44px;top:268px;width:182px"><img src="icons/edgar.svg"><b>SEC EDGAR</b></div>
+  <div class="n t-ext" id="m365"  style="left:44px;top:326px;width:182px"><img src="icons/sharepoint.svg"><b>Microsoft 365</b></div>
+
+  <!-- MARKET-DATA MCP PROVIDERS (left, bottom, compact) -->
+  <div class="n sm t-ext" id="morningstar" style="left:44px;top:420px;width:182px"><img src="icons/morningstar.svg"><b>Morningstar</b></div>
+  <div class="n sm t-ext" id="pitchbook"   style="left:44px;top:468px;width:182px"><img src="icons/pitchbook.svg"><b>PitchBook</b></div>
+  <div class="n sm t-ext" id="moodys"      style="left:44px;top:516px;width:182px"><img src="icons/moodys.svg"><b>Moody&#39;s</b></div>
+  <div class="n sm t-ext" id="factset"     style="left:44px;top:564px;width:182px"><img src="icons/factset.svg"><b>FactSet</b></div>
+  <div class="n sm t-ext" id="capitaliq"   style="left:44px;top:612px;width:182px"><img src="icons/capitaliq.svg"><b>Capital IQ</b></div>
+
+  <!-- CHANNELS (center top) -->
+  <div class="n t-chan" id="web"   style="left:320px;top:124px;width:124px"><img src="icons/web.svg"><b>Web App</b></div>
+  <div class="n t-chan" id="teams" style="left:456px;top:124px;width:124px"><img src="icons/teams.svg"><b>Teams</b></div>
 
   <!-- APPLICATION HUB (center) -->
-  <div class="n hub" id="ca" style="left:452px;top:296px;width:222px">
+  <div class="n hub" id="ca" style="left:336px;top:295px;width:220px">
     <div class="row"><img src="icons/containerapps.svg"><b>Container Apps</b></div>
     <div class="eps"><i>API</i><i>SPA</i><i>MCP server</i></div>
   </div>
 
-  <!-- IDENTITY (left, top) -->
-  <div class="n t-ext" id="entra" style="left:44px;top:120px;width:178px"><img src="icons/entra.svg"><b>Entra ID</b></div>
-  <div class="n t-ext" id="mi"    style="left:44px;top:188px;width:178px"><img src="icons/managedidentity.svg"><b>Managed ID</b></div>
+  <!-- API MANAGEMENT — AI gateway, horizontally between Container Apps and Foundry -->
+  <div class="n gw t-app" id="apim" style="left:616px;top:330px;width:160px"><img src="icons/apim.svg"><b>API Management</b></div>
 
-  <!-- MARKET-DATA MCP PROVIDERS (left, bottom) -->
-  <div class="n t-ext" id="morningstar" style="left:44px;top:310px;width:186px"><img src="icons/morningstar.svg"><b>Morningstar</b></div>
-  <div class="n t-ext" id="pitchbook"   style="left:44px;top:378px;width:186px"><img src="icons/pitchbook.svg"><b>PitchBook</b></div>
-  <div class="n t-ext" id="moodys"      style="left:44px;top:446px;width:186px"><img src="icons/moodys.svg"><b>Moody&#39;s</b></div>
-  <div class="n t-ext" id="factset"     style="left:44px;top:514px;width:186px"><img src="icons/factset.svg"><b>FactSet</b></div>
-  <div class="n t-ext" id="capitaliq"   style="left:44px;top:582px;width:186px"><img src="icons/capitaliq.svg"><b>Capital IQ</b></div>
+  <!-- AI · MICROSOFT FOUNDRY (right) -->
+  <div class="n t-ai" id="foundry"      style="left:812px;top:326px;width:224px"><img src="icons/cognitive.svg"><b>Microsoft Foundry</b></div>
+  <div class="n t-ai stack" id="agents" style="left:812px;top:384px;width:224px"><img src="icons/cognitive.svg"><b>Persona Agents ×5</b></div>
+  <div class="n t-ai" id="bing"         style="left:812px;top:442px;width:224px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
+  <div class="n t-ai" id="aisvcs"       style="left:812px;top:500px;width:224px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
 
-  <!-- API MANAGEMENT — AI gateway, in front of Foundry (not inside it) -->
-  <div class="n gw t-app" id="apim" style="left:768px;top:110px;width:218px"><img src="icons/apim.svg"><b>API Management</b></div>
+  <!-- DATA & DOCUMENTS (bottom band, Fabric leftmost) -->
+  <div class="n t-data" id="fabric"  style="left:274px;top:600px;width:140px"><img src="icons/fabric.svg"><b>Fabric</b></div>
+  <div class="n t-data" id="cosmos"  style="left:424px;top:600px;width:140px"><img src="icons/cosmos.svg"><b>Cosmos DB</b></div>
+  <div class="n t-data" id="search"  style="left:574px;top:600px;width:140px"><img src="icons/search.svg"><b>AI Search</b></div>
+  <div class="n t-data" id="storage" style="left:724px;top:600px;width:140px"><img src="icons/storage.svg"><b>Storage</b></div>
 
-  <!-- AI · MICROSOFT FOUNDRY -->
-  <div class="n t-ai" id="foundry"      style="left:768px;top:206px;width:218px"><img src="icons/cognitive.svg"><b>Microsoft Foundry</b></div>
-  <div class="n t-ai stack" id="agents" style="left:768px;top:280px;width:218px"><img src="icons/cognitive.svg"><b>Persona Agents ×5</b></div>
-  <div class="n t-ai" id="bing"         style="left:768px;top:378px;width:218px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
-  <div class="n t-ai" id="aisvcs"       style="left:768px;top:452px;width:218px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
+  <!-- FUNCTIONS (event handler, right of the data band) -->
+  <div class="n t-app" id="func" style="left:902px;top:590px;width:150px"><img src="icons/function.svg"><b>Functions</b></div>
 
-  <!-- DATA & DOCUMENTS (bottom band) -->
-  <div class="n t-data" id="cosmos"  style="left:288px;top:600px;width:136px"><img src="icons/cosmos.svg"><b>Cosmos DB</b></div>
-  <div class="n t-data" id="search"  style="left:446px;top:600px;width:136px"><img src="icons/search.svg"><b>AI Search</b></div>
-  <div class="n t-data" id="fabric"  style="left:604px;top:600px;width:136px"><img src="icons/fabric.svg"><b>Fabric</b></div>
-  <div class="n t-data" id="storage" style="left:762px;top:600px;width:136px"><img src="icons/storage.svg"><b>Storage</b></div>
-
-  <!-- FUNCTIONS (event handler) -->
-  <div class="n t-app" id="func" style="left:820px;top:512px;width:172px"><img src="icons/function.svg"><b>Functions</b></div>
-
-  <!-- EXTERNAL · M365 (top-right) -->
-  <div class="n t-ext" id="edgar" style="left:1048px;top:126px;width:186px"><img src="icons/edgar.svg"><b>SEC EDGAR</b></div>
-  <div class="n t-ext" id="m365"  style="left:1048px;top:196px;width:186px"><img src="icons/sharepoint.svg"><b>Microsoft 365</b></div>
-
-  <!-- OBSERVE (bottom-right) -->
-  <div class="n t-obs" id="appins" style="left:1048px;top:512px;width:186px"><img src="icons/appinsights.svg"><b>App Insights</b></div>
-  <div class="n t-obs" id="law"    style="left:1048px;top:574px;width:186px"><img src="icons/loganalytics.svg"><b>Log Analytics</b></div>
-  <div class="n t-obs" id="mon"    style="left:1048px;top:636px;width:186px"><img src="icons/monitor.svg"><b>Azure Monitor</b></div>
+  <!-- OBSERVE (right) -->
+  <div class="n t-obs" id="appins" style="left:1080px;top:430px;width:164px"><img src="icons/appinsights.svg"><b>App Insights</b></div>
+  <div class="n t-obs" id="law"    style="left:1080px;top:494px;width:164px"><img src="icons/loganalytics.svg"><b>Log Analytics</b></div>
+  <div class="n t-obs" id="mon"    style="left:1080px;top:558px;width:164px"><img src="icons/monitor.svg"><b>Azure Monitor</b></div>
 </div>
 
 <script>
@@ -165,50 +166,43 @@ function wire(points,opt={}){line(points,opt); if(opt.label){const i=Math.max(1,
 
 requestAnimationFrame(()=>{
   // ===== NORTH: channels -> hub / agents =====
-  wire([pt('web','b',0.5),{x:pt('web','b').x,y:270},{x:pt('ca','t',0.30).x,y:270},pt('ca','t',0.30)],{label:'HTTPS',lx:pt('web','b').x,ly:212});
-  wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:222},{x:738,y:222},{x:738,y:pt('agents','l',0.34).y},pt('agents','l',0.34)],{label:'invoke',lx:670,ly:222});
+  wire([pt('web','b',0.5),{x:pt('web','b').x,y:268},{x:pt('ca','t',0.35).x,y:268},pt('ca','t',0.35)],{label:'HTTPS',lx:pt('web','b').x,ly:236});
+  wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:232},{x:788,y:232},{x:788,y:pt('agents','l',0.5).y},pt('agents','l',0.5)],{label:'invoke',lx:655,ly:232});
 
-  // ===== WEST-TOP: identity -> hub (dashed) =====
-  wire([pt('entra','r'),{x:426,y:pt('entra','r').y},{x:426,y:pt('ca','l',0.24).y},pt('ca','l',0.24)],{ctrl:true,label:'auth',lx:322,ly:pt('entra','r').y});
-  wire([pt('mi','r'),{x:426,y:pt('mi','r').y},{x:426,y:pt('ca','l',0.80).y},pt('ca','l',0.80)],{ctrl:true,label:'RBAC',lx:322,ly:pt('mi','r').y});
+  // ===== WEST: identity + external -> hub (short L inputs, distinct lanes/entries) =====
+  wire([pt('entra','r'),{x:300,y:pt('entra','r').y},{x:300,y:pt('ca','l',0.13).y},pt('ca','l',0.13)],{ctrl:true,label:'auth',lx:264,ly:pt('entra','r').y});
+  wire([pt('mi','r'),{x:288,y:pt('mi','r').y},{x:288,y:pt('ca','l',0.79).y},pt('ca','l',0.79)],{ctrl:true,label:'RBAC',lx:257,ly:pt('mi','r').y});
+  wire([pt('edgar','r'),{x:312,y:pt('edgar','r').y},{x:312,y:pt('ca','l',0.52).y},pt('ca','l',0.52)],{label:'filings',lx:270,ly:pt('edgar','r').y});
+  wire([pt('m365','r'),{x:324,y:pt('m365','r').y},{x:324,y:pt('ca','l',0.33).y},pt('ca','l',0.33)],{label:'Graph',lx:280,ly:pt('m365','r').y});
 
-  // ===== WEST-BOTTOM: app <-> market-data MCP providers (OAuth MCP bus) =====
-  const mcpX=256;
-  // feeder from the hub to the MCP rail
-  line([pt('ca','l',0.95),{x:mcpX,y:pt('ca','l',0.95).y}]);
-  tag(360,pt('ca','l',0.95).y,'OAuth MCP');
-  // vertical rail spanning the five providers, then a short tap into each (app calls out)
+  // ===== WEST-BOTTOM: app <-> market-data MCP providers (compact OAuth MCP rail) =====
+  const mcpX=252;
+  line([pt('ca','l',0.94),{x:mcpX,y:pt('ca','l',0.94).y}]);
+  tag(296,pt('ca','l',0.94).y,'OAuth MCP');
   const provs=['morningstar','pitchbook','moodys','factset','capitaliq'];
-  const railTop=pt('morningstar','l').y, railBot=pt('capitaliq','l').y;
-  line([{x:mcpX,y:railTop},{x:mcpX,y:railBot}],{arrow:false});
+  line([{x:mcpX,y:pt('ca','l',0.94).y},{x:mcpX,y:pt('capitaliq','r').y}],{arrow:false});
   provs.forEach(id=>{const p=pt(id,'r'); line([{x:mcpX,y:p.y},p]);});
 
-  // ===== EAST: hub -> APIM (AI gateway) -> Foundry -> agents; agents -> hub (MCP); hub -> AI Services =====
-  wire([pt('ca','r',0.12),{x:730,y:pt('ca','r',0.12).y},{x:730,y:pt('apim','l').y},pt('apim','l')],{label:'AI gateway',lx:704,ly:190});
-  wire([pt('apim','b',0.5),pt('foundry','t',0.5)],{label:'route',lx:928,ly:198});
-  wire([pt('foundry','b',0.5),pt('agents','t',0.5)],{label:'models',lx:915,ly:267});
-  wire([pt('agents','l',0.66),{x:744,y:pt('agents','l',0.66).y},{x:744,y:pt('ca','r',0.84).y},pt('ca','r',0.84)],{label:'MCP tools',lx:710,ly:360});
-  wire([pt('ca','r',0.5),{x:724,y:pt('ca','r',0.5).y},{x:724,y:pt('aisvcs','l').y},pt('aisvcs','l')],{label:'extract · safety',lx:714,ly:436});
-  wire([pt('agents','b',0.5),pt('bing','t',0.5)],{label:'news',lx:902,ly:353});
+  // ===== EAST: horizontal flow  Container Apps -> API Management -> Microsoft Foundry -> agents =====
+  wire([pt('ca','r',0.5),pt('apim','l',0.5)],{label:'AI gateway',lx:586,ly:338});
+  wire([pt('apim','r',0.5),pt('foundry','l',0.5)],{label:'route',lx:794,ly:316});
+  wire([pt('foundry','b',0.5),pt('agents','t',0.5)],{});
+  wire([pt('agents','l',0.62),{x:588,y:pt('agents','l',0.62).y},{x:588,y:pt('ca','r',0.86).y},pt('ca','r',0.86)],{label:'MCP tools',lx:690,ly:428});
+  wire([pt('ca','r',0.66),{x:598,y:pt('ca','r',0.66).y},{x:598,y:pt('aisvcs','l').y},pt('aisvcs','l')],{label:'extract · safety',lx:690,ly:520});
+  wire([pt('agents','b',0.5),pt('bing','t',0.5)],{});
 
-  // ===== SOUTH: hub -> data (single feeder onto a bus, short taps) =====
-  const busY=584;
+  // ===== SOUTH: hub -> data (single feeder onto a bus, short taps; Fabric leftmost) =====
+  const busY=560;
   line([pt('ca','b',0.5),{x:pt('ca','b').x,y:busY}]);
-  tag(pt('ca','b').x,548,'reads · docs · events');
-  line([{x:356,y:busY},{x:832,y:busY}],{arrow:false});
-  ['cosmos','search','fabric','storage'].forEach(id=>{const b=pt(id,'t',0.5);line([{x:b.x,y:busY},b]);});
+  tag(pt('ca','b').x,540,'reads · docs · events');
+  line([{x:pt('fabric','t').x,y:busY},{x:pt('storage','t').x,y:busY}],{arrow:false});
+  ['fabric','cosmos','search','storage'].forEach(id=>{const b=pt(id,'t',0.5);line([{x:b.x,y:busY},b]);});
 
-  // ===== product-to-product =====
-  // app -> Functions (deal events) ; Functions -> telemetry
-  wire([pt('ca','r',0.92),{x:712,y:pt('ca','r',0.92).y},{x:712,y:536},{x:pt('func','l').x,y:536},pt('func','l')],{label:'events',lx:766,ly:536});
-  wire([pt('edgar','l'),{x:1020,y:pt('edgar','l').y},{x:1020,y:678},{x:pt('fabric','b').x,y:678},pt('fabric','b',0.5)],{label:'archive',lx:1020,ly:470});
-
-  // ===== NORTH-EAST: single grouped spoke, app -> external systems (top channel) =====
-  wire([pt('ca','t',0.72),{x:728,y:pt('ca','t',0.72).y},{x:728,y:80},{x:1030,y:80},{x:1030,y:pt('edgar','l',0.5).y},pt('edgar','l')],{});
-  tag(884,72,'SEC filings · M365 Graph');
+  // ===== app -> Functions (deal events), in the clear channel below the AI zone =====
+  wire([pt('ca','b',0.82),{x:pt('ca','b',0.82).x,y:552},{x:pt('func','t').x,y:552},pt('func','t')],{label:'events',lx:748,ly:552});
 
   // ===== SOUTH-EAST: observability (telemetry from Functions, then chain) =====
-  wire([pt('func','r',0.5),{x:1020,y:pt('func','r',0.5).y},{x:1020,y:pt('appins','l').y},pt('appins','l')],{ctrl:true,label:'telemetry',lx:1019,ly:536});
+  wire([pt('func','r',0.5),{x:1060,y:pt('func','r',0.5).y},{x:1060,y:pt('appins','l').y},pt('appins','l')],{ctrl:true,label:'telemetry',lx:1052,ly:578});
   wire([pt('appins','b',0.5),pt('law','t',0.5)],{ctrl:true});
   wire([pt('law','b',0.5),pt('mon','t',0.5)],{ctrl:true});
 });
