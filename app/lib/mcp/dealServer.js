@@ -79,7 +79,7 @@ export function buildDealMcpServer(auth = { mode: 'disabled' }) {
       title: 'Get deal', description: TOOL_DESCRIPTIONS.get_deal,
       inputSchema: {
         deal_id: z.string().describe('The deal id (from list_deals or search_deals).'),
-        sections: z.array(z.enum(DEAL_SECTIONS)).optional().describe('Optional subset: summary, financials, workstreams, memo, compliance, risks, activity.')
+        sections: z.array(z.string()).optional().describe('Optional subset: summary, financials, workstreams, memo, compliance, risks, activity. Unknown values are ignored.')
       }
     },
     async ({ deal_id, sections }) => toContent(dispatchTool('get_deal', { deal_id, sections }, { scope: 'portfolio' })));

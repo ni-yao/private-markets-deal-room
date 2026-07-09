@@ -55,10 +55,29 @@ export function summaryFor(id) {
 }
 
 // Bounded "analyst view" of one deal. `sections` narrows what is returned.
+// Tolerant of unknown / aliased section names (agents sometimes emit e.g.
+// "keyFigures") so a minor schema drift never hard-fails the call.
+const SECTION_ALIAS = {
+  keyfigures: 'financials', figures: 'financials', financial: 'financials', financials: 'financials',
+  overview: 'summary', summary: 'summary', thesis: 'summary',
+  diligence: 'workstreams', workstream: 'workstreams', workstreams: 'workstreams', lanes: 'workstreams',
+  findings: 'risks', risk: 'risks', risks: 'risks',
+  compliance: 'compliance', memo: 'memo', activity: 'activity'
+};
+function normalizeSections(sections) {
+  if (!Array.isArray(sections) || !sections.length) return DEFAULT_SECTIONS;
+  const out = [];
+  for (const s of sections) {
+    const k = String(s).toLowerCase().replace(/[^a-z]/g, '');
+    const mapped = SECTION_ALIAS[k] || (DEAL_SECTIONS.includes(k) ? k : null);
+    if (mapped && !out.includes(mapped)) out.push(mapped);
+  }
+  return out.length ? out : DEFAULT_SECTIONS;
+}
 export function dealAnalystView(id, sections) {
   const d = getDeal(id);
   if (!d) return { error: 'deal-not-found', deal_id: id };
-  const want = new Set(Array.isArray(sections) && sections.length ? sections : DEFAULT_SECTIONS);
+  const want = new Set(normalizeSections(sections));
   const view = { id: d.id, company: d.company };
 
   if (want.has('summary')) {

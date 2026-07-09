@@ -146,12 +146,31 @@ const PERSONA_FRAMING = {
 async function askAgent(message, deal) {
   const base = config.backend.url;
   const persona = personaFor(message);
-  // Route persona-named questions to the deal ANALYST with a persona framing (the
-  // analyst tool path is reliable; the standalone persona agents currently fail a
-  // get_deal tool validation). The answer stays deal-grounded AND persona-flavored.
-  const framing = persona ? PERSONA_FRAMING[persona] : '';
-  const msg = framing ? `${framing}\n\nQuestion: ${message}` : message;
-  const body = deal?.dealId ? { message: msg, dealId: deal.dealId, scope: 'deal' } : { message: msg, scope: 'portfolio' };
+  // Orchestration: route a persona-intent request (AI MD / Retail MD / Supply MD /
+  // Partner) to the MATCHING persona agent — which performs reads AND its lane's
+  // governed WRITE actions (record findings/contributions, gate, IC) — scoped to
+  // this channel's deal. Everything else goes to the deal analyst. The Deal Room
+  // bot stays the single interface; the specialised agents still do the work.
+  if (persona) {
+    try {
+      const r = await fetch(`${base}/api/persona-agents/${persona}/chat`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message, dealId: deal?.dealId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data?.reply) { console.log(`[bot] routed to persona ${persona}`); return data.reply; }
+      console.log(`[bot] persona ${persona} unavailable (HTTP ${r.status}) — falling back to analyst`);
+    } catch (e) { console.log(`[bot] persona ${persona} call failed — falling back to analyst`); }
+    // Resilient fallback: the analyst with the persona's framing (deal-grounded read).
+    const framing = PERSONA_FRAMING[persona] || '';
+    const fmsg = framing ? `${framing}\n\nQuestion: ${message}` : message;
+    const fbody = deal?.dealId ? { message: fmsg, dealId: deal.dealId, scope: 'deal' } : { message: fmsg, scope: 'portfolio' };
+    const fr = await fetch(`${base}/api/deal-agent/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(fbody) });
+    const fd = await fr.json().catch(() => ({}));
+    return fd?.reply || fd?.error || 'I don’t have an answer right now.';
+  }
+  // No persona intent — the deal analyst answers, grounded in this channel's deal.
+  const body = deal?.dealId ? { message, dealId: deal.dealId, scope: 'deal' } : { message, scope: 'portfolio' };
   const r = await fetch(`${base}/api/deal-agent/chat`, {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
