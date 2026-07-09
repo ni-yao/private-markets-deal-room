@@ -129,6 +129,33 @@ param teamsImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:
 @description('Port the Teams-interface container listens on.')
 param teamsTargetPort int = 8090
 
+@description('Orchestrator replica floor/ceiling. Keep both = 1: the shared backend holds the M365 delegated token in-memory and a single writer avoids datastore races.')
+@minValue(1)
+param orchestratorMinReplicas int = 1
+@minValue(1)
+param orchestratorMaxReplicas int = 1
+
+@description('Entra app (client) ID for the Teams tab SSO (access_as_user). Empty disables per-user SSO.')
+param teamsTabClientId string = ''
+
+@description('Client secret for the Teams tab SSO app registration.')
+@secure()
+param teamsTabClientSecret string = ''
+
+@description('Deploy an Azure Bot registration for the in-channel conversational bot (requires botAppId + deployTeamsApp).')
+param deployBot bool = false
+
+@description('Entra app (client) ID / MSA App ID backing the Teams bot. Empty disables the bot.')
+param botAppId string = ''
+
+@description('Client secret for the Teams bot app registration.')
+@secure()
+param botAppPassword string = ''
+
+@allowed([ 'MultiTenant', 'SingleTenant', 'UserAssignedMSI' ])
+@description('Bot app type.')
+param botAppType string = 'MultiTenant'
+
 @description('Model deployment name the orchestrator app calls for chat/agents.')
 param appModelDeployment string = 'gpt-5-mini'
 
@@ -344,6 +371,14 @@ module app 'modules/app.bicep' = {
     deployTeamsApp: deployTeamsApp
     teamsImage: teamsImage
     teamsTargetPort: teamsTargetPort
+    orchestratorMinReplicas: orchestratorMinReplicas
+    orchestratorMaxReplicas: orchestratorMaxReplicas
+    teamsTabClientId: teamsTabClientId
+    teamsTabClientSecret: teamsTabClientSecret
+    deployBot: deployBot
+    botAppId: botAppId
+    botAppPassword: botAppPassword
+    botAppType: botAppType
     uamiResourceId: core.outputs.uamiResourceId
     uamiClientId: core.outputs.uamiClientId
     uamiPrincipalId: core.outputs.uamiPrincipalId
@@ -414,5 +449,6 @@ output containerAppFqdn string = app.outputs.containerAppFqdn
 output containerAppUrl string = app.outputs.containerAppUrl
 output teamsAppName string = app.outputs.teamsAppName
 output teamsAppUrl string = app.outputs.teamsAppUrl
+output botName string = app.outputs.botName
 output functionAppName string = app.outputs.functionAppName
 output vnetName string = network.outputs.vnetName

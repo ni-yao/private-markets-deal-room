@@ -50,6 +50,19 @@ param orchestratorImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:
 // separately after infra (like the orchestrator), so this stays portable.
 param deployTeamsApp = true
 
+// Orchestrator MUST stay single-replica: it holds the M365 delegated token in
+// memory and a single writer avoids datastore races (see docs/SOLUTION.md §6).
+param orchestratorMinReplicas = 1
+param orchestratorMaxReplicas = 1
+
+// Teams tab SSO (per-user context) + in-channel bot. IDs are non-secret; the
+// matching secrets (teamsTabClientSecret / botAppPassword / m365ClientSecret) are
+// passed at deploy time (--parameters name=value) or sourced from Key Vault — never git.
+param teamsTabClientId = ''   // Entra app (client) id for the Teams tab SSO
+param deployBot = false        // set true (with botAppId + deployTeamsApp) to register the Azure Bot
+param botAppId = ''            // MSA App id backing the Teams bot
+param botAppType = 'MultiTenant'
+
 param enablePrivateEndpoints = false
 param keyVaultPurgeProtection = false
 

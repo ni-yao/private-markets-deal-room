@@ -1,0 +1,142 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "swedencentral"
+    },
+    "locationShort": {
+      "value": "swc"
+    },
+    "workload": {
+      "value": "dealhub"
+    },
+    "environmentName": {
+      "value": "dev"
+    },
+    "costCenter": {
+      "value": "private-markets"
+    },
+    "openAiDeployments": {
+      "value": [
+        {
+          "name": "gpt-5-mini",
+          "model": {
+            "format": "OpenAI",
+            "name": "gpt-5-mini",
+            "version": "2025-08-07"
+          },
+          "sku": {
+            "name": "GlobalStandard",
+            "capacity": 30
+          }
+        },
+        {
+          "name": "gpt-5-nano",
+          "model": {
+            "format": "OpenAI",
+            "name": "gpt-5-nano",
+            "version": "2025-08-07"
+          },
+          "sku": {
+            "name": "GlobalStandard",
+            "capacity": 30
+          }
+        },
+        {
+          "name": "text-embedding-3-large",
+          "model": {
+            "format": "OpenAI",
+            "name": "text-embedding-3-large",
+            "version": "1"
+          },
+          "sku": {
+            "name": "Standard",
+            "capacity": 30
+          }
+        }
+      ]
+    },
+    "appModelDeployment": {
+      "value": "gpt-5-mini"
+    },
+    "searchSku": {
+      "value": "basic"
+    },
+    "storageSku": {
+      "value": "Standard_LRS"
+    },
+    "deployFabric": {
+      "value": true
+    },
+    "fabricSkuName": {
+      "value": "F2"
+    },
+    "fabricAdminMembers": {
+      "value": []
+    },
+    "deployApim": {
+      "value": false
+    },
+    "apimSkuName": {
+      "value": "Developer"
+    },
+    "apimPublisherEmail": {
+      "value": "deal-room-platform@contoso.com"
+    },
+    "apimPublisherName": {
+      "value": "Private Markets Deal Room"
+    },
+    "orchestratorImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    },
+    "deployTeamsApp": {
+      "value": true
+    },
+    "orchestratorMinReplicas": {
+      "value": 1
+    },
+    "orchestratorMaxReplicas": {
+      "value": 1
+    },
+    "teamsTabClientId": {
+      "value": ""
+    },
+    "deployBot": {
+      "value": false
+    },
+    "botAppId": {
+      "value": ""
+    },
+    "botAppType": {
+      "value": "MultiTenant"
+    },
+    "enablePrivateEndpoints": {
+      "value": false
+    },
+    "keyVaultPurgeProtection": {
+      "value": false
+    },
+    "fabricLive": {
+      "value": true
+    },
+    "fabricSqlEndpoint": {
+      "value": "a64b6mf4xwwexabphg3h6kmlnq-vohf2iaot5lu5l5wepkbscocq4.datawarehouse.fabric.microsoft.com"
+    },
+    "fabricSqlDatabase": {
+      "value": "deal_room_starter"
+    },
+    "fabricWorkspace": {
+      "value": "Deal Room"
+    },
+    "fabricLakehouse": {
+      "value": "deal_room_starter"
+    },
+    "onelakeWorkspaceId": {
+      "value": "205d8eab-9f0e-4e57-afb6-23d41909c287"
+    },
+    "onelakeLakehouseId": {
+      "value": "544efa34-5a8d-4b3a-8aad-216dabe71c37"
+    }
+  }
+}

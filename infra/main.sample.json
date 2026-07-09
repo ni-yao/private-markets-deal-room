@@ -1,0 +1,142 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "swedencentral"
+    },
+    "locationShort": {
+      "value": "swc"
+    },
+    "workload": {
+      "value": "dealhub"
+    },
+    "environmentName": {
+      "value": "dev"
+    },
+    "costCenter": {
+      "value": "private-markets"
+    },
+    "appModelDeployment": {
+      "value": "gpt-5-mini"
+    },
+    "openAiDeployments": {
+      "value": [
+        {
+          "name": "gpt-5-mini",
+          "model": {
+            "format": "OpenAI",
+            "name": "gpt-5-mini",
+            "version": "2025-08-07"
+          },
+          "sku": {
+            "name": "GlobalStandard",
+            "capacity": 30
+          }
+        },
+        {
+          "name": "text-embedding-3-large",
+          "model": {
+            "format": "OpenAI",
+            "name": "text-embedding-3-large",
+            "version": "1"
+          },
+          "sku": {
+            "name": "Standard",
+            "capacity": 30
+          }
+        }
+      ]
+    },
+    "cosmosDatabaseName": {
+      "value": "dealroom"
+    },
+    "searchSku": {
+      "value": "basic"
+    },
+    "storageSku": {
+      "value": "Standard_LRS"
+    },
+    "deployFabric": {
+      "value": false
+    },
+    "fabricAdminMembers": {
+      "value": []
+    },
+    "deployApim": {
+      "value": false
+    },
+    "apimPublisherEmail": {
+      "value": "platform@yourorg.com"
+    },
+    "apimPublisherName": {
+      "value": "Your Org — Deal Room"
+    },
+    "orchestratorImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    },
+    "deployTeamsApp": {
+      "value": true
+    },
+    "teamsImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    },
+    "orchestratorMinReplicas": {
+      "value": 1
+    },
+    "orchestratorMaxReplicas": {
+      "value": 1
+    },
+    "entraTenantId": {
+      "value": ""
+    },
+    "workspaceTenant": {
+      "value": "yourtenant"
+    },
+    "mcpAudience": {
+      "value": ""
+    },
+    "mcpRequiredScope": {
+      "value": "deals.read"
+    },
+    "m365ClientId": {
+      "value": ""
+    },
+    "m365TenantId": {
+      "value": ""
+    },
+    "m365TeamId": {
+      "value": ""
+    },
+    "teamsTabClientId": {
+      "value": ""
+    },
+    "deployBot": {
+      "value": false
+    },
+    "botAppId": {
+      "value": ""
+    },
+    "botAppType": {
+      "value": "MultiTenant"
+    },
+    "enablePrivateEndpoints": {
+      "value": false
+    },
+    "keyVaultPurgeProtection": {
+      "value": false
+    },
+    "fabricLive": {
+      "value": false
+    },
+    "fabricSqlEndpoint": {
+      "value": ""
+    },
+    "onelakeWorkspaceId": {
+      "value": ""
+    },
+    "onelakeLakehouseId": {
+      "value": ""
+    }
+  }
+}

@@ -39,6 +39,30 @@ param teamsImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:
 @description('Port the Teams-interface container listens on.')
 param teamsTargetPort int = 8090
 
+@description('Orchestrator replica floor. Keep 1: the shared backend holds the M365 delegated token in-memory and a single writer avoids datastore races.')
+@minValue(1)
+param orchestratorMinReplicas int = 1
+@description('Orchestrator replica ceiling. Keep equal to the floor (1) unless you have externalised the M365 token and validated multi-writer behaviour.')
+@minValue(1)
+param orchestratorMaxReplicas int = 1
+
+@description('Entra app (client) ID for the Teams tab SSO (access_as_user). Empty disables per-user SSO.')
+param teamsTabClientId string = ''
+@description('Client secret for the Teams tab SSO app registration.')
+@secure()
+param teamsTabClientSecret string = ''
+
+@description('Deploy an Azure Bot registration for the in-channel conversational bot (requires botAppId + deployTeamsApp).')
+param deployBot bool = false
+@description('Entra app (client) ID / MSA App ID backing the Teams bot. Empty disables the bot.')
+param botAppId string = ''
+@description('Client secret for the Teams bot app registration.')
+@secure()
+param botAppPassword string = ''
+@allowed([ 'MultiTenant', 'SingleTenant', 'UserAssignedMSI' ])
+@description('Bot app type.')
+param botAppType string = 'MultiTenant'
+
 // Cross-domain wiring (from core + ai modules)
 param uamiResourceId string
 param uamiClientId string
@@ -190,8 +214,8 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        minReplicas: 1
-        maxReplicas: 3
+        minReplicas: orchestratorMinReplicas
+        maxReplicas: orchestratorMaxReplicas
       }
     }
   }
@@ -212,6 +236,12 @@ resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp)
     managedEnvironmentId: caEnv.id
     configuration: {
       activeRevisionsMode: 'Single'
+      secrets: [
+        // Inert placeholders keep the template valid until SSO / bot are configured;
+        // the Teams app gates SSO on TEAMS_TAB_CLIENT_ID and the bot on BOT_APP_ID.
+        { name: 'teams-tab-client-secret', value: empty(teamsTabClientSecret) ? 'unset' : teamsTabClientSecret }
+        { name: 'bot-app-password', value: empty(botAppPassword) ? 'unset' : botAppPassword }
+      ]
       ingress: {
         external: true
         targetPort: teamsTargetPort
@@ -253,7 +283,15 @@ resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp)
             { name: 'AZURE_CLIENT_ID', value: uamiClientId }
             // Single source of truth — the Teams app forwards to the shared backend.
             { name: 'SHARED_BACKEND_URL', value: 'https://${orchestratorApp.properties.configuration.ingress.fqdn}' }
+            { name: 'APP_BASE_URL', value: 'https://ca-${workload}-teams-${environmentName}-${locationShort}.${caEnv.properties.defaultDomain}' }
             { name: 'ENTRA_TENANT_ID', value: entraTenantId }
+            // Per-user Teams tab SSO (access_as_user).
+            { name: 'TEAMS_TAB_CLIENT_ID', value: teamsTabClientId }
+            { name: 'TEAMS_TAB_CLIENT_SECRET', secretRef: 'teams-tab-client-secret' }
+            // In-channel conversational bot (context-aware, login-free via managed identity).
+            { name: 'BOT_APP_ID', value: botAppId }
+            { name: 'BOT_APP_PASSWORD', secretRef: 'bot-app-password' }
+            { name: 'BOT_APP_TYPE', value: botAppType }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
           ]
         }
@@ -262,6 +300,36 @@ resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp)
         minReplicas: 1
         maxReplicas: 3
       }
+    }
+  }
+}
+
+// Azure Bot registration for the in-channel conversational bot. Global resource;
+// its messaging endpoint targets the Teams app /api/messages. Optional — gated on
+// deployBot + a bot app id + the Teams app (which hosts the messaging endpoint).
+resource bot 'Microsoft.BotService/botServices@2022-09-15' = if (deployBot && !empty(botAppId) && deployTeamsApp) {
+  name: 'bot-${workload}-${environmentName}-${suffix}'
+  location: 'global'
+  tags: tags
+  sku: { name: 'F0' }
+  kind: 'azurebot'
+  properties: {
+    displayName: 'Deal Room'
+    endpoint: deployTeamsApp ? 'https://${teamsApp!.properties.configuration.ingress.fqdn}/api/messages' : ''
+    msaAppId: botAppId
+    msaAppType: botAppType
+    msaAppTenantId: botAppType == 'MultiTenant' ? '' : entraTenantId
+  }
+}
+
+resource botTeamsChannel 'Microsoft.BotService/botServices/channels@2022-09-15' = if (deployBot && !empty(botAppId) && deployTeamsApp) {
+  parent: bot
+  name: 'MsTeamsChannel'
+  location: 'global'
+  properties: {
+    channelName: 'MsTeamsChannel'
+    properties: {
+      isEnabled: true
     }
   }
 }
@@ -369,4 +437,5 @@ output containerAppFqdn string = orchestratorApp.properties.configuration.ingres
 output containerAppUrl string = 'https://${orchestratorApp.properties.configuration.ingress.fqdn}'
 output teamsAppName string = deployTeamsApp ? teamsApp!.name : 'not-deployed'
 output teamsAppUrl string = deployTeamsApp ? 'https://${teamsApp!.properties.configuration.ingress.fqdn}' : 'not-deployed'
+output botName string = (deployBot && !empty(botAppId) && deployTeamsApp) ? bot!.name : 'not-deployed'
 output functionAppName string = functionApp.name

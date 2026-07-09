@@ -105,6 +105,29 @@ resource cosmosDb 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-11-15
   }
 }
 
+// Data-plane containers the app expects to EXIST at boot. initRepo() smoke-tests
+// the `companies` container on startup — if these are missing the app fails to
+// enter cosmos mode and silently falls back to in-memory (0 deals). Provisioning
+// them here makes a fresh customer deployment turnkey. The generic document
+// collections are id-partitioned; agent-state is partitioned by deal.
+var appContainers = [ 'companies', 'deals', 'events', 'signals', 'connectors' ]
+
+resource cosmosAppContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = [
+  for c in appContainers: {
+    parent: cosmosDb
+    name: c
+    properties: {
+      resource: {
+        id: c
+        partitionKey: {
+          paths: [ '/id' ]
+          kind: 'Hash'
+        }
+      }
+    }
+  }
+]
+
 resource cosmosAgentState 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-11-15' = {
   parent: cosmosDb
   name: 'agent-state'

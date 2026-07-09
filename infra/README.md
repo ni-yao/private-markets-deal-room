@@ -15,6 +15,7 @@ customer-deployable — no author-specific tenant/subscription/resource IDs.
 | `modules/integration.bicep` | API Management (AI Gateway), Service Bus, Event Grid. |
 | `modules/network.bicep` | VNet + optional Private Endpoints / Private DNS. |
 | `main.dev.bicepparam` | Dev values (public, fast iteration). |
+| `main.sample.bicepparam` | **Customer template** — copy, fill placeholders, deploy. |
 | `main.test.bicepparam` | Test/UAT values (mirrors dev, separate subscription). |
 | `main.prod.bicepparam` | Prod values (private endpoints, purge protection, ZRS, APIM SLA). |
 | `../.github/workflows/deal-room-infra.yml` | CI/CD: OIDC login, lint, what-if on PR, deploy-as-stack on merge. |
@@ -135,8 +136,63 @@ az stack sub create `
 | `deployFabric` | `true` | Fabric also needs **`fabricAdminMembers`**; if that list is empty Fabric is skipped. |
 | `fabricAdminMembers` | `[]` | Add a UPN/objectId to actually provision Fabric. |
 | `deployApim` | `true` | Developer SKU takes ~30–45 min. Set `false` for faster dev loops. |
+| `deployTeamsApp` | `false` | Deploy the `ca-dealhub-teams` interface app (Teams tab + bot proxy). |
+| `orchestratorMinReplicas` / `orchestratorMaxReplicas` | `1` / `1` | **Keep both = 1** — the shared backend holds the M365 delegated token in memory and a single writer avoids datastore races. |
+| `teamsTabClientId` (+ `teamsTabClientSecret`) | `''` | Entra app for the Teams tab **SSO** (per-user context). Secret passed at deploy. |
+| `deployBot` / `botAppId` (+ `botAppPassword`) | `false` / `''` | Register the **Azure Bot** for the in-channel conversational bot (needs `deployTeamsApp`). |
+| `m365ClientId` / `m365TeamId` (+ `m365ClientSecret`) | `''` | M365 delegated connector for Teams **channel + SharePoint VDR** provisioning; `m365TeamId` pins the parent “one channel per deal” team. |
 | `enablePrivateEndpoints` | `false` | `true` locks data-plane services to the VNet and disables public access. |
 | `keyVaultPurgeProtection` | `false` | Keep `false` in dev so you can redeploy the same vault name. |
+
+## Identity prerequisites (Entra app registrations)
+
+The Teams experience needs a few Entra app registrations in **your** tenant. Create
+them once, then pass their IDs as parameters (secrets at deploy time, never in git):
+
+| App registration | Parameter(s) | Purpose |
+|---|---|---|
+| **Teams tab SSO** | `teamsTabClientId` + `teamsTabClientSecret` | `access_as_user` scope; pre-authorize the Teams/Office clients → per-user context in the tab. |
+| **Teams bot** | `botAppId` + `botAppPassword` (+ `deployBot=true`) | Backs the Azure Bot; the in-channel conversational bot answers @mentions. |
+| **M365 connector (delegated)** | `m365ClientId` + `m365ClientSecret` | Delegated Microsoft Graph for **channel + SharePoint VDR provisioning** — admin-consent scopes: `Channel.Create`, `ChannelSettings.ReadWrite.All`, `Sites.ReadWrite.All`, `Files.ReadWrite.All`, `GroupMember.Read.All`, `TeamMember.ReadWrite.All`, `TeamsAppInstallation.ReadWriteForTeam`. |
+| **Deal MCP (optional)** | `mcpAudience` + `mcpRequiredScope` | Secures `/mcp` for M365 Copilot / hosted agents. |
+
+`m365TeamId` (optional) pins the parent Teams team that holds **one channel per deal**;
+leave empty to find/create "The Deal Room" team on first provisioning.
+
+## Post-deploy — bring the app to life
+
+Infra provisions the platform (incl. **all Cosmos containers** the app needs at
+boot). Then:
+
+```bash
+# 1. Build + roll out the real images by digest (ASCII tags only)
+az acr build --registry <acrName> --image deal-room:v1 --file app/Dockerfile app
+az acr build --registry <acrName> --image dealhub-teams:v1 --file teams-app/Dockerfile teams-app
+az containerapp update -n ca-dealhub-orch-<env>-<loc>  -g rg-dealhub-app-<env>-<loc> --image <acrLoginServer>/deal-room@sha256:<digest>
+az containerapp update -n ca-dealhub-teams-<env>-<loc> -g rg-dealhub-app-<env>-<loc> --image <acrLoginServer>/dealhub-teams@sha256:<digest>
+
+# 2. Create the Foundry agents (deal-room-analyst + persona agents)
+python3 app/scripts/create_deal_agent.py          # + create_persona_agents.py
+
+# 3. Connect M365 (delegated) so channels + SharePoint VDR can be provisioned
+#    Browse:  https://<orch-fqdn>/api/m365/login   → sign in → /?connected=m365
+
+# 4. Provision a Teams channel + SharePoint VDR per deal (durable channel↔deal map)
+curl -X POST https://<orch-fqdn>/api/deals/teams/ensure-all
+```
+
+### ⚠ Cosmos data availability (important for governed tenants)
+The orchestrator checks Cosmos **only at boot**; if Cosmos is unreachable it falls
+back to in-memory mode with **0 deals**. On a **Consumption** Container Apps
+environment (the default here) the app reaches Cosmos over the **public** endpoint,
+so keep `enablePrivateEndpoints=false` (Cosmos `publicNetworkAccess=Enabled`).
+
+If your tenant enforces a policy that forces Cosmos public access **off** (e.g. an
+MCAPS `CosmosDB_PublicNetwork_Modify` initiative), either (a) add a resource-scoped
+**policy exemption** for the Cosmos account and keep public access enabled, or
+(b) deploy a **VNet-integrated** Container Apps environment + a Cosmos **private
+endpoint** (`enablePrivateEndpoints=true`). Never leave Cosmos unreachable — the app
+cannot serve deals in memory mode. See [`docs/SOLUTION.md`](../docs/SOLUTION.md) §6.
 
 ## Not provisioned by this template
 
