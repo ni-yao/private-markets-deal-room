@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.44.1.10279",
-      "templateHash": "8457990981161063636"
+      "templateHash": "3782524503515787302"
     }
   },
   "parameters": {
@@ -383,6 +383,20 @@
       "defaultValue": "",
       "metadata": {
         "description": "Optional pinned parent Teams team ID that holds one channel per deal. Empty = find/create \"The Deal Room\"."
+      }
+    },
+    "teamsAppCatalogId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Tenant-specific Teams app catalog id (org-catalog teamsApp) used to install the Deal Dashboard app + bot into deal teams. Empty skips the app install (non-fatal)."
+      }
+    },
+    "m365PublishGroup": {
+      "type": "string",
+      "defaultValue": "Private Equity Deals",
+      "metadata": {
+        "description": "Entra/M365 group whose members every deal channel is auto-published to."
       }
     },
     "acrSku": {
@@ -1684,6 +1698,12 @@
           "m365TeamId": {
             "value": "[parameters('m365TeamId')]"
           },
+          "teamsAppCatalogId": {
+            "value": "[parameters('teamsAppCatalogId')]"
+          },
+          "m365PublishGroup": {
+            "value": "[parameters('m365PublishGroup')]"
+          },
           "workspaceTenant": {
             "value": "[parameters('workspaceTenant')]"
           },
@@ -1779,7 +1799,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.44.1.10279",
-              "templateHash": "1681331225827478342"
+              "templateHash": "13581021327451336652"
             }
           },
           "parameters": {
@@ -1850,6 +1870,20 @@
             },
             "workspaceTenant": {
               "type": "string"
+            },
+            "teamsAppCatalogId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Tenant-specific Teams app catalog id (org-catalog teamsApp) used to install the Deal Dashboard app + bot into deal teams. Empty skips the app install (non-fatal)."
+              }
+            },
+            "m365PublishGroup": {
+              "type": "string",
+              "defaultValue": "Private Equity Deals",
+              "metadata": {
+                "description": "Entra/M365 group whose members every deal channel is auto-published to."
+              }
             },
             "deployTeamsApp": {
               "type": "bool",
@@ -2207,6 +2241,14 @@
                         {
                           "name": "M365_TEAM_ID",
                           "value": "[parameters('m365TeamId')]"
+                        },
+                        {
+                          "name": "TEAMS_APP_CATALOG_ID",
+                          "value": "[parameters('teamsAppCatalogId')]"
+                        },
+                        {
+                          "name": "M365_PUBLISH_GROUP",
+                          "value": "[parameters('m365PublishGroup')]"
                         },
                         {
                           "name": "M365_CLIENT_SECRET",

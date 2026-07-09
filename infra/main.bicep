@@ -200,6 +200,12 @@ param onelakeLakehouseId string = ''
 @description('Optional pinned parent Teams team ID that holds one channel per deal. Empty = find/create "The Deal Room".')
 param m365TeamId string = ''
 
+@description('Tenant-specific Teams app catalog id (org-catalog teamsApp) used to install the Deal Dashboard app + bot into deal teams. Empty skips the app install (non-fatal).')
+param teamsAppCatalogId string = ''
+
+@description('Entra/M365 group whose members every deal channel is auto-published to.')
+param m365PublishGroup string = 'Private Equity Deals'
+
 @description('Container Registry SKU.')
 @allowed([
   'Basic'
@@ -367,6 +373,8 @@ module app 'modules/app.bicep' = {
     m365ClientSecret: m365ClientSecret
     mcpReadonlyKey: mcpReadonlyKey
     m365TeamId: m365TeamId
+    teamsAppCatalogId: teamsAppCatalogId
+    m365PublishGroup: m365PublishGroup
     workspaceTenant: workspaceTenant
     deployTeamsApp: deployTeamsApp
     teamsImage: teamsImage

@@ -72,6 +72,8 @@ param mcpRequiredScope = 'deals.read'
 param m365ClientId = ''                   // Entra app (client) id for the M365 connector
 param m365TenantId = ''                   // defaults to entraTenantId when empty
 param m365TeamId = ''                     // pinned parent Teams team id (one channel per deal); empty = find/create
+param teamsAppCatalogId = ''              // org-catalog teamsApp id (install Deal Dashboard app + bot); empty skips install
+param m365PublishGroup = 'Private Equity Deals'  // group whose members each deal channel is published to
 // Teams tab SSO (per-user context).
 param teamsTabClientId = ''               // Entra app (client) id for the tab SSO
 // In-channel conversational bot.

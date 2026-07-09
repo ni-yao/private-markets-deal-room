@@ -63,6 +63,10 @@ param deployBot = false        // set true (with botAppId + deployTeamsApp) to r
 param botAppId = ''            // MSA App id backing the Teams bot
 param botAppType = 'MultiTenant'
 
+// M365 channel/VDR provisioning (org-catalog app id is NOT a secret; group name is configurable).
+param teamsAppCatalogId = '55a506df-b5f9-4096-9719-5fad2261eb38'
+param m365PublishGroup = 'Private Equity Deals'
+
 param enablePrivateEndpoints = false
 param keyVaultPurgeProtection = false
 

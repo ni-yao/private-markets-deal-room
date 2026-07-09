@@ -32,6 +32,11 @@ param mcpReadonlyKey string = ''
 param m365TeamId string
 param workspaceTenant string
 
+@description('Tenant-specific Teams app catalog id (org-catalog teamsApp) used to install the Deal Dashboard app + bot into deal teams. Empty skips the app install (non-fatal).')
+param teamsAppCatalogId string = ''
+@description('Entra/M365 group whose members every deal channel is auto-published to.')
+param m365PublishGroup string = 'Private Equity Deals'
+
 @description('Deploy the Teams-interface Container App (forwards to the shared backend). Enabled in the Teams phase once the teams-app image exists.')
 param deployTeamsApp bool = false
 @description('Container image for the Teams-interface Container App.')
@@ -208,6 +213,8 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'M365_CLIENT_ID', value: m365ClientId }
             { name: 'M365_TENANT_ID', value: empty(m365TenantId) ? entraTenantId : m365TenantId }
             { name: 'M365_TEAM_ID', value: m365TeamId }
+            { name: 'TEAMS_APP_CATALOG_ID', value: teamsAppCatalogId }
+            { name: 'M365_PUBLISH_GROUP', value: m365PublishGroup }
             { name: 'M365_CLIENT_SECRET', secretRef: 'm365-client-secret' }
             { name: 'MCP_READONLY_KEY', secretRef: 'mcp-readonly-key' }
           ]

@@ -111,6 +111,12 @@
     "botAppType": {
       "value": "MultiTenant"
     },
+    "teamsAppCatalogId": {
+      "value": "55a506df-b5f9-4096-9719-5fad2261eb38"
+    },
+    "m365PublishGroup": {
+      "value": "Private Equity Deals"
+    },
     "enablePrivateEndpoints": {
       "value": false
     },

@@ -108,6 +108,12 @@
     "m365TeamId": {
       "value": ""
     },
+    "teamsAppCatalogId": {
+      "value": ""
+    },
+    "m365PublishGroup": {
+      "value": "Private Equity Deals"
+    },
     "teamsTabClientId": {
       "value": ""
     },

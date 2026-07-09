@@ -108,15 +108,20 @@ async function setChannelThreads(teamId) {
 // so each deal channel is visible to the whole PE deal team. Best-effort +
 // idempotent (a user already on the team returns 4xx which we ignore). Needs
 // GroupMember.Read.All + TeamMember.ReadWrite.All (admin-consented).
-const PUBLISH_GROUP = 'Private Equity Deals';
+// The group whose members every deal channel is published to. Tenant-configurable
+// (env), defaults to the reference "Private Equity Deals" team.
+const PUBLISH_GROUP = (process.env.M365_PUBLISH_GROUP || 'Private Equity Deals').trim();
 
 // Install the org-catalog Deal Dashboard Teams app into a deal team so its bot can
-// receive @mentions in the channel. Uses the known org-catalog teamsApp id directly
+// receive @mentions in the channel. Uses the org-catalog teamsApp id directly
 // (no catalog read scope needed). Best-effort + idempotent (409 = already installed).
-// Requires TeamsAppInstallation.ReadWriteForTeam (admin-consented).
-const TEAMS_APP_CATALOG_ID = process.env.TEAMS_APP_CATALOG_ID || '55a506df-b5f9-4096-9719-5fad2261eb38';
+// Requires TeamsAppInstallation.ReadWriteForTeam (admin-consented). The catalog id
+// is tenant-specific and MUST be supplied via TEAMS_APP_CATALOG_ID; when unset the
+// install step is skipped (non-fatal — the bot still works once installed manually).
+const TEAMS_APP_CATALOG_ID = (process.env.TEAMS_APP_CATALOG_ID || '').trim();
 export async function installTeamsAppInTeam(teamId) {
   if (!teamId) return { installed: false, reason: 'no-team' };
+  if (!TEAMS_APP_CATALOG_ID) { console.log('[install] TEAMS_APP_CATALOG_ID not set — skipping app install'); return { installed: false, reason: 'no-catalog-id' }; }
   try {
     await graph(`/teams/${teamId}/installedApps`, {
       method: 'POST',
