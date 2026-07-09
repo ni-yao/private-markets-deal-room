@@ -66,7 +66,7 @@ def build(host: str, sso_client_id=None, bot_id=None, copilot=False, oauth_ref_i
     manifest = {
         "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
         "manifestVersion": "1.19",
-        "version": "0.2.1",
+        "version": "0.2.2",
         "id": app_id,
         "developer": {
             "name": "Private Markets Deal Room",
@@ -74,7 +74,7 @@ def build(host: str, sso_client_id=None, bot_id=None, copilot=False, oauth_ref_i
             "privacyUrl": f"{base}/privacy",
             "termsOfUseUrl": f"{base}/terms",
         },
-        "name": {"short": "Deal Room", "full": "The Deal Room"},
+        "name": {"short": "Deal Room Assistant", "full": "Deal Room Assistant"},
         "description": {
             "short": "AI-native private-equity deal flow in Teams.",
             "full": "Deal Dashboard brings your fund's live deal flow into Teams: a channel dashboard and personal tab (Entra SSO) over the shared Deal Room backend (single data source), proactive Adaptive Card alerts as deals advance, and an M365 Copilot agent that answers deal questions through the Entra-secured MCP. The deal chat is grounded in live data and screened by Azure AI Content Safety; a Bing-grounded news scout surfaces fresh M&A catalysts.",
