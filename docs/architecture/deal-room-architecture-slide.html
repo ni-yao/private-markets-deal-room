@@ -72,9 +72,9 @@
   <div class="zone" style="left:28px;top:396px;width:214px;height:272px;background:var(--extbg);border-color:var(--extedge)"><div class="zh" style="color:var(--ext)">Market data · MCP</div></div>
   <div class="zone" style="left:300px;top:92px;width:300px;height:104px;background:var(--chanbg);border-color:var(--chanedge)"><div class="zh" style="color:var(--chan)">Channels</div></div>
   <div class="zone" style="left:300px;top:236px;width:300px;height:300px;background:var(--appbg);border-color:var(--appedge)"><div class="zh" style="color:var(--app)">Application</div></div>
-  <div class="zone" style="left:800px;top:296px;width:244px;height:252px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Microsoft Foundry</div></div>
+  <div class="zone" style="left:828px;top:92px;width:244px;height:258px;background:var(--aibg);border-color:var(--aiedge)"><div class="zh" style="color:var(--ai)">AI · Microsoft Foundry</div></div>
   <div class="zone" style="left:258px;top:566px;width:632px;height:126px;background:var(--databg);border-color:var(--dataedge)"><div class="zh" style="color:var(--data)">Data &amp; Documents</div></div>
-  <div class="zone" style="left:1064px;top:398px;width:196px;height:240px;background:var(--obsbg);border-color:var(--obsedge)"><div class="zh" style="color:var(--obs)">Observe</div></div>
+  <div class="zone" style="left:828px;top:362px;width:244px;height:196px;background:var(--obsbg);border-color:var(--obsedge)"><div class="zh" style="color:var(--obs)">Observe</div></div>
 
   <svg id="wires"></svg>
 
@@ -103,14 +103,14 @@
     <div class="eps"><i>API</i><i>SPA</i><i>MCP server</i></div>
   </div>
 
-  <!-- API MANAGEMENT — AI gateway, horizontally between Container Apps and Foundry -->
+  <!-- API MANAGEMENT — AI gateway, between Container Apps and Foundry -->
   <div class="n gw t-app" id="apim" style="left:616px;top:330px;width:160px"><img src="icons/apim.svg"><b>API Management</b></div>
 
-  <!-- AI · MICROSOFT FOUNDRY (right) -->
-  <div class="n t-ai" id="foundry"      style="left:812px;top:326px;width:224px"><img src="icons/cognitive.svg"><b>Microsoft Foundry</b></div>
-  <div class="n t-ai stack" id="agents" style="left:812px;top:384px;width:224px"><img src="icons/cognitive.svg"><b>Persona Agents ×5</b></div>
-  <div class="n t-ai" id="bing"         style="left:812px;top:442px;width:224px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
-  <div class="n t-ai" id="aisvcs"       style="left:812px;top:500px;width:224px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
+  <!-- AI · MICROSOFT FOUNDRY (right, moved up) -->
+  <div class="n t-ai" id="foundry"      style="left:844px;top:120px;width:212px"><img src="icons/cognitive.svg"><b>Microsoft Foundry</b></div>
+  <div class="n t-ai stack" id="agents" style="left:844px;top:178px;width:212px"><img src="icons/cognitive.svg"><b>Persona Agents ×5</b></div>
+  <div class="n t-ai" id="bing"         style="left:844px;top:236px;width:212px"><img src="icons/web.svg"><b>Bing Grounding</b></div>
+  <div class="n t-ai" id="aisvcs"       style="left:844px;top:294px;width:212px"><img src="icons/cognitive.svg"><b>AI Services</b></div>
 
   <!-- DATA & DOCUMENTS (bottom band, Fabric leftmost) -->
   <div class="n t-data" id="fabric"  style="left:274px;top:600px;width:140px"><img src="icons/fabric.svg"><b>Fabric</b></div>
@@ -118,13 +118,13 @@
   <div class="n t-data" id="search"  style="left:574px;top:600px;width:140px"><img src="icons/search.svg"><b>AI Search</b></div>
   <div class="n t-data" id="storage" style="left:724px;top:600px;width:140px"><img src="icons/storage.svg"><b>Storage</b></div>
 
-  <!-- FUNCTIONS (event handler, right of the data band) -->
-  <div class="n t-app" id="func" style="left:902px;top:590px;width:150px"><img src="icons/function.svg"><b>Functions</b></div>
+  <!-- FUNCTIONS (event handler, under API Management) -->
+  <div class="n t-app" id="func" style="left:616px;top:388px;width:160px"><img src="icons/function.svg"><b>Functions</b></div>
 
-  <!-- OBSERVE (right) -->
-  <div class="n t-obs" id="appins" style="left:1080px;top:430px;width:164px"><img src="icons/appinsights.svg"><b>App Insights</b></div>
-  <div class="n t-obs" id="law"    style="left:1080px;top:494px;width:164px"><img src="icons/loganalytics.svg"><b>Log Analytics</b></div>
-  <div class="n t-obs" id="mon"    style="left:1080px;top:558px;width:164px"><img src="icons/monitor.svg"><b>Azure Monitor</b></div>
+  <!-- OBSERVE (right, under Foundry) -->
+  <div class="n t-obs" id="appins" style="left:844px;top:390px;width:212px"><img src="icons/appinsights.svg"><b>App Insights</b></div>
+  <div class="n t-obs" id="law"    style="left:844px;top:448px;width:212px"><img src="icons/loganalytics.svg"><b>Log Analytics</b></div>
+  <div class="n t-obs" id="mon"    style="left:844px;top:506px;width:212px"><img src="icons/monitor.svg"><b>Azure Monitor</b></div>
 </div>
 
 <script>
@@ -167,7 +167,7 @@ function wire(points,opt={}){line(points,opt); if(opt.label){const i=Math.max(1,
 requestAnimationFrame(()=>{
   // ===== NORTH: channels -> hub / agents =====
   wire([pt('web','b',0.5),{x:pt('web','b').x,y:268},{x:pt('ca','t',0.35).x,y:268},pt('ca','t',0.35)],{label:'HTTPS',lx:pt('web','b').x,ly:236});
-  wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:232},{x:788,y:232},{x:788,y:pt('agents','l',0.5).y},pt('agents','l',0.5)],{label:'invoke',lx:655,ly:232});
+  wire([pt('teams','b',0.5),{x:pt('teams','b').x,y:236},{x:800,y:236},{x:800,y:pt('agents','l',0.5).y},pt('agents','l',0.5)],{label:'invoke',lx:660,ly:236});
 
   // ===== WEST: identity + external -> hub (short L inputs, distinct lanes/entries) =====
   wire([pt('entra','r'),{x:300,y:pt('entra','r').y},{x:300,y:pt('ca','l',0.13).y},pt('ca','l',0.13)],{ctrl:true,label:'auth',lx:264,ly:pt('entra','r').y});
@@ -183,13 +183,14 @@ requestAnimationFrame(()=>{
   line([{x:mcpX,y:pt('ca','l',0.94).y},{x:mcpX,y:pt('capitaliq','r').y}],{arrow:false});
   provs.forEach(id=>{const p=pt(id,'r'); line([{x:mcpX,y:p.y},p]);});
 
-  // ===== EAST: horizontal flow  Container Apps -> API Management -> Microsoft Foundry -> agents =====
-  wire([pt('ca','r',0.5),pt('apim','l',0.5)],{label:'AI gateway',lx:586,ly:338});
-  wire([pt('apim','r',0.5),pt('foundry','l',0.5)],{label:'route',lx:794,ly:316});
+  // ===== EAST-TOP: Container Apps -> API Management -> Foundry (route trunk fans to models + AI Services) =====
+  wire([pt('ca','r',0.5),pt('apim','l',0.5)],{label:'AI gateway',lx:586,ly:344});
+  wire([pt('apim','r',0.5),{x:812,y:pt('apim','r',0.5).y},{x:812,y:pt('foundry','l',0.5).y},pt('foundry','l',0.5)],{label:'route',lx:792,ly:250});
+  line([pt('apim','r',0.5),{x:812,y:pt('apim','r',0.5).y},{x:812,y:pt('aisvcs','l',0.5).y},pt('aisvcs','l',0.5)]);
+  tag(792,308,'extract · safety');
   wire([pt('foundry','b',0.5),pt('agents','t',0.5)],{});
-  wire([pt('agents','l',0.62),{x:588,y:pt('agents','l',0.62).y},{x:588,y:pt('ca','r',0.86).y},pt('ca','r',0.86)],{label:'MCP tools',lx:690,ly:428});
-  wire([pt('ca','r',0.66),{x:598,y:pt('ca','r',0.66).y},{x:598,y:pt('aisvcs','l').y},pt('aisvcs','l')],{label:'extract · safety',lx:690,ly:520});
   wire([pt('agents','b',0.5),pt('bing','t',0.5)],{});
+  wire([pt('agents','l',0.8),{x:604,y:pt('agents','l',0.8).y},{x:604,y:pt('ca','r',0.2).y},pt('ca','r',0.2)],{label:'MCP tools',lx:672,ly:200});
 
   // ===== SOUTH: hub -> data (single feeder onto a bus, short taps; Fabric leftmost) =====
   const busY=560;
@@ -198,11 +199,9 @@ requestAnimationFrame(()=>{
   line([{x:pt('fabric','t').x,y:busY},{x:pt('storage','t').x,y:busY}],{arrow:false});
   ['fabric','cosmos','search','storage'].forEach(id=>{const b=pt(id,'t',0.5);line([{x:b.x,y:busY},b]);});
 
-  // ===== app -> Functions (deal events), in the clear channel below the AI zone =====
-  wire([pt('ca','b',0.82),{x:pt('ca','b',0.82).x,y:552},{x:pt('func','t').x,y:552},pt('func','t')],{label:'events',lx:748,ly:552});
-
-  // ===== SOUTH-EAST: observability (telemetry from Functions, then chain) =====
-  wire([pt('func','r',0.5),{x:1060,y:pt('func','r',0.5).y},{x:1060,y:pt('appins','l').y},pt('appins','l')],{ctrl:true,label:'telemetry',lx:1052,ly:578});
+  // ===== EAST-LOWER: short horizontal path  Container Apps -> Functions -> Observe =====
+  wire([pt('ca','r',0.9),pt('func','l',0.5)],{label:'events',lx:590,ly:396});
+  wire([pt('func','r',0.5),pt('appins','l',0.5)],{ctrl:true,label:'telemetry',lx:812,ly:402});
   wire([pt('appins','b',0.5),pt('law','t',0.5)],{ctrl:true});
   wire([pt('law','b',0.5),pt('mon','t',0.5)],{ctrl:true});
 });
