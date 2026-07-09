@@ -76,16 +76,45 @@ function teamIdsFromActivity(activity) {
   return [...new Set(ids.filter(Boolean))];
 }
 
-// Resolve the deal that owns this channel's team -> { dealId, company } | null.
+const normName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// Resolve the deal for this channel -> { dealId, company } | null.
+//   1. by channel/thread id (the persisted channel↔deal map), then
+//   2. by the channel's DISPLAY NAME matched to a deal company — robust even when
+//      the id map is stale/unhydrated, because a deal channel is named after its company.
 async function resolveDeal(activity) {
   const base = config.backend.url;
   if (!base) return null;
-  for (const tid of teamIdsFromActivity(activity)) {
+  const cd = activity.channelData || {};
+  const channelName = cd.channel?.name || '';
+  const candidates = teamIdsFromActivity(activity);
+  console.log(`[bot] resolveDeal convType=${activity.conversation?.conversationType} channelName="${channelName}" candidates=${JSON.stringify(candidates)}`);
+
+  // 1. by id
+  for (const tid of candidates) {
     try {
       const r = await fetch(`${base}/api/deals/resolve-team/${encodeURIComponent(tid)}`);
-      if (r.ok) { const d = await r.json(); if (d?.dealId) return d; }
+      if (r.ok) { const d = await r.json(); if (d?.dealId) { console.log(`[bot] resolved by id ${tid} -> ${d.company}`); return d; } }
     } catch { /* try the next candidate id */ }
   }
+
+  // 2. by channel display name -> deal company
+  if (channelName) {
+    try {
+      const r = await fetch(`${base}/api/deals`);
+      if (r.ok) {
+        const deals = await r.json();
+        const cn = normName(channelName);
+        const hit = (Array.isArray(deals) ? deals : []).find((d) => {
+          const co = normName(d.company);
+          return co && cn && (co === cn || co.startsWith(cn) || cn.startsWith(co) || co.includes(cn) || cn.includes(co));
+        });
+        if (hit) { console.log(`[bot] resolved by name "${channelName}" -> ${hit.company}`); return { dealId: hit.id, company: hit.company }; }
+      }
+    } catch { /* ignore */ }
+  }
+
+  console.log(`[bot] resolveDeal FAILED — no deal for channel "${channelName}" / ${candidates[0] || '(none)'}`);
   return null;
 }
 
