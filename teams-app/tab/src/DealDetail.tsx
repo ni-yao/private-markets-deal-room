@@ -51,6 +51,9 @@ function sourceHint(src?: string): string {
   return `Source: ${src}.`;
 }
 
+// Raw-dollar formatter for market-intel valuations (impliedValuation is in $, not $M).
+const bigMoney = (n?: number) => (n == null ? '—' : n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(0)}M` : `$${Math.round(n)}`);
+
 type Tab = 'stages' | 'overview' | 'workspace' | 'research' | 'ic';
 
 export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { dealId: string; canViewStage2: boolean; onClose: () => void; onAsk: (id: string) => void }) {
@@ -328,7 +331,7 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
                         {(market.comparableDeals || []).slice(0, 8).map((c, i) => (
                           <div className="mr-row" key={i}>
                             <span className="mr-name">{c.company}{c.ticker ? <span className="chip">{c.ticker}</span> : null}</span>
-                            <span className="mr-val">{c.dealType || '—'} · {money(c.impliedValuation)}</span>
+                            <span className="mr-val">{c.dealType || '—'} · {bigMoney(c.impliedValuation)}</span>
                             {c.status ? <span className={`chip ${String(c.status).toLowerCase().replace(/\s+/g, '-')}`}>{c.status}</span> : null}
                           </div>
                         ))}
