@@ -11,6 +11,8 @@ subscription-agnostic **Bicep** infrastructure definition, containerized to
 
 ![deal journey](app/docs/deal-journey.png)
 
+> **📘 Solution documentation:** [docs/SOLUTION.md](docs/SOLUTION.md) — architecture, Teams app & channel model, context-aware bot, security/identity, deployment and the operations runbook. Architecture diagram: [docs/dealhub-architecture.drawio](docs/dealhub-architecture.drawio) (Draw.io).
+
 ## The flow (the canonical process)
 
 Two stages joined by the **PURSUE** gate, nine sequential steps:
