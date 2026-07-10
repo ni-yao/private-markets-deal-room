@@ -99,7 +99,8 @@ import { mcpAuthMiddleware, mcpReadonlyAuthMiddleware, mcpAuthInfo, mcpReadonlyK
 import { listConnectors, testConnector, disconnectConnector } from './lib/connectors.js';
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
-import { m365Configured, m365Connected, m365FilesScope } from './lib/m365/graph.js';
+import { m365Configured, m365Connected, m365FilesScope, listDealDocuments, saveDealDocument, M365NotConnectedError } from './lib/m365/graph.js';
+import { buildIcMemoDocx, buildDealModelXlsx, OFFICE_MIME } from './lib/m365/office.js';
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 import { config, validateConfig } from './lib/config.js';
@@ -265,6 +266,59 @@ api.patch('/deals/:id/swimlanes/:lane', async (req, res) => {
   const r = await assignSwimlane(req.params.id, req.params.lane, req.body?.md);
   if (r.error) return res.status(r.error === 'invalid-md' ? 422 : 404).json(r);
   res.json(r.deal);
+});
+
+// ---- Deal documents (Word/Excel in the SharePoint data room) ----------------
+// Leverages the signed-in user's Microsoft 365 (delegated Graph) to list the
+// deal's data-room documents and to GENERATE a Word IC memo / Excel deal model
+// from the live deal record, saved back into SharePoint. Reads follow deal
+// access; writes are RBAC-gated (deal team / partner). Degrades cleanly with a
+// 409 when M365 isn't connected yet.
+const docSafeCompany = (deal) =>
+  String(deal.company || deal.id).replace(/[\\/:*?"<>|#%]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Deal';
+
+api.get('/deals/:id/documents', async (req, res) => {
+  const deal = getDealRaw(req.params.id);
+  if (!deal) return res.status(404).json({ error: 'not-found' });
+  const identity = requestingIdentity(req);
+  const gate = authorizeDealAccess(identity, deal.stage || deal.stageName);
+  if (!gate.ok) return res.status(403).json({ denied: true, reason: gate.reason });
+  try {
+    const out = await listDealDocuments(deal);
+    res.json({ ...out, canWrite: !!gate.access.canWrite });
+  } catch (err) {
+    const notConnected = err instanceof M365NotConnectedError;
+    res.status(notConnected ? 409 : 502).json({ error: String(err?.message || err).slice(0, 240), notConnected });
+  }
+});
+
+api.post('/deals/:id/documents/:kind', async (req, res) => {
+  const { id, kind } = req.params;
+  if (kind !== 'ic-memo' && kind !== 'model') return res.status(404).json({ error: 'unknown-document' });
+  const deal = getDealRaw(id);
+  if (!deal) return res.status(404).json({ error: 'not-found' });
+  const identity = requestingIdentity(req);
+  const gate = authorizeDealAccess(identity, deal.stage || deal.stageName);
+  if (!gate.ok) return res.status(403).json({ denied: true, reason: gate.reason });
+  if (!gate.access.canWrite) return res.status(403).json({ denied: true, reason: 'Generating deal documents requires deal-team or partner access.' });
+  try {
+    const co = docSafeCompany(deal);
+    let filename, buffer, contentType;
+    if (kind === 'ic-memo') {
+      buffer = await buildIcMemoDocx(deal);
+      filename = `IC Memo — ${co}.docx`;
+      contentType = OFFICE_MIME.docx;
+    } else {
+      buffer = await buildDealModelXlsx(deal);
+      filename = `Deal Model — ${co}.xlsx`;
+      contentType = OFFICE_MIME.xlsx;
+    }
+    const document = await saveDealDocument(deal, filename, buffer, contentType);
+    res.json({ ok: true, kind, document });
+  } catch (err) {
+    const notConnected = err instanceof M365NotConnectedError;
+    res.status(notConnected ? 409 : 502).json({ error: String(err?.message || err).slice(0, 240), notConnected });
+  }
 });
 // Record an MD contribution (guidance | value_add | diligence) into a lane. This
 // is the dashboard-side entrypoint mirroring the MCP record_contribution tool.

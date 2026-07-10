@@ -54,7 +54,7 @@ function sourceHint(src?: string): string {
 // Raw-dollar formatter for market-intel valuations (impliedValuation is in $, not $M).
 const bigMoney = (n?: number) => (n == null ? '—' : n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(0)}M` : `$${Math.round(n)}`);
 
-type Tab = 'stages' | 'overview' | 'workspace' | 'research' | 'ic';
+type Tab = 'stages' | 'overview' | 'workspace' | 'research' | 'ic' | 'documents';
 
 export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { dealId: string; canViewStage2: boolean; onClose: () => void; onAsk: (id: string) => void }) {
   const [deal, setDeal] = useState<DealFull | null>(null);
@@ -68,6 +68,8 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
   const [busy, setBusy] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [cfg, setCfg] = useState<any>(null);
+  const [docs, setDocs] = useState<{ folderUrl?: string; documents?: any[]; canWrite?: boolean; error?: string; notConnected?: boolean } | null>(null);
+  const [docsBusy, setDocsBusy] = useState<string>('');
 
   async function load(setSel = false) {
     const [d, i] = await Promise.all([
@@ -100,6 +102,31 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
     if (!citations) fetch(`/api/deals/${dealId}/citations`).then((r) => (r.ok ? r.json() : null)).then(setCitations).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, dealId]);
+
+  // Lazily list the deal's SharePoint data-room documents when the tab opens.
+  useEffect(() => {
+    if (tab !== 'documents') return;
+    setDocs(null);
+    fetch(`/api/deals/${dealId}/documents`)
+      .then(async (r) => { const d = await r.json().catch(() => ({})); setDocs(r.ok ? d : { error: d?.error || `Failed (${r.status})`, notConnected: !!d?.notConnected }); })
+      .catch((e) => setDocs({ error: String(e?.message || e) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, dealId]);
+
+  // Generate a Word IC memo / Excel model from the live record into SharePoint.
+  async function genDoc(kind: 'ic-memo' | 'model') {
+    setDocsBusy(kind); setNote('');
+    try {
+      const r = await fetch(`/api/deals/${dealId}/documents/${kind}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d?.document?.webUrl) window.open(d.document.webUrl, '_blank', 'noopener');
+      else if (!r.ok) setNote(d?.reason || d?.error || 'Could not generate the document.');
+      const lr = await fetch(`/api/deals/${dealId}/documents`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+      if (lr) setDocs(lr);
+    } catch (e: any) {
+      setNote(`Could not generate the document (${String(e?.message || e)}).`);
+    } finally { setDocsBusy(''); }
+  }
 
   async function act(label: string, url: string, body: unknown = {}) {
     setBusy(label); setNote('');
@@ -192,9 +219,9 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
 
             {!stage2Locked && (
             <div className="dd-tabs">
-              {(['overview', 'stages', 'workspace', 'research', 'ic'] as Tab[]).map((t) => (
+              {(['overview', 'stages', 'workspace', 'research', 'documents', 'ic'] as Tab[]).map((t) => (
                 <button key={t} className={`dd-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>
-                  {t === 'stages' ? 'Stages & orchestration' : t === 'overview' ? 'Overview' : t === 'workspace' ? 'Workspace' : t === 'research' ? 'Market research' : 'IC readiness'}
+                  {t === 'stages' ? 'Stages & orchestration' : t === 'overview' ? 'Overview' : t === 'workspace' ? 'Workspace' : t === 'research' ? 'Market research' : t === 'documents' ? 'Documents' : 'IC readiness'}
                 </button>
               ))}
             </div>
@@ -210,6 +237,37 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
               ) : (
               <>
               {note ? <div className="dd-actionnote">{note}</div> : null}
+
+              {tab === 'documents' && (
+                <div className="dd-panel">
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>📁 Data room documents <span className="muted" style={{ fontWeight: 400 }}>— Word &amp; Excel in this deal’s SharePoint, on your Microsoft 365 license</span></div>
+                  {docs?.notConnected ? (
+                    <div className="muted">Connect Microsoft 365 (from the Deal Dashboard) to read and generate documents in this deal’s SharePoint data room.</div>
+                  ) : docs?.error ? (
+                    <div className="muted">Couldn’t load documents: {docs.error}</div>
+                  ) : !docs ? (
+                    <div className="muted">Loading documents…</div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
+                        <button className="btn primary" disabled={!docs.canWrite || !!docsBusy} onClick={() => genDoc('ic-memo')}>{docsBusy === 'ic-memo' ? 'Generating…' : '📝 Generate IC memo (Word)'}</button>
+                        <button className="btn" disabled={!docs.canWrite || !!docsBusy} onClick={() => genDoc('model')}>{docsBusy === 'model' ? 'Generating…' : '📊 Generate deal model (Excel)'}</button>
+                        {docs.folderUrl ? <a className="btn ghost" href={docs.folderUrl} target="_blank" rel="noopener">Open data room ↗</a> : null}
+                      </div>
+                      {!docs.canWrite ? <div className="muted" style={{ marginBottom: 6 }}>Read-only — generating documents needs deal-team or partner access.</div> : null}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(docs.documents || []).length ? (docs.documents || []).map((f: any) => (
+                          <a key={f.id} href={f.webUrl} target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, textDecoration: 'none', color: 'inherit' }}>
+                            <span style={{ fontSize: 18 }}>{/\.docx?$/i.test(f.name) ? '📝' : /\.xlsx?$/i.test(f.name) ? '📊' : '📄'}</span>
+                            <span style={{ fontWeight: 600, flex: 1 }}>{f.name}</span>
+                            <span className="muted">{f.modified ? new Date(f.modified).toLocaleDateString() : ''}</span>
+                          </a>
+                        )) : <div className="muted">No documents yet — generate an IC memo or model to get started.</div>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {tab === 'stages' && (
                 <>

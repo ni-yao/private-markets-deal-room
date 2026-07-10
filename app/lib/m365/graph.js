@@ -309,3 +309,60 @@ export async function provisionDealFolders(teamId, folderNames) {
   return { driveId: drive.id, driveWebUrl: drive.webUrl || null, folders };
 }
 
+// ---- Deal documents (Word/Excel) in the SharePoint data room ----------------
+// List and write generated Office documents into the deal's SharePoint data room
+// (the deal team's default document library) using the SAME delegated token as
+// the rest of Graph — so it runs on the signed-in user's M365 license. Each deal
+// gets its own folder in the library, created on demand (idempotent).
+
+const safeDocName = (s) => String(s || 'Deal').replace(/[\\/:*?"<>|#%]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'Deal';
+
+async function dealDocFolder(deal) {
+  const teamId = deal?.teamsChannel?.teamId;
+  if (!teamId) throw new GraphError('This deal has no provisioned Teams/SharePoint space yet — launch the deal first.');
+  const drive = await getTeamDrive(teamId);
+  if (!drive?.id) throw new GraphError('Could not resolve the deal document library.');
+  const folderName = safeDocName(deal.company || deal.id);
+  const seg = encodeURIComponent(folderName);
+  let folder = await graph(`/drives/${drive.id}/root:/${seg}?$select=id,webUrl`).catch(() => null);
+  if (!folder?.id) {
+    folder = await graph(`/drives/${drive.id}/root/children`, {
+      method: 'POST',
+      body: { name: folderName, folder: {}, '@microsoft.graph.conflictBehavior': 'replace' },
+    });
+  }
+  return { driveId: drive.id, folderId: folder.id, folderUrl: folder.webUrl || drive.webUrl || null };
+}
+
+// List the deal's generated/uploaded documents (files only), newest first.
+export async function listDealDocuments(deal) {
+  const { driveId, folderId, folderUrl } = await dealDocFolder(deal);
+  const res = await graph(`/drives/${driveId}/items/${folderId}/children?$select=id,name,size,webUrl,lastModifiedDateTime,file&$orderby=lastModifiedDateTime desc`);
+  const documents = (res?.value || [])
+    .filter((x) => x.file)
+    .map((x) => ({ id: x.id, name: x.name, size: x.size, webUrl: x.webUrl, modified: x.lastModifiedDateTime, mime: x.file?.mimeType || null }));
+  return { folderUrl, documents };
+}
+
+// Upload a generated document (Buffer) into the deal's data-room folder. Returns
+// the SharePoint item (webUrl opens it in Word/Excel on the web).
+export async function saveDealDocument(deal, filename, buffer, contentType) {
+  const { driveId, folderId, folderUrl } = await dealDocFolder(deal);
+  let token;
+  try {
+    token = await getAccessToken('m365');
+  } catch (err) {
+    if (err instanceof NotLoggedInError) throw new M365NotConnectedError('M365 is not connected — sign in from the Home connectivity panel.');
+    throw err;
+  }
+  const seg = encodeURIComponent(filename);
+  const resp = await fetch(`${GRAPH}/drives/${driveId}/items/${folderId}:/${seg}:/content`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': contentType },
+    body: buffer,
+  });
+  if (!resp.ok) throw new GraphError(`Graph upload ${filename} → ${resp.status}: ${(await resp.text().catch(() => '')).slice(0, 240)}`);
+  const item = await resp.json();
+  return { id: item.id, name: item.name, size: item.size, webUrl: item.webUrl, folderUrl };
+}
+
