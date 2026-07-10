@@ -470,5 +470,7 @@ output containerAppFqdn string = orchestratorApp.properties.configuration.ingres
 output containerAppUrl string = 'https://${orchestratorApp.properties.configuration.ingress.fqdn}'
 output teamsAppName string = deployTeamsApp ? teamsApp!.name : 'not-deployed'
 output teamsAppUrl string = deployTeamsApp ? 'https://${teamsApp!.properties.configuration.ingress.fqdn}' : 'not-deployed'
+output teamsAppFqdn string = deployTeamsApp ? teamsApp!.properties.configuration.ingress.fqdn : 'not-deployed'
+output orchestratorFqdn string = orchestratorApp.properties.configuration.ingress.fqdn
 output botName string = (deployBot && !empty(botAppId) && deployTeamsApp) ? bot!.name : 'not-deployed'
 output functionAppName string = functionApp.name

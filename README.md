@@ -40,22 +40,39 @@ it running.
 | 1 | **Azure subscription** with `Owner` (or `Contributor` + `Role Based Access Control Administrator`) | subscription-scoped deploy creates resource groups **and** role assignments |
 | 2 | **Azure CLI** ≥ 2.60 + **Bicep** | `az bicep install` |
 | 3 | **Region** with AI Foundry + Container Apps | default `swedencentral` (EU residency) |
-| 4 | **Entra app registrations** — Teams tab SSO, M365 connector, bot, MCP | created once in *your* tenant; their client IDs are passed as parameters (secrets at deploy time). See [infra/README.md](infra/README.md). **Optional** — leave empty to deploy without the identity features and add them later. |
+| 4 | **Entra admin** (Application Administrator / Global Administrator) | to run [`scripts/provision-entra.ps1`](scripts/provision-entra.ps1), which **auto-creates** the four app registrations (Teams SSO, M365 connector, bot, MCP) and grants admin consent. Prefer to pre-create them? Pass the IDs as parameters instead. **Optional** for a data-only demo. |
 | 5 | **Container images** | build with `az acr build` after infra, then `az containerapp update --image <acr>/<repo>@sha256:<digest>` (or pass `orchestratorImage` / `teamsImage`) |
 | 6 | *(optional)* **Microsoft Fabric** capacity admin | only when `deployFabric = true` |
 | 7 | *(optional)* **APIM publisher email** | only when `deployApim = true` |
 
 > **Demo / POC mode:** leave all identity + optional parameters empty and the platform runs on **seeded data** with deterministic agents — **no secrets required**.
 
-### Deploy in one command
+### Deploy
+
+**Data-only demo (no identity):** one command, no secrets —
 ```bash
-az deployment sub create \
-  --location swedencentral \
-  --template-file infra/main.bicep \
-  --parameters infra/main.sample.bicepparam \
-  --parameters teamsTabClientSecret=<secret> botAppPassword=<secret> m365ClientSecret=<secret>
+az deployment sub create --location swedencentral \
+  --template-file infra/main.bicep --parameters infra/main.sample.bicepparam
 ```
-Copy [`infra/main.sample.bicepparam`](infra/main.sample.bicepparam) → `main.<env>.bicepparam`, fill the placeholders, and deploy. Full runbook + `what-if` preview: [infra/README.md](infra/README.md).
+
+**Full platform (Teams SSO, per-user M365 docs, bot):** three steps — provision, auto-create Entra apps, wire.
+```bash
+# 1) Provision the platform (Container Apps get their FQDNs; see stack outputs)
+az deployment sub create --location swedencentral \
+  --template-file infra/main.bicep --parameters infra/main.<env>.bicepparam
+
+# 2) Auto-create the Entra app registrations + grant admin consent.
+#    Idempotent; writes entra.generated.bicepparam and prints the secret params once.
+./scripts/provision-entra.ps1 \
+  -TeamsFqdn <teamsAppFqdn output> -OrchFqdn <orchestratorFqdn output>
+
+# 3) Wire the generated app IDs + secrets into the platform
+az deployment sub create --location swedencentral \
+  --template-file infra/main.bicep \
+  --parameters infra/main.<env>.bicepparam --parameters entra.generated.bicepparam \
+  --parameters teamsTabClientSecret=<...> m365ClientSecret=<...> botAppPassword=<...>
+```
+[`scripts/provision-entra.ps1`](scripts/provision-entra.ps1) is idempotent (re-runnable) and needs **PowerShell 7** + an **Entra-admin `az` login**. Copy [`infra/main.sample.bicepparam`](infra/main.sample.bicepparam) → `main.<env>.bicepparam` to set your parameters. Full runbook + `what-if` preview: [infra/README.md](infra/README.md).
 
 ### Roles — prefab or your own (the wiring harness)
 Identity-aware access is a **parameter, not a configuration step**:
