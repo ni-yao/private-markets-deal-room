@@ -17,6 +17,7 @@ get the "restricted to the deal team" lock).
 | `teams-agent-chat.png` | 🤖 Talk to your deals | The Deal Room agent answering a natural-language question, grounded in live deal data. |
 | `teams-dashboard.png` | 📊 The Teams dashboard | The channel-tab dashboard — KPIs, origination funnel, live pipeline deals. |
 | `teams-stage1.png` | 🗂️ Stage 1 | Stage 1 — Origination & Screening (funnel + candidate pipeline). |
+| `teams-stage1-analytics.png` | 🗂️ Stage 1 | Target deep-dive — SEC EDGAR filings + AI-generated analyst report (sector outlook, risks, recommendation). |
 | `teams-stage2.png` | 🗂️ Stage 2 | Stage 2 — Diligence & Approval (deals in diligence). |
 | `teams-rbac.png` | 🔐 Identity-aware access | An Analyst blocked from a Stage-2 deal (role-gated lock). |
 

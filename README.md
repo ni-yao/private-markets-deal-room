@@ -80,6 +80,15 @@ The app *is* the process: two stages joined by the **PURSUE** gate.
 
 ![Stage 1 — Origination & Screening in the Teams tab](teams-app/docs/teams-stage1.png)
 
+**Deep-dive analytics on any target.** Expand a candidate for a grounded workup —
+**SEC EDGAR filings**, a Morningstar quality read, and an **AI-generated analyst
+report** (sector outlook, competitive position, key risks, and a screening
+recommendation) — all sourced live and cited:
+
+![Stage 1 deep-dive — SEC filings and an AI-generated analyst report for a target](teams-app/docs/teams-stage1-analytics.png)
+
+<sub>*Drilling into National CineMedia (NCMI): live SEC filings alongside an AI-generated analyst report — thesis, sector outlook, competitive position, key risks and a screening recommendation.*</sub>
+
 > ⚡ **PURSUE** provisions the deal's collaboration space — a real **Teams channel**
 > and a **SharePoint virtual data room** — via delegated Microsoft Graph, with a
 > durable channel↔deal mapping that keeps the agent's context correct as deals scale.
