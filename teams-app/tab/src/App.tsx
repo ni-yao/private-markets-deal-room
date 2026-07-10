@@ -36,7 +36,9 @@ export default function App() {
   const [market, setMarket] = useState<MarketIntel | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [agents, setAgents] = useState<Agent[]>([ORCHESTRATOR]);
-  const [chatOpen, setChatOpen] = useState(true);
+  // Agents panel starts collapsed — it opens on an explicit "Ask" action so the
+  // dashboard isn't crowded on first load.
+  const [chatOpen, setChatOpen] = useState(false);
   const [chatFocusDealId, setChatFocusDealId] = useState('');
   const [openDealId, setOpenDealId] = useState('');
   const [canViewStage2, setCanViewStage2] = useState(true);
