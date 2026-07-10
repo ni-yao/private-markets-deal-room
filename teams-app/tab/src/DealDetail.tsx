@@ -117,13 +117,13 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
   // Generate a Word IC memo / Excel model from the live record — as the signed-in
   // user (SSO). 'download' streams a personal working copy; 'sharepoint' publishes
   // into the shared deal data room (write-gated).
-  async function genDoc(kind: 'ic-memo' | 'model', dest: 'download' | 'sharepoint') {
-    setDocsBusy(`${kind}:${dest}`); setNote('');
+  async function genDoc(kind: 'ic-memo' | 'model', dest: 'download' | 'sharepoint', live = false) {
+    setDocsBusy(`${kind}:${dest}${live ? ':live' : ''}`); setNote('');
     try {
       const sso = await getSsoToken();
       const headers: Record<string, string> = { 'content-type': 'application/json' };
       if (sso) headers['authorization'] = `Bearer ${sso}`;
-      const r = await fetch(`/api/deals/${dealId}/documents/${kind}?dest=${dest}`, { method: 'POST', headers, body: '{}' });
+      const r = await fetch(`/api/deals/${dealId}/documents/${kind}?dest=${dest}${live ? '&live=1' : ''}`, { method: 'POST', headers, body: '{}' });
       if (dest === 'download') {
         if (!r.ok) { const d = await r.json().catch(() => ({})); setNote(d?.reason || d?.error || 'Could not generate the document.'); return; }
         const blob = await r.blob();
@@ -263,6 +263,7 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
                     <button className="btn primary" disabled={!!docsBusy} onClick={() => genDoc('ic-memo', 'download')}>{docsBusy === 'ic-memo:download' ? 'Preparing…' : '📝 IC memo (Word)'}</button>
                     <button className="btn primary" disabled={!!docsBusy} onClick={() => genDoc('model', 'download')}>{docsBusy === 'model:download' ? 'Preparing…' : '📊 Deal model (Excel)'}</button>
+                    <button className="btn" disabled={!!docsBusy} onClick={() => genDoc('model', 'download', true)}>{docsBusy === 'model:download:live' ? 'Preparing…' : '🔄 Deal model — live (refreshable)'}</button>
                     {docs?.folderUrl ? <a className="btn ghost" href={docs.folderUrl} target="_blank" rel="noopener">Open data room ↗</a> : null}
                   </div>
                   {note ? <div className="muted" style={{ marginBottom: 6 }}>{note}</div> : null}

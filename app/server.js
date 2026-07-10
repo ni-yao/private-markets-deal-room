@@ -100,7 +100,7 @@ import { listConnectors, testConnector, disconnectConnector } from './lib/connec
 import connectorLoginRouter from './lib/mcp/loginRoutes.js';
 import m365LoginRouter from './lib/m365/loginRoutes.js';
 import { m365Configured, m365Connected, m365FilesScope, listDealDocuments, saveDealDocument, M365NotConnectedError } from './lib/m365/graph.js';
-import { buildIcMemoDocx, buildDealModelXlsx, OFFICE_MIME } from './lib/m365/office.js';
+import { buildIcMemoDocx, buildDealModelXlsx, buildLiveModelXlsx, buildModelHtml, buildModelCsv, OFFICE_MIME } from './lib/m365/office.js';
 import { repoMode } from './lib/repo/index.js';
 import graphRouter from './lib/graph.js';
 import { config, validateConfig } from './lib/config.js';
@@ -319,8 +319,17 @@ api.post('/deals/:id/documents/:kind', async (req, res) => {
       filename = `IC Memo — ${co}.docx`;
       contentType = OFFICE_MIME.docx;
     } else {
-      buffer = await buildDealModelXlsx(deal);
-      filename = `Deal Model — ${co}.xlsx`;
+      const live = String(req.query.live || req.body?.live || '') === '1' || req.query.live === 'true';
+      if (live) {
+        const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+        const host = req.headers['x-forwarded-host'] || req.headers.host;
+        const liveUrl = `${proto}://${host}/api/deals/${encodeURIComponent(id)}/model.html`;
+        buffer = await buildLiveModelXlsx(deal, liveUrl);
+        filename = `Deal Model (live) — ${co}.xlsx`;
+      } else {
+        buffer = await buildDealModelXlsx(deal);
+        filename = `Deal Model — ${co}.xlsx`;
+      }
       contentType = OFFICE_MIME.xlsx;
     }
     if (dest === 'download') {
@@ -334,6 +343,21 @@ api.post('/deals/:id/documents/:kind', async (req, res) => {
     const notConnected = err instanceof M365NotConnectedError;
     res.status(notConnected ? 409 : 502).json({ error: String(err?.message || err).slice(0, 240), notConnected });
   }
+});
+
+// Live model data sources for an Excel web query / any tool. Public reads (the
+// workbook's Data ▸ Refresh All fetches these unauthenticated) returning the same
+// model rows as the generated workbook.
+api.get('/deals/:id/model.html', (req, res) => {
+  const deal = getDealRaw(req.params.id);
+  if (!deal) return res.status(404).type('text/plain').send('not found');
+  res.type('text/html; charset=utf-8').send(buildModelHtml(deal));
+});
+api.get('/deals/:id/model.csv', (req, res) => {
+  const deal = getDealRaw(req.params.id);
+  if (!deal) return res.status(404).type('text/plain').send('not found');
+  res.type('text/csv; charset=utf-8').setHeader('Content-Disposition', `attachment; filename="deal-model-${req.params.id}.csv"`);
+  res.send(buildModelCsv(deal));
 });
 // Record an MD contribution (guidance | value_add | diligence) into a lane. This
 // is the dashboard-side entrypoint mirroring the MCP record_contribution tool.

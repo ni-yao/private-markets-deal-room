@@ -102,7 +102,8 @@ app.post('/api/deals/:id/documents/:kind', async (req, res) => {
   const body = JSON.stringify({ dest, requestingUser: identity ? { oid: identity.oid, upn: identity.upn, name: identity.name } : undefined });
 
   try {
-    const url = `${config.backend.url}/api/deals/${encodeURIComponent(req.params.id)}/documents/${encodeURIComponent(req.params.kind)}?dest=${encodeURIComponent(dest)}`;
+    const live = req.query.live ? `&live=${encodeURIComponent(req.query.live)}` : '';
+    const url = `${config.backend.url}/api/deals/${encodeURIComponent(req.params.id)}/documents/${encodeURIComponent(req.params.kind)}?dest=${encodeURIComponent(dest)}${live}`;
     const upstream = await fetch(url, { method: 'POST', headers, body });
     res.status(upstream.status);
     const cd = upstream.headers.get('content-disposition');
