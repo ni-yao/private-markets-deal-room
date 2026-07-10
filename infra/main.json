@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.44.1.10279",
-      "templateHash": "3782524503515787302"
+      "version": "0.41.2.15936",
+      "templateHash": "15540526129904980561"
     }
   },
   "parameters": {
@@ -277,6 +277,47 @@
         "description": "Bot app type."
       }
     },
+    "partnerIds": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Entra object IDs (users or groups) granted the PARTNER role (full access + write)."
+      }
+    },
+    "dealTeamIds": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Entra object IDs (users or groups) granted the DEAL-TEAM role (stage-2 + write)."
+      }
+    },
+    "analystIds": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Entra object IDs (users or groups) granted the ANALYST role (stage-1, read-only)."
+      }
+    },
+    "defaultAgentRole": {
+      "type": "string",
+      "defaultValue": "deal-team",
+      "allowedValues": [
+        "partner",
+        "deal-team",
+        "analyst",
+        "member"
+      ],
+      "metadata": {
+        "description": "Role applied to callers not listed in any role array."
+      }
+    },
+    "botBackendKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Shared secret proving Teams->orchestrator server calls (per-user identity + OBO Graph token). Empty = auto-derived stable per-deployment value."
+      }
+    },
     "appModelDeployment": {
       "type": "string",
       "defaultValue": "gpt-5-mini",
@@ -530,8 +571,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "3111176500648927884"
+              "version": "0.41.2.15936",
+              "templateHash": "6097161337932617302"
             }
           },
           "parameters": {
@@ -733,8 +774,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "3012756822903373680"
+              "version": "0.41.2.15936",
+              "templateHash": "7989564886492300953"
             }
           },
           "parameters": {
@@ -1153,8 +1194,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "12375516838465669664"
+              "version": "0.41.2.15936",
+              "templateHash": "17761628631824841857"
             }
           },
           "parameters": {
@@ -1477,8 +1518,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "13170190214981113908"
+              "version": "0.41.2.15936",
+              "templateHash": "14691147016701583382"
             }
           },
           "parameters": {
@@ -1740,6 +1781,21 @@
           "botAppType": {
             "value": "[parameters('botAppType')]"
           },
+          "partnerIds": {
+            "value": "[parameters('partnerIds')]"
+          },
+          "dealTeamIds": {
+            "value": "[parameters('dealTeamIds')]"
+          },
+          "analystIds": {
+            "value": "[parameters('analystIds')]"
+          },
+          "defaultAgentRole": {
+            "value": "[parameters('defaultAgentRole')]"
+          },
+          "botBackendKey": {
+            "value": "[parameters('botBackendKey')]"
+          },
           "uamiResourceId": {
             "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgNames').core), 'Microsoft.Resources/deployments', 'core'), '2025-04-01').outputs.uamiResourceId.value]"
           },
@@ -1798,8 +1854,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "13581021327451336652"
+              "version": "0.41.2.15936",
+              "templateHash": "4366172776420874300"
             }
           },
           "parameters": {
@@ -2029,10 +2085,43 @@
             "onelakeLakehouseId": {
               "type": "string",
               "defaultValue": ""
+            },
+            "partnerIds": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Identity-aware RBAC (prefab roles) — Entra object IDs (users/groups) per role."
+              }
+            },
+            "dealTeamIds": {
+              "type": "array",
+              "defaultValue": []
+            },
+            "analystIds": {
+              "type": "array",
+              "defaultValue": []
+            },
+            "defaultAgentRole": {
+              "type": "string",
+              "defaultValue": "deal-team",
+              "allowedValues": [
+                "partner",
+                "deal-team",
+                "analyst",
+                "member"
+              ]
+            },
+            "botBackendKey": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Shared Teams->orchestrator secret (per-user identity + OBO Graph token). Empty = auto-derived."
+              }
             }
           },
           "variables": {
             "pna": "[if(parameters('enablePrivateEndpoints'), 'Disabled', 'Enabled')]",
+            "botKey": "[if(empty(parameters('botBackendKey')), uniqueString(subscription().id, parameters('workload'), parameters('environmentName'), 'bot-backend-key'), parameters('botBackendKey'))]",
             "roleIds": {
               "acrPull": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
               "storageBlobDataOwner": "b7e6dc6d-f1e8-4753-8033-0f276bb0955b"
@@ -2093,6 +2182,10 @@
                     {
                       "name": "mcp-readonly-key",
                       "value": "[if(empty(parameters('mcpReadonlyKey')), 'unset', parameters('mcpReadonlyKey'))]"
+                    },
+                    {
+                      "name": "bot-backend-key",
+                      "value": "[variables('botKey')]"
                     }
                   ],
                   "ingress": {
@@ -2257,6 +2350,26 @@
                         {
                           "name": "MCP_READONLY_KEY",
                           "secretRef": "mcp-readonly-key"
+                        },
+                        {
+                          "name": "BOT_BACKEND_KEY",
+                          "secretRef": "bot-backend-key"
+                        },
+                        {
+                          "name": "PARTNER_IDS",
+                          "value": "[join(parameters('partnerIds'), ',')]"
+                        },
+                        {
+                          "name": "DEAL_TEAM_IDS",
+                          "value": "[join(parameters('dealTeamIds'), ',')]"
+                        },
+                        {
+                          "name": "ANALYST_IDS",
+                          "value": "[join(parameters('analystIds'), ',')]"
+                        },
+                        {
+                          "name": "DEFAULT_AGENT_ROLE",
+                          "value": "[parameters('defaultAgentRole')]"
                         }
                       ]
                     }
@@ -2297,6 +2410,10 @@
                     {
                       "name": "bot-app-password",
                       "value": "[if(empty(parameters('botAppPassword')), 'unset', parameters('botAppPassword'))]"
+                    },
+                    {
+                      "name": "bot-backend-key",
+                      "value": "[variables('botKey')]"
                     }
                   ],
                   "ingress": {
@@ -2381,6 +2498,10 @@
                         {
                           "name": "BOT_APP_TYPE",
                           "value": "[parameters('botAppType')]"
+                        },
+                        {
+                          "name": "BOT_BACKEND_KEY",
+                          "secretRef": "bot-backend-key"
                         },
                         {
                           "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
@@ -2662,8 +2783,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.44.1.10279",
-              "templateHash": "4171855750662216235"
+              "version": "0.41.2.15936",
+              "templateHash": "2737780461225722692"
             }
           },
           "parameters": {

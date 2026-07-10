@@ -156,6 +156,26 @@ param botAppPassword string = ''
 @description('Bot app type.')
 param botAppType string = 'MultiTenant'
 
+//------------------------------------------------------------------------------
+// Identity-aware RBAC — the "roles wiring harness".
+// Prefab roles (partner / deal-team / analyst): supply the Entra object IDs (users
+// OR groups) for each role and access is enforced with no app configuration. Leave
+// all empty to run open (defaultAgentRole applies to every caller). To define your
+// OWN roles/permissions, edit app/lib/userPolicy.js — these arrays feed it directly.
+//------------------------------------------------------------------------------
+@description('Entra object IDs (users or groups) granted the PARTNER role (full access + write).')
+param partnerIds array = []
+@description('Entra object IDs (users or groups) granted the DEAL-TEAM role (stage-2 + write).')
+param dealTeamIds array = []
+@description('Entra object IDs (users or groups) granted the ANALYST role (stage-1, read-only).')
+param analystIds array = []
+@allowed([ 'partner', 'deal-team', 'analyst', 'member' ])
+@description('Role applied to callers not listed in any role array.')
+param defaultAgentRole string = 'deal-team'
+@description('Shared secret proving Teams->orchestrator server calls (per-user identity + OBO Graph token). Empty = auto-derived stable per-deployment value.')
+@secure()
+param botBackendKey string = ''
+
 @description('Model deployment name the orchestrator app calls for chat/agents.')
 param appModelDeployment string = 'gpt-5-mini'
 
@@ -387,6 +407,11 @@ module app 'modules/app.bicep' = {
     botAppId: botAppId
     botAppPassword: botAppPassword
     botAppType: botAppType
+    partnerIds: partnerIds
+    dealTeamIds: dealTeamIds
+    analystIds: analystIds
+    defaultAgentRole: defaultAgentRole
+    botBackendKey: botBackendKey
     uamiResourceId: core.outputs.uamiResourceId
     uamiClientId: core.outputs.uamiClientId
     uamiPrincipalId: core.outputs.uamiPrincipalId

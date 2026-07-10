@@ -89,7 +89,19 @@ param fabricLakehouse string = 'deal_room_starter'
 param onelakeWorkspaceId string = ''
 param onelakeLakehouseId string = ''
 
+@description('Identity-aware RBAC (prefab roles) — Entra object IDs (users/groups) per role.')
+param partnerIds array = []
+param dealTeamIds array = []
+param analystIds array = []
+@allowed([ 'partner', 'deal-team', 'analyst', 'member' ])
+param defaultAgentRole string = 'deal-team'
+@description('Shared Teams->orchestrator secret (per-user identity + OBO Graph token). Empty = auto-derived.')
+@secure()
+param botBackendKey string = ''
+
 var pna = enablePrivateEndpoints ? 'Disabled' : 'Enabled'
+// Stable per-customer internal key when not supplied.
+var botKey = empty(botBackendKey) ? uniqueString(subscription().id, workload, environmentName, 'bot-backend-key') : botBackendKey
 var roleIds = {
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
   storageBlobDataOwner: 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
@@ -149,6 +161,7 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
         // Read-only MCP key for Foundry-hosted (Teams) agents; the app gates the key
         // path on a non-empty value, so the placeholder is inert until a key is set.
         { name: 'mcp-readonly-key', value: empty(mcpReadonlyKey) ? 'unset' : mcpReadonlyKey }
+        { name: 'bot-backend-key', value: botKey }
       ]
       ingress: {
         external: true
@@ -217,6 +230,11 @@ resource orchestratorApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'M365_PUBLISH_GROUP', value: m365PublishGroup }
             { name: 'M365_CLIENT_SECRET', secretRef: 'm365-client-secret' }
             { name: 'MCP_READONLY_KEY', secretRef: 'mcp-readonly-key' }
+            { name: 'BOT_BACKEND_KEY', secretRef: 'bot-backend-key' }
+            { name: 'PARTNER_IDS', value: join(partnerIds, ',') }
+            { name: 'DEAL_TEAM_IDS', value: join(dealTeamIds, ',') }
+            { name: 'ANALYST_IDS', value: join(analystIds, ',') }
+            { name: 'DEFAULT_AGENT_ROLE', value: defaultAgentRole }
           ]
         }
       ]
@@ -248,6 +266,7 @@ resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp)
         // the Teams app gates SSO on TEAMS_TAB_CLIENT_ID and the bot on BOT_APP_ID.
         { name: 'teams-tab-client-secret', value: empty(teamsTabClientSecret) ? 'unset' : teamsTabClientSecret }
         { name: 'bot-app-password', value: empty(botAppPassword) ? 'unset' : botAppPassword }
+        { name: 'bot-backend-key', value: botKey }
       ]
       ingress: {
         external: true
@@ -299,6 +318,7 @@ resource teamsApp 'Microsoft.App/containerApps@2024-03-01' = if (deployTeamsApp)
             { name: 'BOT_APP_ID', value: botAppId }
             { name: 'BOT_APP_PASSWORD', secretRef: 'bot-app-password' }
             { name: 'BOT_APP_TYPE', value: botAppType }
+            { name: 'BOT_BACKEND_KEY', secretRef: 'bot-backend-key' }
             { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }
           ]
         }

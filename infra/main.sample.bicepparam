@@ -81,6 +81,16 @@ param deployBot = false                   // true (with botAppId + deployTeamsAp
 param botAppId = ''                       // MSA App id backing the bot
 param botAppType = 'MultiTenant'
 
+// ── Identity-aware RBAC — the roles wiring harness ───────────────────────────
+// Supply Entra OBJECT IDs (users OR groups) per prefab role. Empty = open mode
+// (defaultAgentRole applies to everyone). To define your OWN roles / permissions,
+// edit app/lib/userPolicy.js — these arrays feed it directly. botBackendKey is a
+// secure value; leave it unset and it is auto-derived (stable per deployment).
+param partnerIds = []                     // e.g. [ '<partner-oid>', '<partners-group-oid>' ]
+param dealTeamIds = []
+param analystIds = []
+param defaultAgentRole = 'deal-team'      // partner | deal-team | analyst | member
+
 // ── Hardening ────────────────────────────────────────────────────────────────
 // Container Apps here run on a Consumption (public) environment, so leave this
 // false to keep Cosmos publicly reachable. Only set true if you also provision a

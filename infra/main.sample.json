@@ -126,6 +126,18 @@
     "botAppType": {
       "value": "MultiTenant"
     },
+    "partnerIds": {
+      "value": []
+    },
+    "dealTeamIds": {
+      "value": []
+    },
+    "analystIds": {
+      "value": []
+    },
+    "defaultAgentRole": {
+      "value": "deal-team"
+    },
     "enablePrivateEndpoints": {
       "value": false
     },

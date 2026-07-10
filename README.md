@@ -18,6 +18,58 @@ subscription-agnostic **Bicep** accelerator on **Azure Container Apps**.
 
 ---
 
+## 🚀 Deploy this accelerator
+
+The Deal Room ships as a **self-contained Azure accelerator** — a parameterised
+**Bicep wiring harness** you deploy into *your own* tenant and subscription. One
+subscription-scoped command provisions everything; you supply only a handful of
+parameters and run the Bicep. There are **no manual configuration steps** to get
+it running.
+
+### What the platform does
+- **Conversational deal agent** (`@Deal Room Assistant`) — @mention it in any deal channel; answers are grounded in the **live** deal record and resolved from the channel itself.
+- **Channel-native Teams tab** — dashboard + per-deal workspace over Entra SSO (single data source: the shared `/api`).
+- **Identity-aware RBAC** — partner / deal-team / analyst, enforced by *who is asking*.
+- **M365 document generation** — per-user **Word** IC memos & **Excel** models on the requester’s own licence: download, **live-refreshable** (Excel web query), or published to the deal’s **SharePoint** data room; plus CSV export.
+- **Azure AI Foundry** model inference (managed identity), a **Deal MCP server** (`/mcp`) for hosted/Copilot agents, optional **APIM AI Gateway**, and **Fabric/OneLake** market intelligence.
+- **Domain-split resource groups** — `rg-<workload>-{core,ai,data,app,integration,network}-{env}-{loc}` with cross-RG managed-identity RBAC.
+
+### Prerequisites
+| # | Requirement | Notes |
+|---|---|---|
+| 1 | **Azure subscription** with `Owner` (or `Contributor` + `Role Based Access Control Administrator`) | subscription-scoped deploy creates resource groups **and** role assignments |
+| 2 | **Azure CLI** ≥ 2.60 + **Bicep** | `az bicep install` |
+| 3 | **Region** with AI Foundry + Container Apps | default `swedencentral` (EU residency) |
+| 4 | **Entra app registrations** — Teams tab SSO, M365 connector, bot, MCP | created once in *your* tenant; their client IDs are passed as parameters (secrets at deploy time). See [infra/README.md](infra/README.md). **Optional** — leave empty to deploy without the identity features and add them later. |
+| 5 | **Container images** | build with `az acr build` after infra, then `az containerapp update --image <acr>/<repo>@sha256:<digest>` (or pass `orchestratorImage` / `teamsImage`) |
+| 6 | *(optional)* **Microsoft Fabric** capacity admin | only when `deployFabric = true` |
+| 7 | *(optional)* **APIM publisher email** | only when `deployApim = true` |
+
+> **Demo / POC mode:** leave all identity + optional parameters empty and the platform runs on **seeded data** with deterministic agents — **no secrets required**.
+
+### Deploy in one command
+```bash
+az deployment sub create \
+  --location swedencentral \
+  --template-file infra/main.bicep \
+  --parameters infra/main.sample.bicepparam \
+  --parameters teamsTabClientSecret=<secret> botAppPassword=<secret> m365ClientSecret=<secret>
+```
+Copy [`infra/main.sample.bicepparam`](infra/main.sample.bicepparam) → `main.<env>.bicepparam`, fill the placeholders, and deploy. Full runbook + `what-if` preview: [infra/README.md](infra/README.md).
+
+### Roles — prefab or your own (the wiring harness)
+Identity-aware access is a **parameter, not a configuration step**:
+- **Prefab roles** — supply Entra **object IDs** (users *or* groups) for `partnerIds`, `dealTeamIds`, `analystIds`. Access is enforced immediately, no code changes.
+- **Your own roles** — edit [`app/lib/userPolicy.js`](app/lib/userPolicy.js) (the single policy seam these parameters feed) to define custom roles, personas and permissions.
+- **Open mode** — leave the arrays empty; `defaultAgentRole` applies to everyone.
+
+### Customize & extend (agentic skills)
+- **Agents** — the deal + persona agents are Foundry agents scaffolded in [`app/scripts/`](app/scripts); the **Deal MCP server** (`/mcp` — `list_deals` / `get_deal` / `search_deals`) is the reusable tool surface for your own hosted agents and Copilot declarative agents.
+- **Data** — replace the seeded record with your source of truth behind the single `/api` + Cosmos seam.
+- **Surfaces** — the Teams tab reuses the web components; add tabs/cards without touching the backend.
+
+---
+
 ## 🤖 Talk to your deals — the conversational agent
 
 **`@Deal Room Assistant`** is a Teams bot you @mention in any deal channel. It
