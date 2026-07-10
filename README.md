@@ -10,7 +10,9 @@ Built on **Azure AI Foundry** (live model inference via managed identity), a Tea
 **Bot Framework** agent + an **Entra-SSO channel tab**, deployed with a
 subscription-agnostic **Bicep** accelerator on **Azure Container Apps**.
 
-![deal journey](app/docs/deal-journey.png)
+![The Deal Room web dashboard](app/docs/deal-journey.png)
+
+<sub>*The Deal Room browser dashboard — the single web-app view. Everything below is the **same live deal record surfaced natively in Microsoft Teams**.*</sub>
 
 > **📘 Solution documentation:** [docs/SOLUTION.md](docs/SOLUTION.md) — architecture, Teams app & channel model, context-aware bot, security/identity, deployment and the operations runbook. Architecture diagram: [docs/dealhub-architecture.drawio](docs/dealhub-architecture.drawio) (Draw.io).
 
@@ -29,6 +31,10 @@ replies in **natural language, grounded in that specific deal** — it works out
 > 💬 *@Deal Room Assistant, what's the current valuation and the key financials?*
 > 💬 *@Deal Room Assistant, how does the retail MD read this opportunity?*
 > 💬 *@Deal Room Assistant, what changed on this deal this week?*
+
+<!-- Teams screenshot — @Deal Room Assistant answering in a deal channel (the natural-language showcase).
+     Drop the PNG at teams-app/docs/teams-agent-chat.png, then uncomment. See teams-app/docs/README.md -->
+<!-- ![Teams — the @Deal Room Assistant agent answering in a deal channel](teams-app/docs/teams-agent-chat.png) -->
 
 Behind every reply:
 
@@ -57,6 +63,10 @@ the dashboard knows *who* is looking.
 - **Native Teams theming** — light / dark / high-contrast, with a deal-focused layout
   when the tab is pinned to a single deal channel.
 
+<!-- Teams screenshot — the SSO channel tab (Home / per-deal detail).
+     Drop the PNG at teams-app/docs/teams-dashboard.png, then uncomment. See teams-app/docs/README.md -->
+<!-- ![Teams — the Deal Room channel-tab dashboard](teams-app/docs/teams-dashboard.png) -->
+
 ## 🗂️ Stage 1 & Stage 2 — the deal areas
 
 The app *is* the process: two stages joined by the **PURSUE** gate.
@@ -70,13 +80,13 @@ The app *is* the process: two stages joined by the **PURSUE** gate.
 | **Auto Screen → Triage** | Candidates are scored and triaged against the mandate. |
 | **Screening Gate** | A decision desk where the MD records **PURSUE** on the gate-ready shortlist, creating a screened deal. |
 
-![sourcing framework](app/docs/sourcing-framework.png)
+<!-- Teams screenshot — Stage 1 screening view in the Teams channel tab.
+     Drop the PNG at teams-app/docs/teams-stage1.png, then uncomment. See teams-app/docs/README.md -->
+<!-- ![Teams — Stage 1 screening in the channel tab](teams-app/docs/teams-stage1.png) -->
 
 > ⚡ **PURSUE** provisions the deal's collaboration space — a real **Teams channel**
 > and a **SharePoint virtual data room** — via delegated Microsoft Graph, with a
 > durable channel↔deal mapping that keeps the agent's context correct as deals scale.
-
-![launch workspace](app/docs/launch-workspace-diagram.png)
 
 ### Stage 2 · Diligence & Approval — the deal hub
 
@@ -86,6 +96,10 @@ The app *is* the process: two stages joined by the **PURSUE** gate.
 | **Diligence** | The agent works the deal across specialist personas, grounded in the live record and the data room. |
 | **Synthesis** | Findings and risks roll up for the investment committee. |
 | **Approval & Execution → Archive** | The MD / partner records the decision; the deal is executed and archived. |
+
+<!-- Teams screenshot — Stage 2 diligence view in the Teams channel tab.
+     Drop the PNG at teams-app/docs/teams-stage2.png, then uncomment. See teams-app/docs/README.md -->
+<!-- ![Teams — Stage 2 diligence in the channel tab](teams-app/docs/teams-stage2.png) -->
 
 ## 🔐 Identity-aware access (RBAC)
 
@@ -103,6 +117,10 @@ user's identity**, resolved server-side (a client can never widen its own powers
 - **Stage-2 gating** — diligence / approval data is withheld from read-only roles.
 - A **partner** and an **analyst** asking the *same* question get appropriately
   different answers.
+
+<!-- Teams screenshot (optional) — a role-gated / denied agent response in a channel.
+     Drop the PNG at teams-app/docs/teams-rbac.png, then uncomment. See teams-app/docs/README.md -->
+<!-- ![Teams — a role-gated agent response](teams-app/docs/teams-rbac.png) -->
 
 ## Under the hood — one backend, two surfaces
 
