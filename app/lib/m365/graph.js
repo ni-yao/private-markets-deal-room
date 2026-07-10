@@ -346,14 +346,19 @@ export async function listDealDocuments(deal) {
 
 // Upload a generated document (Buffer) into the deal's data-room folder. Returns
 // the SharePoint item (webUrl opens it in Word/Excel on the web).
-export async function saveDealDocument(deal, filename, buffer, contentType) {
+export async function saveDealDocument(deal, filename, buffer, contentType, userToken = null) {
   const { driveId, folderId, folderUrl } = await dealDocFolder(deal);
-  let token;
-  try {
-    token = await getAccessToken('m365');
-  } catch (err) {
-    if (err instanceof NotLoggedInError) throw new M365NotConnectedError('M365 is not connected — sign in from the Home connectivity panel.');
-    throw err;
+  // A per-user OBO Graph token (supplied by the Teams server) makes the upload
+  // authored AS the requester on their own M365 license; otherwise fall back to
+  // the shared connector account that provisioned the data room.
+  let token = userToken;
+  if (!token) {
+    try {
+      token = await getAccessToken('m365');
+    } catch (err) {
+      if (err instanceof NotLoggedInError) throw new M365NotConnectedError('M365 is not connected — sign in from the Home connectivity panel.');
+      throw err;
+    }
   }
   const seg = encodeURIComponent(filename);
   const resp = await fetch(`${GRAPH}/drives/${driveId}/items/${folderId}:/${seg}:/content`, {

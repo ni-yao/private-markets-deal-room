@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getSsoToken } from './teams';
 
 // Native Deal Workspace (single-deal scope) — brings the webapp's Stages,
 // Orchestration and Deal Workspace into the tab. Reads/drives the shared backend:
@@ -113,16 +114,32 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, dealId]);
 
-  // Generate a Word IC memo / Excel model from the live record into SharePoint.
-  async function genDoc(kind: 'ic-memo' | 'model') {
-    setDocsBusy(kind); setNote('');
+  // Generate a Word IC memo / Excel model from the live record — as the signed-in
+  // user (SSO). 'download' streams a personal working copy; 'sharepoint' publishes
+  // into the shared deal data room (write-gated).
+  async function genDoc(kind: 'ic-memo' | 'model', dest: 'download' | 'sharepoint') {
+    setDocsBusy(`${kind}:${dest}`); setNote('');
     try {
-      const r = await fetch(`/api/deals/${dealId}/documents/${kind}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
-      const d = await r.json().catch(() => ({}));
-      if (r.ok && d?.document?.webUrl) window.open(d.document.webUrl, '_blank', 'noopener');
-      else if (!r.ok) setNote(d?.reason || d?.error || 'Could not generate the document.');
-      const lr = await fetch(`/api/deals/${dealId}/documents`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-      if (lr) setDocs(lr);
+      const sso = await getSsoToken();
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      if (sso) headers['authorization'] = `Bearer ${sso}`;
+      const r = await fetch(`/api/deals/${dealId}/documents/${kind}?dest=${dest}`, { method: 'POST', headers, body: '{}' });
+      if (dest === 'download') {
+        if (!r.ok) { const d = await r.json().catch(() => ({})); setNote(d?.reason || d?.error || 'Could not generate the document.'); return; }
+        const blob = await r.blob();
+        const cd = r.headers.get('content-disposition') || '';
+        const m = /filename\*?=(?:UTF-8'')?["']?([^"';]+)/i.exec(cd);
+        const name = m ? decodeURIComponent(m[1]) : (kind === 'ic-memo' ? 'IC Memo.docx' : 'Deal Model.xlsx');
+        const href = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(href);
+      } else {
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d?.document?.webUrl) window.open(d.document.webUrl, '_blank', 'noopener');
+        else setNote(d?.reason || d?.error || 'Could not save the document.');
+        const lr = await fetch(`/api/deals/${dealId}/documents`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+        if (lr) setDocs(lr);
+      }
     } catch (e: any) {
       setNote(`Could not generate the document (${String(e?.message || e)}).`);
     } finally { setDocsBusy(''); }
@@ -240,21 +257,28 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
 
               {tab === 'documents' && (
                 <div className="dd-panel">
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>📁 Data room documents <span className="muted" style={{ fontWeight: 400 }}>— Word &amp; Excel in this deal’s SharePoint, on your Microsoft 365 license</span></div>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>📁 Deal documents <span className="muted" style={{ fontWeight: 400 }}>— generate a Word IC memo or Excel model from the live deal, on your Microsoft 365 license</span></div>
+                  {/* Download works for anyone with deal access — built on the requester's
+                      license, no M365 connection required. */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
+                    <button className="btn primary" disabled={!!docsBusy} onClick={() => genDoc('ic-memo', 'download')}>{docsBusy === 'ic-memo:download' ? 'Preparing…' : '📝 IC memo (Word)'}</button>
+                    <button className="btn primary" disabled={!!docsBusy} onClick={() => genDoc('model', 'download')}>{docsBusy === 'model:download' ? 'Preparing…' : '📊 Deal model (Excel)'}</button>
+                    {docs?.folderUrl ? <a className="btn ghost" href={docs.folderUrl} target="_blank" rel="noopener">Open data room ↗</a> : null}
+                  </div>
+                  {note ? <div className="muted" style={{ marginBottom: 6 }}>{note}</div> : null}
                   {docs?.notConnected ? (
-                    <div className="muted">Connect Microsoft 365 (from the Deal Dashboard) to read and generate documents in this deal’s SharePoint data room.</div>
+                    <div className="muted">Downloads work now. Connect Microsoft 365 (from the Deal Dashboard) to also publish into this deal’s shared SharePoint data room.</div>
                   ) : docs?.error ? (
-                    <div className="muted">Couldn’t load documents: {docs.error}</div>
+                    <div className="muted">Couldn’t load the data room: {docs.error}</div>
                   ) : !docs ? (
-                    <div className="muted">Loading documents…</div>
+                    <div className="muted">Loading data room…</div>
                   ) : (
                     <>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
-                        <button className="btn primary" disabled={!docs.canWrite || !!docsBusy} onClick={() => genDoc('ic-memo')}>{docsBusy === 'ic-memo' ? 'Generating…' : '📝 Generate IC memo (Word)'}</button>
-                        <button className="btn" disabled={!docs.canWrite || !!docsBusy} onClick={() => genDoc('model')}>{docsBusy === 'model' ? 'Generating…' : '📊 Generate deal model (Excel)'}</button>
-                        {docs.folderUrl ? <a className="btn ghost" href={docs.folderUrl} target="_blank" rel="noopener">Open data room ↗</a> : null}
+                        <button className="btn" disabled={!docs.canWrite || !!docsBusy} onClick={() => genDoc('ic-memo', 'sharepoint')}>{docsBusy === 'ic-memo:sharepoint' ? 'Saving…' : '📤 Save IC memo to data room'}</button>
+                        <button className="btn" disabled={!docs.canWrite || !!docsBusy} onClick={() => genDoc('model', 'sharepoint')}>{docsBusy === 'model:sharepoint' ? 'Saving…' : '📤 Save deal model to data room'}</button>
                       </div>
-                      {!docs.canWrite ? <div className="muted" style={{ marginBottom: 6 }}>Read-only — generating documents needs deal-team or partner access.</div> : null}
+                      {!docs.canWrite ? <div className="muted" style={{ marginBottom: 6 }}>Read-only — publishing to the shared data room needs deal-team or partner access. You can still download your own copy.</div> : null}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {(docs.documents || []).length ? (docs.documents || []).map((f: any) => (
                           <a key={f.id} href={f.webUrl} target="_blank" rel="noopener" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, textDecoration: 'none', color: 'inherit' }}>
@@ -262,7 +286,7 @@ export default function DealDetail({ dealId, canViewStage2, onClose, onAsk }: { 
                             <span style={{ fontWeight: 600, flex: 1 }}>{f.name}</span>
                             <span className="muted">{f.modified ? new Date(f.modified).toLocaleDateString() : ''}</span>
                           </a>
-                        )) : <div className="muted">No documents yet — generate an IC memo or model to get started.</div>}
+                        )) : <div className="muted">No documents in the data room yet.</div>}
                       </div>
                     </>
                   )}

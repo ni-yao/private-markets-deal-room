@@ -300,7 +300,17 @@ api.post('/deals/:id/documents/:kind', async (req, res) => {
   const identity = requestingIdentity(req);
   const gate = authorizeDealAccess(identity, deal.stage || deal.stageName);
   if (!gate.ok) return res.status(403).json({ denied: true, reason: gate.reason });
-  if (!gate.access.canWrite) return res.status(403).json({ denied: true, reason: 'Generating deal documents requires deal-team or partner access.' });
+  // Destination: 'download' streams a personal working copy to the requester
+  // (built on their license, needs no Graph); 'sharepoint' publishes into the
+  // shared deal data room (write-gated). A per-user OBO Graph token — trusted
+  // only from the Teams server via BOT_BACKEND_KEY — authors the SharePoint copy
+  // AS the requester; otherwise the shared connector account is used.
+  const dest = String(req.query.dest || req.body?.dest || 'download').toLowerCase();
+  const userToken = (BOT_BACKEND_KEY && req.headers['x-bot-key'] === BOT_BACKEND_KEY)
+    ? (req.headers['x-user-graph-token'] || null) : null;
+  if (dest === 'sharepoint' && !gate.access.canWrite) {
+    return res.status(403).json({ denied: true, reason: 'Publishing to the deal data room requires deal-team or partner access.' });
+  }
   try {
     const co = docSafeCompany(deal);
     let filename, buffer, contentType;
@@ -313,8 +323,13 @@ api.post('/deals/:id/documents/:kind', async (req, res) => {
       filename = `Deal Model — ${co}.xlsx`;
       contentType = OFFICE_MIME.xlsx;
     }
-    const document = await saveDealDocument(deal, filename, buffer, contentType);
-    res.json({ ok: true, kind, document });
+    if (dest === 'download') {
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      return res.send(buffer);
+    }
+    const document = await saveDealDocument(deal, filename, buffer, contentType, userToken);
+    res.json({ ok: true, kind, dest, document });
   } catch (err) {
     const notConnected = err instanceof M365NotConnectedError;
     res.status(notConnected ? 409 : 502).json({ error: String(err?.message || err).slice(0, 240), notConnected });

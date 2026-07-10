@@ -75,6 +75,45 @@ app.post('/api/messages', async (req, res) => {
   await b.adapter.process(req, res, (context) => b.botHandler.run(context));
 });
 
+// Deal documents — per-user Word/Excel export. Built AS the signed-in Teams user
+// (SSO -> OBO Graph token): 'download' streams a personal working copy; 'sharepoint'
+// publishes into the shared deal data room authored as the requester. Intercepted
+// before the generic proxy so the OBO token + identity are attached.
+const GRAPH_DOC_SCOPES = [
+  'https://graph.microsoft.com/Files.ReadWrite',
+  'https://graph.microsoft.com/Sites.ReadWrite.All',
+  'https://graph.microsoft.com/User.Read',
+];
+app.post('/api/deals/:id/documents/:kind', async (req, res) => {
+  if (!isBackendLive()) return res.status(502).json({ error: 'shared-backend-not-configured' });
+  const ssoToken = req.body?.ssoToken || (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const identity = identityFromSsoToken(ssoToken);
+  const dest = String(req.query.dest || req.body?.dest || 'download').toLowerCase();
+
+  let userToken = null;
+  if (dest === 'sharepoint') {
+    try { userToken = await exchangeOnBehalfOf(ssoToken, GRAPH_DOC_SCOPES); } catch { userToken = null; }
+    if (!userToken) return res.status(409).json({ notConnected: true, reason: 'Sign in to Microsoft 365 in Teams to publish to the shared data room.' });
+  }
+
+  const headers = { 'content-type': 'application/json' };
+  if (config.backend.botKey) headers['x-bot-key'] = config.backend.botKey;
+  if (userToken) headers['x-user-graph-token'] = userToken;
+  const body = JSON.stringify({ dest, requestingUser: identity ? { oid: identity.oid, upn: identity.upn, name: identity.name } : undefined });
+
+  try {
+    const url = `${config.backend.url}/api/deals/${encodeURIComponent(req.params.id)}/documents/${encodeURIComponent(req.params.kind)}?dest=${encodeURIComponent(dest)}`;
+    const upstream = await fetch(url, { method: 'POST', headers, body });
+    res.status(upstream.status);
+    const cd = upstream.headers.get('content-disposition');
+    if (cd) res.setHeader('Content-Disposition', cd);
+    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+    res.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch (e) {
+    res.status(502).json({ error: 'backend-unreachable', detail: String(e?.message || e) });
+  }
+});
+
 // Everything else under /api forwards to the shared backend (single data source).
 app.use('/api', proxyToBackend);
 

@@ -21,6 +21,9 @@ export const config = Object.freeze({
   // The single source of truth — every data read/write forwards here.
   backend: {
     url: trimUrl(env.SHARED_BACKEND_URL, ''),
+    // Shared secret proving server-to-server calls to the orchestrator, so it can
+    // trust the forwarded requestingUser identity + per-user OBO Graph token.
+    botKey: str(env.BOT_BACKEND_KEY, ''),
   },
   entra: {
     tenantId: str(env.ENTRA_TENANT_ID, '').trim(),
